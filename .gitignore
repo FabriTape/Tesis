@@ -8,6 +8,6 @@ simulacion_2025-10-09_23-38-55/
 *.gz
 *.csv
 *.parquet
-date.sh
+./date.sh
 sims/erosion_bed_SI_ff_0.35_np_1_vel_-10_angle_0_move_0_0_0/
 sims/erosion_bed_SI_ff_0.35_np_1_vel_-10_angle_0_move_0_-3.04_0/
