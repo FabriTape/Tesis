@@ -233,8 +233,8 @@ for i in range(LenTotal):
     # Calculo módulo velocidad relativa (Vectorizado)
     # Al usar arrays de numpy (vx, vy, vz) y escalares (vcm_x, etc), 
     # esta operación se ejecuta en C optimizado.
-    #Vnorm2 = (vx - vcm_x)**2 + (vy - vcm_y)**2 + (vz - vcm_z)**2
-    Vnorm2 = ne.evaluate("(vx - vcm_x)**2 + (vy - vcm_y)**2 + (vz - vcm_z)**2")
+    #Vnorm2 = vx**2 + vy**2 + vz**2
+    Vnorm2 = ne.evaluate("vx**2 + vy**2 + vz**2")
 
 
     # Energía Cinética
