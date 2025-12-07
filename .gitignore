@@ -1,6 +1,7 @@
 CLUSTER/
 Papers/
 simulacion_2025-10-09_23-38-55/
+*.dump
 *.pdf
 *.out
 *.data
