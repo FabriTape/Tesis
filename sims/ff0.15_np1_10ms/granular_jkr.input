@@ -1,0 +1,103 @@
+# Init
+variable data index 1
+
+#newton off
+
+dimension   3
+boundary    p p f
+
+atom_style  sphere
+units       si
+
+comm_modify     vel yes
+neighbor        100e-9 bin
+#neighbor        ${skin} bin
+neigh_modify    delay 0 every 1 check yes
+
+
+#comm_modify mode single vel yes
+processors * * *
+
+# Atom definition
+read_data ${data}
+
+# Groups
+group g1 type 1  
+group g2 type 2
+
+#Settings                      
+
+#pair_style gran/easy 2.7e10 0.17 0.5e-9 0.025 0.1e-9 0.736e-5  #you have to modify the values for your implementation
+#pair_coeff * *
+
+pair_style granular 
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin NULL 1 0.5 rolling sds 5e09 9.895e-09 0.1 twisting marshall
+#pair_coeff * * jkr 54.0e09 1.0e16 0.17 0.025 tangential mindlin NULL 1 0.5 rolling sds 5e09 9.895e-09 0.1 twisting marshall
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin NULL 0.5 0.5 rolling sds 5e09 9.895e-09 0.1 twisting marshall
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin NULL 1 0.3 rolling sds 5e09 9.895e-09 0.1 twisting marshall
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin NULL 0.5 0.3 rolling sds 5e09 9.895e-09 0.1 twisting marshall
+
+
+pair_coeff * * jkr 70.0e09 1.0e16 0.17 0.025 tangential mindlin NULL 1 0.5 rolling sds 5e09 9.895e-09 0.1 twisting marshall
+
+
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin_rescale NULL 1 0.5 rolling sds 5e09 9.895e-09 0.1 twisting marshall
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin_rescale NULL 0.5 0.5 rolling sds 5e09 9.895e-09 0.1 twisting marshall
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin_rescale NULL 1 0.3 rolling sds 5e09 9.895e-09 0.1 twisting marshall
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin_rescale NULL 0.5 0.3 rolling sds 5e09 9.895e-09 0.1 twisting marshall
+
+
+
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin_rescale NULL 1 0.5 rolling sds 5e09 9.895e-09 0.1 twisting sds 5e09 9.895e-09 0.1
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin_rescale NULL 0.5 0.5 rolling sds 5e09 9.895e-09 0.1 twisting sds 5e09 9.895e-09 0.1
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin_rescale NULL 1 0.3 rolling sds 5e09 9.895e-09 0.1 twisting sds 5e09 9.895e-09 0.1
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin_rescale NULL 0.5 0.3 rolling sds 5e09 9.895e-09 0.1 twisting sds 5e09 9.895e-09 0.1
+
+
+
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin_rescale NULL 1 0.5 rolling sds 2.875e-6 1.128e-23 3.559e-09 twisting marshall
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin_rescale NULL 0.5 0.5 rolling sds 2.875e-6 1.128e-23 3.559e-09 twisting marshall
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin_rescale NULL 1 0.3 rolling sds 2.875e-6 1.128e-23 2.135e-09 twisting marshall
+#pair_coeff * * dmt 54.0e09 1.0e16 0.17 0.025 tangential mindlin_rescale NULL 0.5 0.3 rolling sds 2.875e-6 1.128e-23 2.135e-09 twisting marshall
+
+
+
+
+
+
+
+
+#pair_coeff * * jkr 5.4e+10 0.5e-9 0.17 0.025 tangential linear_history 1.0 0.4 0.1 damping velocity 
+#pair_coeff * * jkr 5.4e+10 0.5e-9 0.17 0.025 tangential mindlin 800.0 1.0 0.5 rolling sds 500.0 200.0 0.5 twisting marshall damping velocity 
+# ORIGINAL # pair_coeff * * jkr 1000.0 500.0 0.3 10 tangential mindlin 800.0 1.0 0.5 rolling sds 500.0 200.0 0.5 twisting marshall
+
+
+timestep 5e-11   
+
+# fixes & compute
+fix 1 g1 nve/sphere
+fix 2 g2 nve/sphere
+
+#velocity g1 set 0.0 0.0 0.0 units box
+#velocity g2 set 0.0 0.0 0.0 units box
+
+#dump 1 all custom 1000 out/pre_output.*.gz id type x y z vx vy vz omegax omegay omegaz
+
+#fix 3 all viscous 1e-6 
+#compute 1 all ke/atom
+#compute 2 all coord/atom 1.7e-6
+
+thermo 1000
+thermo_modify lost warn flush yes
+#run 50000
+
+#reset_timestep 0 
+
+velocity g1 create 10.0 83921
+velocity g2 set 0.0 0.0 -10 units box
+
+dump 1 all custom 1000 output.*.gz id type x y z vx vy vz omegax omegay omegaz
+dump_modify 1 format line "%d %d %2.12g %2.12g %2.12g %2.12g %2.12g %2.12g %2.12g %2.12g %2.12g"
+
+restart 500000 restart.*
+run 1000000 upto
