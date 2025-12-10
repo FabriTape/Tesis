@@ -8,8 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import warnings
 warnings.filterwarnings('ignore')
 
-# Configuración de Polars para máximo rendimiento
-pl.Config.set_fmt_str_lengths(1000)
+# NOTA: Se eliminó la línea problemática pl.Config.set_global_string_cache(False)
 
 def escrituraparquet(ruta):
     """Transformar archivos gz en parquet usando Polars"""
@@ -35,7 +34,7 @@ def escrituraparquet(ruta):
             print("\r", "{:03d}".format(int(i*100/len(Archivos)//1)), 
                   "/100%|", int((i*100/len(Archivos))//5)*"#", sep="", end="")
             
-            # Leer directamente con Polars - MUCHO más rápido
+            # Leer directamente con Polars
             df_pl = pl.read_csv(
                 f'{ruta}/{nombre}.gz',
                 separator='\\s+',
@@ -43,12 +42,12 @@ def escrituraparquet(ruta):
                 has_header=False,
                 new_columns=["id", "type", "x", "y", "z", "vx", "vy", "vz", 
                              "omegax", "omegay", "omegaz", "c_1"],
-                infer_schema_length=10000,  # Inferir schema rápido
-                low_memory=True  # Modo bajo consumo de memoria
+                infer_schema_length=10000,
+                low_memory=True
             )
             
-            # Escribir con compresión
-            df_pl.write_parquet(output_path, compression='zstd')  # zstd es más rápido que snappy
+            # Escribir con compresión zstd (más rápido que snappy)
+            df_pl.write_parquet(output_path, compression='zstd')
     
     print("\nConversión exitosa")
 
@@ -78,12 +77,13 @@ def checkparquet(ruta):
     return len(pasos), pasos[1] if len(pasos) > 1 else 0
 
 def _procesar_lote(args):
-    """Procesar un lote de archivos en paralelo"""
+    """Procesar un lote de archivos en paralelo - VERSIÓN OPTIMIZADA y EAGER"""
     archivos_info, altura, threshold, N_base, v0_actual_init = args
     resultados = []
     
     for i, file_path in archivos_info:
-        # Leer SOLO las columnas necesarias
+        # 1. LECTURA DIRECTA EAGER (sin scan_parquet)
+        # Asegurarse de que no se use scan_parquet
         df = pl.read_parquet(
             file_path,
             columns=["id", "type", "z", "vx", "vy", "vz"]
@@ -92,61 +92,43 @@ def _procesar_lote(args):
         # Determinar v0_actual
         v0_actual = v0_actual_init if i == 0 else 0
         
-        # Calcular todas las métricas en UNA SOLA pasada
-        metrics = df.select([
-            # Sumas para Vcm
+        # 2. CÁLCULOS EN UNA SOLA PASADA CON POLARS NATIVO
+        # Usar expresiones y agregaciones directamente, sin lazy
+        # Nota: read_parquet ya devuelve un DataFrame, no un LazyFrame
+        result_row = df.select([
             pl.col("vx").sum().alias("sum_vx"),
             pl.col("vy").sum().alias("sum_vy"),
             pl.col("vz").sum().alias("sum_vz"),
-            
-            # Vnorm2 como expresión
-            (pl.col("vx")**2 + pl.col("vy")**2 + pl.col("vz")**2).alias("vnorm2"),
-            
-            # Flags para filtros
-            (pl.col("z") > altura).alias("altura_flag"),
-            (pl.col("vz") > threshold).alias("velocidad_flag")
-        ])
+            (0.5 * (pl.col("vx")**2 + pl.col("vy")**2 + pl.col("vz")**2).sum()).alias("K_total"),
+            ((pl.col("z") > altura) & (pl.col("vz") > threshold)).sum().alias("count_eyeccion"),
+            (0.5 * (pl.col("vx")**2 + pl.col("vy")**2 + pl.col("vz")**2)
+                .filter((pl.col("z") > altura) & (pl.col("vz") > threshold))
+                .sum()
+            ).alias("K_eyectados"),
+            (pl.col("vx")**2 + pl.col("vy")**2 + pl.col("vz")**2)
+                .filter(pl.col("z") <= altura)
+                .max()
+                .alias("max_v2_confined"),
+            (pl.col("vx")**2 + pl.col("vy")**2 + pl.col("vz")**2)
+                .filter(pl.col("z") <= altura)
+                .min()
+                .alias("min_v2_confined")
+        ]).row(0)
         
-        # Extraer arrays numpy para cálculos rápidos
-        vnorm2_arr = metrics["vnorm2"].to_numpy()
-        altura_flag = metrics["altura_flag"].to_numpy()
-        velocidad_flag = metrics["velocidad_flag"].to_numpy()
+        # 3. EXTRAER RESULTADOS
+        sum_vx, sum_vy, sum_vz, K_total, count_eyeccion, K_eyectados, max_val, min_val = result_row
         
-        # Filtro combinado para eyección
-        eyeccion_mask = altura_flag & velocidad_flag
-        
-        # Cálculos rápidos con numpy
-        count_eyeccion = np.sum(eyeccion_mask)
-        
-        # Energías
-        K_total = 0.5 * np.sum(vnorm2_arr)
-        K_eyectados = 0.5 * np.sum(vnorm2_arr[eyeccion_mask]) if count_eyeccion > 0 else 0
-        
-        # Máximo y mínimo para partículas no eyectadas
-        confinadas_mask = ~altura_flag
-        vnorm2_confinadas = vnorm2_arr[confinadas_mask]
-        
-        if len(vnorm2_confinadas) > 0:
-            # Filtrar por threshold
-            vnorm2_filtrado = vnorm2_confinadas[vnorm2_confinadas < threshold]
-            max_val = vnorm2_filtrado.max() if len(vnorm2_filtrado) > 0 else 0
-            min_val = vnorm2_confinadas.min()
-        else:
-            max_val = vnorm2_arr.max()
-            min_val = vnorm2_arr.min()
-        
-        # Vcm
-        sum_vx = metrics["sum_vx"][0]
-        sum_vy = metrics["sum_vy"][0]
-        sum_vz = metrics["sum_vz"][0]
-        
+        # 4. CALCULAR Vcm
         vcm_x = sum_vx / N_base
         vcm_y = sum_vy / N_base
         vcm_z = (sum_vz + v0_actual) / N_base
         
-        # Datos para Vel_temp (solo si hay partículas altas)
-        if np.any(altura_flag):
-            vnorm2_altos = vnorm2_arr[altura_flag].tolist()
+        # 5. OBTENER vnorm2_altos (solo para partículas altas, ≤100 elementos)
+        # Usar el mismo DataFrame df, no volver a leer
+        if count_eyeccion > 0:
+            vnorm2_altos = df.filter(pl.col("z") > altura).select(
+                pl.col("vx")**2 + pl.col("vy")**2 + pl.col("vz")**2
+            ).to_series().to_list()
         else:
             vnorm2_altos = []
         
@@ -162,7 +144,6 @@ def _procesar_lote(args):
         })
     
     return resultados
-
 def data_analysis(ruta, vel, npa):
     threshold = 0.004
     LenTotal, paso = checkparquet(ruta)
@@ -212,7 +193,8 @@ def data_analysis(ruta, vel, npa):
         archivos_info.append((i, file_path))
     
     # Dividir en lotes para procesamiento paralelo
-    num_workers = min(8, LenTotal)  # Usar hasta 8 workers
+    # AJUSTADO: 6 workers para evitar saturación de I/O
+    num_workers = min(6, LenTotal)
     lote_size = max(1, LenTotal // num_workers)
     lotes = []
     
@@ -254,7 +236,7 @@ def data_analysis(ruta, vel, npa):
         K_eyectados = res['K_eyectados']
         vnorm2_altos = res['vnorm2_altos']
         
-        # Lógica de acumulación
+        # Lógica de acumulación (optimizada para ≤100 partículas)
         if i == 0:
             Data_collect["Eyección"][0] = count_eyeccion
             Data_collect["Eyectados_K"][0] = K_eyectados
@@ -265,7 +247,7 @@ def data_analysis(ruta, vel, npa):
                 Data_collect["Eyectados_K"].append(K_eyectados)
                 Data_collect["Vel_temp"][i % 2] = vnorm2_altos
             else:
-                # Manejar partículas "congeladas"
+                # Manejar partículas "congeladas" - optimizado para pocos elementos
                 temp1 = set(Data_collect["Vel_temp"][(i + 1) % 2])
                 temp2 = set(vnorm2_altos)
                 congelados = list(temp1 - temp2)
