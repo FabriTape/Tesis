@@ -1,165 +1,183 @@
 #!/home/tutturuu/spyder-env/bin python3
 # -*- coding: utf-8 -*-
-from gzip import open as opengz
 import os
+from datetime import datetime, timedelta, UTC
+from pathlib import Path
+
 import polars as pl
-from Lector import Lector
+
 from ovito.data import DataCollection
 from ovito.pipeline import Pipeline, StaticSource
 from ovito.modifiers import CoordinationAnalysisModifier
 from ovito.modifiers import ClusterAnalysisModifier
 from ovito.data import SimulationCell
 
-#read_csv(ruta,skiprows=9,names=["id", "type", "x", "y", "z", "vx", "vy", "vz", "omegax", "omegay", "omegaz", "c_1"],delimiter=" ")
-'''---> Esta funcion ya no se usa y será removida en futuras versiones del programa <---'''
-def escrituraparquet(ruta):
-    """La funcion escritura sirve para transformar archivos gz en parquet
 
-    Args:
-        ruta (str): Es la ruta donde se encuentran los archivos csv
-    """
 
-    ## Definimos la carpeta donde estan los outputs de la sim.
+def Lector(archivo_gz: str, datos: list):
+    nombres_columnas = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "wx", "wy", "wz"]
     
-    Archivos = [archivo for archivo in os.listdir(ruta) if (archivo.startswith("output.") and ".gz" in archivo)]
+    df_archivo = pl.scan_csv(
+        archivo_gz, 
+        skip_rows=9,
+        has_header=False,
+        new_columns=nombres_columnas,
+        separator=" ",         # Cambiamos tab por espacio
+        truncate_ragged_lines=True, # Ignora espacios extra al final de la línea
+        infer_schema_length=10000,
+        schema_overrides={
+            "type": pl.UInt8,
+            "id": pl.UInt64
+        }
+    )
     
-    print("Iniciando conversión de archivos gz a parquet")
-    print("000/100%|",20*"-","|",sep="",end="")
-    
-    for i,archivo in enumerate(Archivos,1):
-        
-        nombre = archivo.replace(".gz","")
-        
-        if  not os.path.isfile(f"{ruta}/datos/{nombre}.parquet"): ## Ver si no lo convertimos antes
-        
-            print("\r","{:03d}".format(int(i*100/len(Archivos)//1)),"/100%|",int((i*100/len(Archivos))//5)*"#",sep="",end="")
-            
-            with opengz(f'{ruta}/{nombre}.gz', 'rb') as csv_file:
-                
-                df_pd = pd.read_csv(
-            csv_file,
-	    sep = '\s+',
-            skiprows=9,
-            names=["id","type","x","y","z","vx","vy","vz","omegax","omegay","omegaz","c_1"])
-        # 2. ESCRITURA EFICIENTE (Directo a Parquet)
-        # Pandas usa PyArrow por debajo, es muy eficiente para escribir
-                df_pd.to_parquet(f"{ruta}/datos/{nombre}.parquet", compression='snappy', index=False)
-    print("conversión exitosa")
-'''Esta funcion esta obsoleta y en futuras versiones será removida'''
-def checkparquet(ruta)->int:
-    """Esta funcion cuenta la cantidad de archivos que se transformaron en parquet
-    Args:
-        ruta (str): es la ruta donde se encuentran los archivos output.
-    Returns:
-        int: Cantidad de carpetas que hay en el directorio de la simulación
-        Paso (int): Cantidad de pasos que salta entre archivos
-    """
-    if not os.path.isdir(f"{ruta}/datos"): 
-        
-        os.mkdir(f"{ruta}/datos")
-        
-    archivos = [d.replace("output.","").replace(".gz", "") for d in os.listdir(ruta) if ("output." in d) and (".gz" in d)]
-    
-    if not archivos:
-        
-        print("No hay datos registrados todavía.")
-        
-        return 0,0
-    
-    paso = sorted([float(i) for i in archivos]) ## El primer elemnto es el 0, el segundo es el paso
-    
-    return len(archivos), paso[1]
-###############################################################################
+    return df_archivo.select(datos)
+
 def limpiar_pantalla():
+    ''' Limpia la terminal según el sistema operativo (Windows o Linux/macOS).
+    Args:
+        None
+    Returns:
+        None
+    '''
     # 'nt' es Windows, 'posix' es Linux/macOS
     os.system('cls' if os.name == 'nt' else 'clear')
+    
 def rreplace(s, old, new="", ocurrence=1):
+    ''' Reemplaza una subcadena buscando desde el final del string (derecha).
+    Args:
+        s (str) : Cadena de texto original.
+        old (str) : Subcadena que se desea reemplazar.
+        new (str) : Subcadena nueva que reemplazará a la antigua.
+        ocurrence (int) : Cantidad de veces que se realizará el reemplazo.
+    Returns:
+        (str) : Cadena de texto con los reemplazos realizados.
+    '''
     li = s.rsplit(old, ocurrence)
     return new.join(li)
+# Funcion obtenida de 
+# https://www.geeksforgeeks.org/python/delete-a-directory-or-file-using-python/
+"""Esta funcion esta en desuso y será removida en suturas versiones"""
+def borrar_dir(ruta):
+    ''' Elimina todos los archivos de un directorio y luego la carpeta misma.
+    Args:
+        ruta (str) : Trayectoria de la carpeta que se desea eliminar.
+    Returns:
+        None
+    '''
+    for filename in os.listdir(ruta):
+        file_path = os.path.join(ruta, filename)
+        if os.path.isfile(file_path):
+            os.remove(file_path)  # Remove the file
+    os.rmdir(ruta)
+
 
 def buscar_carpeta():
+    ''' Permite la navegación interactiva usando objetos de ruta (Path). '''
     
-    """Muestra los elementos registrados y permite elegir uno.
-       Devuelve el nombre de la carpeta seleccionada."""
-       
-    mensaje = """Ingrese el numero de la carpeta a la que desea acceder
+    mensaje = """\nIngrese el numero de la carpeta a la que desea acceder
 ingresar [-1] para elegir los datos de la carpeta actual
 ingresar [-2] para volver atras : """
-    valor = True
-    ruta = "./"
-    ultima_eleccion = []
-    while valor:
+    
+    # Iniciamos con la ruta actual absoluta
+    ruta = Path(".").resolve()
+    
+    while True:
+        # Listar carpetas (filtrando ocultas)
+        carpetas = sorted([d for d in ruta.iterdir() if d.is_dir() and not d.name.startswith(".")])
         
-        carpetas = [d for d in os.listdir(ruta) if os.path.isdir(ruta + d) 
-                    and not d.startswith(".")]
+        # Listar archivos de simulación (solo para visualización)
+        datos_gz = sorted([f.name for f in ruta.glob("output.*.gz")])
         
-        datos_gz = [d for d in os.listdir(ruta) if "output." in d and ".gz" in d]
-        
-        print("carpetas disponibles y 3 archivos output, si los hay:")
-        
+        print(f"\n--- Ubicación actual: {ruta} ---")
+        print("Carpetas disponibles:")
         for i, carpeta in enumerate(carpetas, start=1):
-            
-            print(f"[{i}] {carpeta}")
+            print(f"[{i}] {carpeta.name}")
         
-        for dato in datos_gz[:3]:
-        
-            print(dato)            
+        if datos_gz:
+            print("\nArchivos de datos encontrados (muestra):")
+            for dato in datos_gz[:3]:
+                print(f"  {dato}")
         
         try:
-            
             eleccion = int(input(mensaje))
             
             if 1 <= eleccion <= len(carpetas):
-                
-                ultima_eleccion.append(f"{carpetas[eleccion-1]}/")
-                ruta = os.path.join(ruta,ultima_eleccion[-1]) 
+                # Ir hacia adelante
+                ruta = carpetas[eleccion-1]
                 limpiar_pantalla()
                 
             elif eleccion == -1:
-                
+                # Seleccionar carpeta actual
                 limpiar_pantalla()
-                return ruta
+                return str(ruta) # Retornamos como string para que el resto del código no cambie
             
             elif eleccion == -2:
-                try:
-                    
-                    ruta = rreplace(ruta, ultima_eleccion[-1])
-                    ultima_eleccion.pop(-1)
-                    limpiar_pantalla()
-                    
-                except IndexError:
-                    
-                    limpiar_pantalla()
-                    print("Ya no se puede ir mas atrás, estas en ./")
+                # Ir hacia atrás de forma segura
+                ruta = ruta.parent
+                limpiar_pantalla()
+                
             else:
                 limpiar_pantalla()
                 print("Número inválido, intente de nuevo.")
                 
         except ValueError:
-            
             print("Entrada inválida, por favor ingrese un número.")
             
-def progress(i,N):
+def generar_carpeta():
+    ''' Crea una carpeta para los resultados gestionando la sobreescritura.
+    Args:
+        None
+    Returns:
+        ruta (str) : Ruta de la carpeta de origen de los datos.
+        base (str) : Ruta de la carpeta de destino para el análisis.
+    '''
+    ruta = buscar_carpeta()
+    base = os.path.join(ruta,"datos_analisis") 
+
+    base += (datetime.now(UTC) + timedelta(hours=-3)
+           ).strftime('_%Y-%m-%d_%H:%M')
+    os.mkdir(base)
+    return ruta, base
+
+def progress(i, N):
+    ''' Imprime una barra de progreso visual en la terminal.
+    Args:
+        i (int) : Iteración actual del proceso.
+        N (int) : Cantidad total de iteraciones.
+    Returns:
+        None
+    '''
     print("\r", 
           "{:03d}".format(int((i * 100 / N) // 1)), 
-          "/100%|", 
-          int((i  * 100 / N) // 5) * "_" + "๑ï", 
+          "/100%[", 
+          int((i  * 100 / N) // 5) * "_" + "@ï", 
           sep="", 
           end=""
           )
     
-def detector_de_ondas(lf,R,altura):
+def detector_de_ondas(lf, R, altura):
+    ''' Filtra partículas de la onda de choque y calcula métricas de interés.
+    Args:
+        lf (pl.LazyFrame) : Datos de la simulación cargados en modo Lazy.
+        R (float) : Radio de los granos de la simulación.
+        altura (float) : Altura de corte h_max calculada inicialmente.
+    Returns:
+        lf_onda (pl.LazyFrame) : Partículas filtradas que componen la onda.
+        df_res_onda (pl.DataFrame) : Conteo y velocidad máxima de la onda.
+    '''
     lf_onda = ( lf
      .with_columns((pl.col("vx") ** 2 + pl.col("vy") ** 2 + pl.col("vz") ** 2)
                    .alias("v^2"))
      
-     .filter(pl.col("v^2") > 4e-4)
-     
-     .filter((pl.col("x") < 10 * R) | 
+     .filter((pl.col("z") < altura - 4 * R) &
+             (pl.col("v^2") > 4e-4) &
+             (
+             (pl.col("x") < 10 * R) | 
              (pl.col("x").max() - 10 * R < pl.col("x")) |
              (pl.col("y") < 10 * R) |
              (pl.col("y").max() - 10 * R < pl.col("y")))
-     .filter(pl.col("z") <= altura)
+             )
      )
     df_res_onda = (lf_onda
            .select([ pl.len()
@@ -171,7 +189,13 @@ def detector_de_ondas(lf,R,altura):
     return lf_onda, df_res_onda
 
 def analisis_ovito(lf: pl.LazyFrame, cutoff: float) -> pl.LazyFrame:
-
+    ''' Integra OVITO para calcular coordinación y clusters en partículas.
+    Args:
+        lf (pl.LazyFrame) : Partículas eyectadas para analizar.
+        cutoff (float) : Distancia de corte para los modificadores de OVITO.
+    Returns:
+        (pl.LazyFrame) : Datos originales con columnas de coordinación y cluster.
+    '''
     # 1. Colectar a DataFrame
     df = lf.collect()
     
@@ -185,7 +209,7 @@ def analisis_ovito(lf: pl.LazyFrame, cutoff: float) -> pl.LazyFrame:
     particles.create_property('Position', data=positions)
     
     cell = SimulationCell()
-    cell[:, :] = [[1000, 0, 0, 0], [0, 1000, 0, 0], [0, 0, 1000, 0]]  # celda grande
+    cell[:, :] = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]  
     data.objects.append(cell)
     # 4. Crear pipeline con fuente estática
     pipeline = Pipeline(source=StaticSource(data=data))
@@ -207,17 +231,24 @@ def analisis_ovito(lf: pl.LazyFrame, cutoff: float) -> pl.LazyFrame:
         pl.Series("cluster", cluster)
     ]).lazy()
 
-def data_analysis ():
-    ruta = buscar_carpeta()
-    base = os.path.join(ruta,"datos_analisis") 
-    if not os.path.isdir(base): 
-        os.mkdir(base)
 
+
+def data_analysis():
+    ''' Orquestador principal que ejecuta el flujo de análisis completo.
+    Args:
+        None
+    Returns:
+        None
+    '''
+    ruta, base = generar_carpeta()
     # Radio de los granos
     R = float(input("""ingrese el valor de radio de los granos en [m]
 (se puede usar formato xe-y [m]): """))
+    limpiar_pantalla()
     
-    archivos = [d for d in os.listdir(ruta) if ("output." in d) and (".gz" in d)]
+    archivos = [d for d in os.listdir(ruta) if ("output." in d) 
+                and (".gz" in d)]
+    
     archivos.sort(key = lambda x: '{0:0>19}'.format(x).lower())
 
     LenTotal = len(archivos)
@@ -225,7 +256,7 @@ def data_analysis ():
     lf0 = Lector(f"{ruta}/output.0.gz", ["type", "z"])
     
     # Filtramos donde type == 1 y buscamos el maximo de z
-    altura = 1.05 * ( lf0
+    altura = 4 * R + (lf0
                      .filter(pl.col("type") == 1)
                      .select(pl.col("z").max())
                      .collect()
@@ -235,7 +266,7 @@ def data_analysis ():
     columnas = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
     # --- FASE 2: EL BUCLE DE PROCESAMIENTO ---
     print("Iniciando análisis de datos")
-    print("000/100%|", 22 * "·", "|", sep="", end="")
+    print("000/100%[", 22 * "·", "]", sep="", end="")
 
     for i, file in enumerate(archivos):
         progress(i, LenTotal)
@@ -247,45 +278,36 @@ def data_analysis ():
     	# Buscamos si la onda llego al borde
         lf_onda, df_res_onda = detector_de_ondas(lf_datos, R, altura)
         
-        
-        
         cantidad = df_res_onda.item(0, "cantidad")
         max_v2   = df_res_onda.item(0, "v^2_max")
         bool_v2_max = (max_v2 >= 4e-2) if isinstance(max_v2,float) else False
         
         if cantidad > 3000 or bool_v2_max:
             
-            print(f"""Se analizaron {i} archivos y en el archivo {file}:
+            print(f"""\nSe analizaron {i} archivos y en el archivo {file}:
                   Se detectó una onda de {cantidad} partículas
                   Con una v² máxima de {max_v2}""")
             ruta_guardado = os.path.join(base, f"onda.{i}.parquet")
             lf_onda.sink_parquet(ruta_guardado)
-            
+            break
         else:
             lf_eyectados = ( lf_datos
                             .filter(pl.col("z") > altura)
                             .filter(pl.col("vz") > 0)
                             )
-            
             ruta_guardado = os.path.join(base, f"salida.{i}.parquet")
             lf_procesados = analisis_ovito(lf_eyectados, R)
             lf_procesados.sink_parquet(ruta_guardado)
+            df_eyectados = lf_procesados.filter(pl.col("type") == 2).collect()
+            if df_eyectados.shape[0] == 0:
+                # El proyectil se hundió en la cama
+                lf_proyectil = lf_datos.filter(pl.col("type")==2)
+                ruta_guardado_proyectil = os.path.join(base, 
+                                                      f"proyectil.{i}.parquet")
+                lf_proyectil.sink_parquet(ruta_guardado_proyectil)
+            
             
     progress(100, 100)
-    print("Se terminó el análisis exitosamente")
+    print("\nSe terminó el análisis exitosamente")
     print(f"{LenTotal} datos guardados en: {base}")
-
-# if i == 0:
-# 	    Data_collect["Eyección"][0] = count_eyeccion
-# 	    Data_collect["Eyectados_K"][0] = K_eyectados
-# else:
-#     if count_eyeccion - Data_collect["Eyección"][-1] >= 0:
-#         Data_collect["Eyección"].append(count_eyeccion)
-#         Data_collect["Eyectados_K"].append(K_eyectados)
-#     else:
-#         congelados = list(set(Data_collect["Vel_temp"][(i+1)%2])-set(Data_collect["Vel_temp"][i%2]))
-#         Data_collect["Vel_temp"][i%2] = [x for x in Data_collect["Vel_temp"][i%2] if x != 0.0]
-#         Data_collect["Vel_temp"][i%2].append(*congelados)
-#         Data_collect["Eyección"].append(count_eyeccion+len(congelados))
-#         Data_collect["Eyectados_K"].append(0.5*np.sum(Data_collect["Vel_temp"][i%2]))
-#         Data_collect["K"][-1] += 0.5*np.sum(congelados)
+data_analysis()
