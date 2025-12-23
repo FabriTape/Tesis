@@ -1,4 +1,4 @@
-#!/home/tutturuu/spyder-env/bin python34
+#!/home/tutturuu/spyder-env/bin python3
 # -*- coding: utf-8 -*-
 import os
 from datetime import datetime, timedelta, timezone
