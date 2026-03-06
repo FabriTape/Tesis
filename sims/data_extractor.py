@@ -1,12 +1,14 @@
 #!/home/tutturuu/spyder-env/bin python3
 # -*- coding: utf-8 -*-
 import os
-from datetime import UTC, datetime, timedelta
+import time
 from pathlib import Path
+
 import polars as pl
 from ovito.data import DataCollection, SimulationCell
 from ovito.modifiers import ClusterAnalysisModifier, CoordinationAnalysisModifier
 from ovito.pipeline import Pipeline, StaticSource
+
 
 def limpiar_pantalla():
     """
@@ -20,7 +22,8 @@ def limpiar_pantalla():
     Returns:
         None
     """
-    os.system('cls' if os.name == 'nt' else 'clear')
+    os.system("cls" if os.name == "nt" else "clear")
+
 
 def buscar_carpeta():
     """
@@ -43,8 +46,9 @@ def buscar_carpeta():
     while True:
         # Listamos solo directorios, ordenados y sin ocultos
         try:
-            items = sorted([p for p in ruta.iterdir() if p.is_dir()
-                            and not p.name.startswith(".")])
+            items = sorted(
+                [p for p in ruta.iterdir() if p.is_dir() and not p.name.startswith(".")]
+            )
         except PermissionError:
             print(f"No tienes permiso para acceder a {ruta}")
             ruta = ruta.parent
@@ -69,14 +73,14 @@ def buscar_carpeta():
 
             if eleccion == -1:
                 limpiar_pantalla()
-                return str(ruta) # Retornamos string para compatibilidad
+                return str(ruta)  # Retornamos string para compatibilidad
 
             elif eleccion == -2:
                 ruta = ruta.parent
                 limpiar_pantalla()
 
             elif 1 <= eleccion <= len(items):
-                ruta = items[eleccion-1]
+                ruta = items[eleccion - 1]
                 limpiar_pantalla()
             else:
                 limpiar_pantalla()
@@ -85,6 +89,7 @@ def buscar_carpeta():
         except ValueError:
             limpiar_pantalla()
             print("Entrada inválida.")
+
 
 def generar_carpeta():
     """
@@ -99,15 +104,15 @@ def generar_carpeta():
     """
     ruta_str = buscar_carpeta()
     ruta = Path(ruta_str)
-
-    # Creamos nombre de carpeta con fecha
-    timestamp = (datetime.now(UTC) - timedelta(hours=3)
-                 ).strftime('_%Y-%m-%d_%H:%M')
-
-    base = ruta / f"datos_analisis{timestamp}"
+    base = Path("./resultados")
 
     base.mkdir(exist_ok=True)
-    return str(ruta), str(base)
+
+    nombre = str(ruta).split("/")
+    datos = nombre[-1].replace("erosion_bed_SI_", "", 1)
+
+    return str(ruta), datos
+
 
 def Lector(archivo_gz: str, datos: list):
     nombres_columnas = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
@@ -117,26 +122,13 @@ def Lector(archivo_gz: str, datos: list):
         skip_rows=9,
         has_header=False,
         separator=" ",
-        truncate_ragged_lines=True, # Maneja espacios extra al final
+        truncate_ragged_lines=True,  # Maneja espacios extra al final
         new_columns=nombres_columnas,
-        separator=" ",  # Cambiamos tab por espacio
-        truncate_ragged_lines=True,  # Ignora espacios extra al final de la línea
         infer_schema_length=10000,
         schema_overrides={"type": pl.UInt8, "id": pl.UInt64},
     )
 
     return df_archivo.select(datos)
-
-
-def limpiar_pantalla():
-    """Limpia la terminal según el sistema operativo (Windows o Linux/macOS).
-    Args:
-        None
-    Returns:
-        None
-    """
-    # 'nt' es Windows, 'posix' es Linux/macOS
-    os.system("cls" if os.name == "nt" else "clear")
 
 
 def rreplace(s, old, new="", ocurrence=1):
@@ -170,79 +162,6 @@ def borrar_dir(ruta):
         if os.path.isfile(file_path):
             os.remove(file_path)  # Remove the file
     os.rmdir(ruta)
-
-
-def buscar_carpeta():
-    """Permite la navegación interactiva usando objetos de ruta (Path)."""
-
-    mensaje = """\nIngrese el numero de la carpeta a la que desea acceder
-ingresar [-1] para elegir los datos de la carpeta actual
-ingresar [-2] para volver atras : """
-
-    # Iniciamos con la ruta actual absoluta
-    ruta = Path(".").resolve()
-
-    while True:
-        # Listar carpetas (filtrando ocultas)
-        carpetas = sorted(
-            [d for d in ruta.iterdir() if d.is_dir() and not d.name.startswith(".")]
-        )
-
-        # Listar archivos de simulación (solo para visualización)
-        datos_gz = sorted([f.name for f in ruta.glob("output.*.gz")])
-
-        print(f"\n--- Ubicación actual: {ruta} ---")
-        print("Carpetas disponibles:")
-        for i, carpeta in enumerate(carpetas, start=1):
-            print(f"[{i}] {carpeta.name}")
-
-        if datos_gz:
-            print("\nArchivos de datos encontrados (muestra):")
-            for dato in datos_gz[:3]:
-                print(f"  {dato}")
-
-        try:
-            eleccion = int(input(mensaje))
-
-            if 1 <= eleccion <= len(carpetas):
-                # Ir hacia adelante
-                ruta = carpetas[eleccion - 1]
-                limpiar_pantalla()
-
-            elif eleccion == -1:
-                # Seleccionar carpeta actual
-                limpiar_pantalla()
-                return str(
-                    ruta
-                )  # Retornamos como string para que el resto del código no cambie
-
-            elif eleccion == -2:
-                # Ir hacia atrás de forma segura
-                ruta = ruta.parent
-                limpiar_pantalla()
-
-            else:
-                limpiar_pantalla()
-                print("Número inválido, intente de nuevo.")
-
-        except ValueError:
-            print("Entrada inválida, por favor ingrese un número.")
-
-
-def generar_carpeta():
-    """Crea una carpeta para los resultados gestionando la sobreescritura.
-    Args:
-        None
-    Returns:
-        ruta (str) : Ruta de la carpeta de origen de los datos.
-        base (str) : Ruta de la carpeta de destino para el análisis.
-    """
-    ruta = buscar_carpeta()
-    base = os.path.join(ruta, "datos_analisis")
-
-    base += (datetime.now(UTC) + timedelta(hours=-3)).strftime("_%Y-%m-%d_%H:%M")
-    os.mkdir(base)
-    return ruta, base
 
 
 def progress(i, N):
@@ -292,17 +211,17 @@ def detector_de_ondas(lf, R, altura):
     return lf_onda, df_res_onda
 
 
-def analisis_ovito(lf: pl.LazyFrame, cutoff: float) -> pl.LazyFrame:
+def analisis_ovito(lf: pl.LazyFrame, cutoff: float, altura: float) -> pl.DataFrame:
     """Integra OVITO para calcular coordinación y clusters en partículas.
     Args:
         lf (pl.LazyFrame): Datos de las partículas eyectadas.
         cutoff (float): Distancia de corte para definir vecinos.
-
+        altura (float): altura maxima de la caja
     Returns:
         (pl.LazyFrame) : Datos originales con columnas de coordinación y cluster.
     """
     # 1. Colectar a DataFrame
-    df = lf.collect()
+    df = lf.filter((pl.col("z") > altura) & (pl.col("vz") > 0)).collect()
 
     # 2. Extraer posiciones como NumPy array
     positions = df.select(["x", "y", "z"]).to_numpy()
@@ -330,10 +249,29 @@ def analisis_ovito(lf: pl.LazyFrame, cutoff: float) -> pl.LazyFrame:
     coordinacion = computed_data.particles["Coordination"][:]
     cluster = computed_data.particles["Cluster"][:]
 
-    # 8. Agregar columnas y devolver LazyFrame
+    # 8. Agregar columnas
     return df.with_columns(
         [pl.Series("coordinacion", coordinacion), pl.Series("cluster", cluster)]
-    ).lazy()
+    )
+
+
+def max_altura(ruta: str, R: float, k=3) -> float:
+    """Calcula la altura máxima de la cama con un umbral default de 3 radios de
+    partículas
+    Args:
+        k (int): Cantidad de radios de umbral. Default = 3
+        R (float): Radio de la partícula en [m]
+    Return:
+        altura (float): altura máxima de filtrado"""
+    lf0 = Lector(os.path.join(ruta, "output.0.gz"), ["type", "z"])
+    max_z_type1 = (
+        lf0.filter(pl.col("type") == 1).select(pl.col("z").max()).collect().item()
+    )
+
+    if max_z_type1 is None:
+        raise ValueError("No puede ser que la altura maxima de la cama sea None")
+    altura = k * R + max_z_type1
+    return altura
 
 
 def data_analysis():
@@ -343,7 +281,8 @@ def data_analysis():
     Returns:
         None
     """
-    ruta, base = generar_carpeta()
+
+    ruta, datos = generar_carpeta()
     # Radio de los granos
     R = float(
         input("""ingrese el valor de radio de los granos en [m]
@@ -355,36 +294,25 @@ def data_analysis():
 
     archivos.sort(key=lambda x: "{0:0>19}".format(x).lower())
 
-    LenTotal = len(archivos)
-    # Variables constantes fuera del bucle
-    lf0 = Lector(f"{ruta}/output.0.gz", ["type", "z"])
+    paso_str = archivos[1].replace("output.", "").replace(".gz", "")
+    paso_int = int(paso_str)
 
-    # Filtramos donde type == 1 y buscamos el maximo de z
-    altura = 3 * R + (
-        lf0.filter(pl.col("type") == 1).select(pl.col("z").max()).collect().item()
-    )
+    LenTotal = len(archivos)
+
     ## Estas son las columnas que se van a leer en el bucle for
     columnas = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 
     # Cálculo inicial de altura (lee el archivo 0)
     print("Calculando parámetros iniciales...")
-    lf0 = Lector(os.path.join(ruta, "output.0.gz"), ["type", "z"])
-    max_z_type1 = (lf0
-                   .filter(pl.col("type") == 1)
-                   .select(pl.col("z").max())
-                   .collect()
-                   .item()
-                   )
-    if max_z_type1 is None: max_z_type1 = 0
-    altura = 4 * R + max_z_type1
+    altura = max_altura(ruta, R)
 
     print("Iniciando análisis de datos")
     print("000/100%[", 22 * "·", "]", sep="", end="")
+
     for i, file in enumerate(archivos):
         progress(i, LenTotal)
 
         # Lectura de los datos con columnas espcificas
-
         lf_datos = Lector(f"{ruta}/{file}", columnas)
 
         # Buscamos si la onda llego al borde
@@ -398,35 +326,41 @@ def data_analysis():
             print(f"""\nSe analizaron {i} archivos y en el archivo {file}:
                   Se detectó una onda de {cantidad} partículas
                   Con una v² máxima de {max_v2}""")
-            ruta_guardado = os.path.join(base, f"onda.{i}.parquet")
+            ruta_guardado = f"./resultados/{datos}_ONDA_{i}.parquet"
             lf_onda.sink_parquet(ruta_guardado)
             break
 
         else:
-            lf_eyectados = lf_datos.filter(pl.col("z") > altura & pl.col("vz") > 0)
+            parametros = datos.split("_")
+            df_procesados = analisis_ovito(lf_datos, R, altura)
+            df_procesados_final = df_procesados.with_columns(
+                [
+                    pl.lit(parametros[1]).alias("ff"),
+                    pl.lit(parametros[3]).alias("np"),
+                    pl.lit(parametros[5]).alias("vel0"),
+                    pl.lit(parametros[-5]).alias("angulo"),
+                    pl.lit(parametros[-3]).alias("posx"),
+                    pl.lit(parametros[-2]).alias("posy"),
+                    pl.lit(parametros[-1]).alias("posz"),
+                    pl.lit(paso_int).alias("paso"),
+                    pl.lit(i).alias("i"),
+                ]
+            )
+            if i == 0:
+                df_temp = df_procesados_final
+            else:
+                df_temp = pl.concat(
+                    [df_temp, df_procesados_final], how="vertical_relaxed"
+                )
 
-            lf_procesados = analisis_ovito(lf_eyectados, R)
-
-            df_eyectados_proy = lf_procesados.filter(pl.col("type") == 2).collect()
-            df_eyectados_cama = lf_procesados.filter(pl.col("type") == 1).collect()
-
-            # Verdadero si se eyectaron
-            bool_eyectados_cama = df_eyectados_cama.shape[0] != 0
-            bool_eyectados_proy = df_eyectados_proy.shape[0] != 0
-
-            # Solo escribe archivos en casos de haber uno eyectado
-            if bool_eyectados_cama or bool_eyectados_proy:
-                if bool_eyectados_cama:
-                    ruta_guardado_cama = os.path.join(base, f"cama.{i}.parquet")
-                    df_eyectados_cama.write_parquet(ruta_guardado_cama)
-
-                if not bool_eyectados_proy:
-                    ruta_guardado_proy = os.path.join(base, f"proy.{i}.parquet")
-                    df_eyectados_proy.write_parquet(ruta_guardado_proy)
-
+    if df_temp.shape[0] == 0:
+        with open(f"./resultados/{datos}_NADA.txt", "w") as archivo:
+            archivo.write("No se obtuvo erosión en esta simulación")
+    else:
+        df_temp.write_parquet(f"./resultados/{datos}_TOTAL.parquet")
     progress(100, 100)
     print("\nSe terminó el análisis exitosamente")
-    print(f"{LenTotal} datos guardados en: {base}")
+    print("Datos guardados en: ./resultados/")
 
 
 data_analysis()
