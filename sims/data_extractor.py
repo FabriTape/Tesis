@@ -1,7 +1,5 @@
-#!/home/tutturuu/spyder-env/bin python3
 # -*- coding: utf-8 -*-
 import os
-import time
 from pathlib import Path
 
 import polars as pl
