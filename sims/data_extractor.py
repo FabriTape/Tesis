@@ -227,19 +227,16 @@ def detector_de_ondas(
         - lf_onda (pl.LazyFrame) : Partículas filtradas que componen la onda.
         - df_res_onda (pl.DataFrame) : Conteo y velocidad máxima de la onda.
     """
-
-    lf_onda = lf.with_columns(
-        # Crea una columna con la velocidad cuadrática
-        (pl.col("vx") ** 2 + pl.col("vy") ** 2 + pl.col("vz") ** 2).alias("v^2")
-    ).filter(
-        # Filtrado por altura
-        (pl.col("z") < altura - umbral_techo * R)
-        # Filtrado por velocidad mínima para considerar una onda relevante
-        & (pl.col("v^2") > 4e-4)
-    )
     if usar_caja:
-        lf_onda.filter(
-            (
+        lf_onda = lf.with_columns(
+            # Crea una columna con la velocidad cuadrática
+            (pl.col("vx") ** 2 + pl.col("vy") ** 2 + pl.col("vz") ** 2).alias("v^2")
+        ).filter(
+            # Filtrado por altura
+            (pl.col("z") < altura - umbral_techo * R)
+            # Filtrado por velocidad mínima para considerar una onda relevante
+            & (pl.col("v^2") > 4e-4)
+            & (
                 # Filtrado para ver si llega como mínimo a 20 (default) radios de la pared
                 # usando los limites de la caja
                 (pl.col("x") < umbral_pared * R)
@@ -249,8 +246,15 @@ def detector_de_ondas(
             )
         )
     else:
-        lf_onda.filter(
-            (
+        lf_onda = lf.with_columns(
+            # Crea una columna con la velocidad cuadrática
+            (pl.col("vx") ** 2 + pl.col("vy") ** 2 + pl.col("vz") ** 2).alias("v^2")
+        ).filter(
+            # Filtrado por altura
+            (pl.col("z") < altura - umbral_techo * R)
+            # Filtrado por velocidad mínima para considerar una onda relevante
+            & (pl.col("v^2") > 4e-4)
+            & (
                 # Filtrado para ver si llega como mínimo a 20 (default) radios de la pared
                 # usando máximo y mínimo de partículas
                 (pl.col("x") < umbral_pared * R)
