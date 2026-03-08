@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import polars as pl
+from numpy import empty as npempty
 from ovito.data import DataCollection, SimulationCell
 from ovito.modifiers import ClusterAnalysisModifier, CoordinationAnalysisModifier
 from ovito.pipeline import Pipeline, StaticSource
@@ -197,20 +198,20 @@ def Lector(archivo_gz: str, datos: list) -> pl.LazyFrame:
     return lf_archivo.select(datos)
 
 
-def progress(i, N):
+def progress(i: int, N: int, parte=1) -> None:
     """
     Genera y actualiza una barra de progreso visual en la terminal.
 
     Args:
         i (int): Índice de la iteración actual.
         N (int): Número total de iteraciones esperadas.
-
+        parte (int): Es el modo del mensaje si es por análisis de onda o de ovito:
     Returns:
         None
     """
+    mensaje = "onda" if parte else "coordinación"
     if i == 0:
-        print("Calculando parámetros iniciales...")
-        print("Iniciando análisis de datos")
+        print(f"Iniciando análisis de {mensaje}")
         print("000/100%[", 22 * "·", "]", sep="", end="")
 
     # Actualiza la línea de la terminal en la misma posición (usando \r)
@@ -297,53 +298,69 @@ def detector_de_ondas(
     return lf_onda, df_res_onda
 
 
-def analisis_ovito(lf: pl.LazyFrame, cutoff: float, altura: float) -> pl.DataFrame:
+# 1. ESTA PARTE VA AFUERA DE TU BUCLE FOR (Configuración estática)
+def inicializar_pipeline_ovito(cutoff: float) -> Pipeline:
     """
-    Integra la API de OVITO para realizar análisis topológico avanzado de las partículas eyectadas.
-
-    Calcula el número de coordinación atómica/granular y la pertenencia a clústeres para
-    aquellas partículas que han superado la altura de la cama.
-
-    Args:
-        lf (pl.LazyFrame): Datos posicionales y de velocidad de las partículas.
-        cutoff (float): Radio de corte geométrico para la definición de vecinos cercanos y clústeres.
-        altura (float): Umbral vertical de la cama para filtrar únicamente partículas eyectadas.
-
-    Returns:
-        pl.DataFrame: DataFrame materializado con las propiedades originales más las columnas
-                      calculadas 'coordinacion' y 'cluster'.
+    Inicializa la estructura estática de OVITO una sola vez para ahorrar memoria.
     """
-    # 1. Materializar los datos filtrados en memoria (necesario para la API de OVITO)
-    df = lf.filter((pl.col("z") > altura) & (pl.col("vz") > 0)).collect()
-
-    # 2. Extraer matriz de coordenadas espaciales
-    positions = df.select(["x", "y", "z"]).to_numpy()
-
-    # 3. Inicializar la estructura de datos en memoria para OVITO
     data = DataCollection()
     particles = data.create_particles()
-    particles.create_property("Position", data=positions)
 
-    # Configuración de los vectores base de la celda de simulación (ortogonal por defecto)
+    # Creamos la propiedad con un array vacío como punto de partida
+
+    particles.create_property("Position", data=npempty((0, 3)))
+
     cell = SimulationCell()
     cell[:, :] = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]
     data.objects.append(cell)
 
-    # 4. Crear el flujo de procesamiento (Pipeline) inyectando los datos estáticos
     pipeline = Pipeline(source=StaticSource(data=data))
-
-    # 5. Inserción de modificadores de análisis físico
     pipeline.modifiers.append(CoordinationAnalysisModifier(cutoff=cutoff))
     pipeline.modifiers.append(ClusterAnalysisModifier(cutoff=cutoff))
 
-    # 6. Ejecución computacional del pipeline
+    return pipeline
+
+
+# 2. ESTA ES TU FUNCIÓN EDITADA (Se llama adentro del bucle)
+def analisis_ovito(lf: pl.LazyFrame, pipeline: Pipeline, altura: float) -> pl.DataFrame:
+    """
+    Integra la API de OVITO para realizar análisis topológico avanzado.
+    Inyecta posiciones dinámicamente en un pipeline preconfigurado.
+
+    Args:
+        lf (pl.LazyFrame): Datos posicionales y de velocidad de las partículas.
+        pipeline (Pipeline): Flujo de procesamiento de OVITO ya inicializado.
+        altura (float): Umbral vertical de la cama para filtrar partículas.
+
+    Returns:
+        pl.DataFrame: DataFrame con las propiedades calculadas 'coordinacion' y 'cluster'.
+    """
+    # 1. Materializar los datos filtrados en memoria
+    df = lf.filter((pl.col("z") > altura) & (pl.col("vz") > 0)).collect()
+
+    # Control de seguridad: si no hay partículas eyectadas, devolvemos columnas vacías
+    if df.shape[0] == 0:
+        return df.with_columns(
+            [
+                pl.Series("coordinacion", [], dtype=pl.Float64),
+                pl.Series("cluster", [], dtype=pl.UInt32),
+            ]
+        )
+
+    # 2. Extraer matriz de coordenadas espaciales
+    positions = df.select(["x", "y", "z"]).to_numpy()
+
+    # 3. Inyectar las nuevas posiciones en la fuente estática del pipeline
+    pipeline.source.data.particles_.create_property("Position", data=positions)
+
+    # 4. Ejecución computacional del pipeline actualizado
     computed_data = pipeline.compute()
 
-    # 7. Extracción de los resultados tabulados generados por los modificadores
+    # 5. Extracción de los resultados tabulados
     coordinacion = computed_data.particles["Coordination"][:]
     cluster = computed_data.particles["Cluster"][:]
 
-    # 8. Incorporación y retorno de los nuevos atributos al DataFrame original
+    # 6. Incorporación y retorno de los atributos al DataFrame original
     return df.with_columns(
         [pl.Series("coordinacion", coordinacion), pl.Series("cluster", cluster)]
     )
@@ -441,16 +458,18 @@ def data_analysis():
 
     # Calibración del nivel basal en el timestep 0
     altura = max_altura(ruta, R)
+    lista_resultados = []
 
+    pipeline_global = inicializar_pipeline_ovito(cutoff=R)
+
+    lista_lf = [Lector(f"{ruta}/{f}", columnas) for f in archivos]
     # Ciclo principal de procesamiento temporal
     for i, file in enumerate(archivos):
         progress(i, LenTotal)
 
-        lf_datos = Lector(f"{ruta}/{file}", columnas)
-
         # Evaluación de propagación de la onda de choque en el timestep actual
         lf_onda, df_res_onda = detector_de_ondas(
-            lf_datos, R, altura, limites_f, usar_caja
+            lista_lf[i], R, altura, limites_f, usar_caja
         )
 
         # TODO: Evaluar la optimización computacional realizando este análisis iterando
@@ -470,40 +489,36 @@ def data_analysis():
             ruta_guardado = f"./resultados/{datos}_ONDA_{i}.parquet"
             lf_onda.sink_parquet(ruta_guardado)
             break
+    limpiar_pantalla()
+    for i, file in enumerate(archivos):
+        progress(i, LenTotal, 0)
+        parametros = datos.split("_")
+        df_procesados = analisis_ovito(lista_lf[i], pipeline_global, altura)
 
-        # Análisis continuo previo a la propagación macroscópica de la onda
-        else:
-            parametros = datos.split("_")
-            df_procesados = analisis_ovito(lf_datos, R, altura)
+        # Enriquecimiento del DataFrame con la parametrización del caso de estudio
+        df_procesados_final = df_procesados.with_columns(
+            [
+                pl.lit(parametros[1]).alias("ff"),
+                pl.lit(parametros[3]).alias("np"),
+                pl.lit(parametros[5]).alias("vel0"),
+                pl.lit(parametros[-5]).alias("angulo"),
+                pl.lit(parametros[-3]).alias("posx"),
+                pl.lit(parametros[-2]).alias("posy"),
+                pl.lit(parametros[-1]).alias("posz"),
+                pl.lit(paso_int).alias("paso"),
+                pl.lit(i).alias("i"),
+            ]
+        )
 
-            # Enriquecimiento del DataFrame con la parametrización del caso de estudio
-            df_procesados_final = df_procesados.with_columns(
-                [
-                    pl.lit(parametros[1]).alias("ff"),
-                    pl.lit(parametros[3]).alias("np"),
-                    pl.lit(parametros[5]).alias("vel0"),
-                    pl.lit(parametros[-5]).alias("angulo"),
-                    pl.lit(parametros[-3]).alias("posx"),
-                    pl.lit(parametros[-2]).alias("posy"),
-                    pl.lit(parametros[-1]).alias("posz"),
-                    pl.lit(paso_int).alias("paso"),
-                    pl.lit(i).alias("i"),
-                ]
-            )
-
-            # Concatenación vertical de la serie temporal usando relajación de tipos
-            if i == 0:
-                df_temp = df_procesados_final
-            else:
-                df_temp = pl.concat(
-                    [df_temp, df_procesados_final], how="vertical_relaxed"
-                )
+        # Concatenación vertical de la serie temporal usando relajación de tipos
+        lista_resultados.append(df_procesados_final)
 
     # Evaluación post-ciclo para escenarios sin evento erosivo
-    if df_temp.shape[0] == 0:
+    if not lista_resultados:
         with open(f"./resultados/{datos}_NADA.txt", "w") as archivo:
             archivo.write("No se obtuvo erosión significativa en esta simulación")
     else:
+        df_temp = pl.concat(lista_resultados, how="vertical_relaxed")
         # Serialización de los resultados consolidados a formato Parquet
         df_temp.write_parquet(f"./resultados/{datos}_TOTAL.parquet")
 
