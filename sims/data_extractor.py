@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import gzip
 import os
+from datetime import datetime
 from pathlib import Path
 
 import polars as pl
@@ -8,6 +9,15 @@ from numpy import empty as npempty
 from ovito.data import DataCollection, SimulationCell
 from ovito.modifiers import ClusterAnalysisModifier, CoordinationAnalysisModifier
 from ovito.pipeline import Pipeline, StaticSource
+
+# ==========================================
+# PARÁMETROS FÍSICOS Y UMBRALES DE ANÁLISIS
+# ==========================================
+UMBRAL_V2_MIN = 4e-4  # Energía cinética mínima para considerar una partícula activa
+UMBRAL_V2_MAX = 4e-2  # Energía cinética máxima para considerar un impacto crítico
+PARTICULAS_CRITICAS = (
+    3000  # Cantidad de partículas en movimiento para detectar onda macroscópica
+)
 
 
 def extractor_de_borde(
@@ -32,7 +42,8 @@ def extractor_de_borde(
         resultados[llave] = []
 
     # Abre y lee el archivo comprimido en modo texto
-    with gzip.open(os.path.join(ruta, nombre_archivo), "rt") as f:
+    ruta_archivo = Path(ruta) / nombre_archivo
+    with gzip.open(ruta_archivo, "rt") as f:
         # Inversión del diccionario para acceder rápidamente a la llave por el número de línea
         indice_a_llave = {v: k for k, v in columnas.items()}
 
@@ -263,7 +274,7 @@ def detector_de_ondas(
             # 1. Filtro vertical: Descartar partículas eyectadas muy por encima de la cama
             (pl.col("z") < altura - umbral_techo * R)
             # 2. Filtro cinético: Excluir partículas estáticas o con energía despreciable
-            & (pl.col("v^2") > 4e-4)
+            & (pl.col("v^2") > UMBRAL_V2_MIN)
             & (
                 # 3. Filtro perimetral (Caja Estática): Asegurar que el evento alcance las fronteras
                 (pl.col("x") < umbral_pared * R)
@@ -280,7 +291,7 @@ def detector_de_ondas(
             # 1. Filtro vertical
             (pl.col("z") < altura - umbral_techo * R)
             # 2. Filtro cinético
-            & (pl.col("v^2") > 4e-4)
+            & (pl.col("v^2") > UMBRAL_V2_MIN)
             & (
                 # 3. Filtro perimetral (Caja Dinámica): Evalúa fronteras basadas en las posiciones actuales
                 (pl.col("x") < umbral_pared * R)
@@ -350,8 +361,14 @@ def analisis_ovito(lf: pl.LazyFrame, pipeline: Pipeline, altura: float) -> pl.Da
     # 2. Extraer matriz de coordenadas espaciales
     positions = df.select(["x", "y", "z"]).to_numpy()
 
-    # 3. Inyectar las nuevas posiciones en la fuente estática del pipeline
-    pipeline.source.data.particles_.create_property("Position", data=positions)
+    # 3a. Clonar los datos estáticos actuales para destrabar el modo "solo lectura"
+    datos_mutables = pipeline.source.data.clone()
+
+    # 3b. Inyectar las nuevas posiciones en tu copia (que ahora es mutable)
+    datos_mutables.particles_.create_property("Position", data=positions)
+
+    # 3c. Reasignar la copia actualizada como la nueva fuente del pipeline
+    pipeline.source.data = datos_mutables
 
     # 4. Ejecución computacional del pipeline actualizado
     computed_data = pipeline.compute()
@@ -381,7 +398,8 @@ def max_altura(ruta: str, R: float, umbral_techo=3) -> float:
     Raises:
         ValueError: Si no se encuentran partículas de tipo 1 en la simulación.
     """
-    lf0 = Lector(os.path.join(ruta, "output.0.gz"), ["type", "z"])
+    ruta_archivo = str(Path(ruta) / "output.0.gz")
+    lf0 = Lector(ruta_archivo, ["type", "z"])
 
     # Localiza la partícula tipo 1 (asumida como material del lecho) con mayor cota Z
     max_z_type1 = (
@@ -398,6 +416,218 @@ def max_altura(ruta: str, R: float, umbral_techo=3) -> float:
     return altura
 
 
+def verificar_analisis_previo(datos: str) -> bool:
+    """
+    Verifica si una simulación ya fue procesada buscando archivos previos en el directorio de resultados.
+
+    Si encuentra coincidencias, desglosa el nombre del archivo para determinar
+    el estado del análisis anterior (completo, parcial por onda, o sin erosión) y la fecha.
+    Luego, despliega una alerta interactiva para que el usuario decida si desea sobreescribir.
+
+    Args:
+        datos (str): Cadena de texto con los parámetros de la simulación, utilizada
+                     como identificador único (prefijo) en los nombres de archivo.
+
+    Returns:
+        bool: True si el análisis debe continuar (no existen datos previos o el
+              usuario confirma la sobreescritura). False si el usuario decide abortar.
+    """
+    directorio_resultados = Path("./resultados")
+
+    # Buscamos cualquier archivo que empiece con el ID de esta simulación
+    archivos_previos = list(directorio_resultados.glob(f"{datos}_*"))
+    if not archivos_previos:
+        return True
+    # Tomamos el primer archivo encontrado (asumiendo que solo hay uno por simulación)
+    archivo_viejo = archivos_previos[0]
+    nombre_viejo = archivo_viejo.name
+
+    # Desglosamos el nombre para saber qué tipo de resultado fue y cuándo se hizo
+    # Ej: "param1_param2_TOTAL_2026-03-08_18-30-00.parquet"
+
+    if "_TOTAL_" in nombre_viejo:
+        estado = "Análisis COMPLETO (Erosión detectada)"
+        fecha_previa = nombre_viejo.split("_TOTAL_")[-1].replace(".parquet", "")
+
+    elif "_ONDA_" in nombre_viejo:
+        # En este caso el nombre tiene la iteración en el medio, ej: "..._ONDA_80_2026..."
+        estado = "Onda detectada (Procesamiento parcial)"
+        # Partimos por _ONDA_, tomamos la segunda mitad, y luego partimos por el primer guión bajo
+        # para separar el número de iteración del timestamp
+        partes = nombre_viejo.split("_ONDA_")[-1].replace(".parquet", "").split("_", 1)
+        fecha_previa = partes[1] if len(partes) > 1 else "Fecha desconocida"
+
+    elif "_NADA" in nombre_viejo:
+        estado = "SIN EROSIÓN"
+        fecha_previa = nombre_viejo.split("_NADA_")[-1].replace(".txt", "")
+
+    else:
+        estado = "Estado desconocido"
+        fecha_previa = "Fecha no extraíble"
+
+    limpiar_pantalla()
+    print("--- ATENCIÓN: SIMULACIÓN YA ANALIZADA ---")
+    print(f"Parámetros: {datos}")
+    print(f"Resultado: {estado}")
+    print(f"Fecha del análisis: {fecha_previa}\n")
+
+    # Le damos al usuario la opción de abortar para no perder tiempo
+    respuesta = input(
+        "¿Deseas volver a procesar esta simulación sobrescribiendo los datos? (Y/N): "
+    )
+    if respuesta.lower() != "y":
+        print("Análisis abortado por el usuario.")
+        return False  # Termina la ejecución de la función aquí mismo
+    return True  # Continua con el  análisis
+
+
+def control_caja(limites_i: dict, limites_f: dict, archivos: list) -> bool:
+    """
+    Evalúa la consistencia volumétrica de la caja de simulación entre el estado inicial y final.
+
+    Si detecta variaciones en los límites espaciales (por ejemplo, debido a condiciones de
+    contorno dinámicas o ensambles NPT), interrumpe el flujo para consultar al usuario si
+    desea mantener la caja estática original como volumen de control o utilizar bordes dinámicos.
+
+    Args:
+        limites_i (dict): Diccionario con los límites espaciales iniciales de la caja.
+        limites_f (dict): Diccionario con los límites espaciales finales de la caja.
+        archivos (list): Lista de nombres de los archivos de volcado, utilizada para
+                         indicarle al usuario entre qué iteraciones ocurrió el cambio.
+
+    Returns:
+        bool: True si se decide utilizar los bordes fijos de la caja para el análisis de
+              la onda. False si el usuario prefiere que el código adapte los bordes
+              dinámicamente en base a la posición de las partículas.
+    """
+    # Gestión de divergencia en los límites del volumen de control (ej. condiciones NPT)
+    if limites_f != limites_i:
+        while True:
+            seguir = input(
+                f"""Los bordes de las caja cambiaron entre {archivos[0]} y {archivos[-1]}
+    En {archivos[0]} son:
+    {limites_i}
+    En {archivos[-1]} son:
+    {limites_f}
+    ¿Deseás aun así usar los bordes de la caja para el cálculo? (Y/N): """
+            )
+            if seguir in "Nn":
+                return False
+
+            elif seguir in "Yy":
+                return True
+            else:
+                limpiar_pantalla()
+                print("(No se registró ninguna entrada válida. Por favor, usar Y o N)")
+    else:
+        return True
+
+
+def preparar_archivos(ruta: str) -> tuple[list, int, int]:
+    """
+    Escanea el directorio de la simulación, filtra los archivos de volcado (dumps)
+    y los ordena cronológicamente. Además, calcula el paso temporal entre volcados.
+
+    Args:
+        ruta (str): Ruta absoluta o relativa al directorio de la simulación.
+
+    Returns:
+        tuple:
+            - list: Lista de nombres de archivos '.gz' ordenados cronológicamente.
+            - int: Frecuencia de volcado de datos (timestep) extraída del segundo archivo.
+            - int: Cantidad de archivos que hay en el directorio.
+    """
+    # Identificación y recopilación de los archivos de volcado de la simulación
+    archivos = [d.name for d in Path(ruta).glob("output.*.gz")]
+
+    # Ordenamiento alfanumérico estricto asegurando el orden cronológico de los pasos temporales
+    archivos.sort(key=lambda x: "{0:0>19}".format(x).lower())
+
+    # Extracción de la frecuencia de volcado de datos iterando los sufijos de archivo
+    # Se añade un control de seguridad por si la simulación tiene un solo archivo
+    if len(archivos) > 1:
+        paso_str = archivos[1].replace("output.", "").replace(".gz", "")
+        paso_int = int(paso_str)
+    else:
+        paso_int = 0  # Valor por defecto seguro si solo hay un frame
+
+    return archivos, paso_int, len(archivos)
+
+
+def cortar_analisis_onda(
+    cantidad: int,
+    bool_v2_max: bool,
+    max_v2: float,
+    i: int,
+    file: str,
+    datos: str,
+    fecha_hora: str,
+    lf_onda: pl.LazyFrame,
+) -> bool:
+    """
+    Evalúa si se alcanzó el criterio físico crítico para considerar la propagación de una onda masiva.
+
+    Si se cumple la condición de corte (por cantidad de partículas involucradas o por
+    energía cinética máxima), imprime una alerta, serializa los datos de la onda a disco
+    y devuelve una señal para interrumpir el escaneo secuencial (Fail Fast).
+
+    Args:
+        cantidad (int): Número de partículas detectadas como parte de la onda en el timestep actual.
+        bool_v2_max (bool): Bandera que indica si alguna partícula superó el umbral crítico de velocidad.
+        max_v2 (float): Valor absoluto de la velocidad cuadrática máxima registrada.
+        i (int): Índice numérico de la iteración actual.
+        file (str): Nombre del archivo de volcado actual (ej. 'output.80.gz').
+        datos (str): Identificador base de los parámetros de la simulación.
+        fecha_hora (str): Marca temporal para generar nombres de archivo únicos.
+        lf_onda (pl.LazyFrame): Estructura de datos perezosa que contiene las partículas de la onda.
+
+    Returns:
+        bool: True si se detectó la onda y se guardó el archivo (señal de corte).
+              False si el evento aún no alcanza la magnitud crítica.
+    """
+    # Criterio de impacto crítico: onda macroscópica o una partícula de altísima energía
+    if cantidad > PARTICULAS_CRITICAS or bool_v2_max:
+        print(f"""\nSe analizaron {i} archivos y en el archivo {file}:
+                Se detectó una onda masiva de {cantidad} partículas
+                Con una v² máxima absoluta de {max_v2}""")
+
+        # Generación dinámica de la ruta de salida y materialización a formato columnar Parquet
+        ruta_guardado = f"./resultados/{datos}_ONDA_{i}_{fecha_hora}.parquet"
+        lf_onda.sink_parquet(ruta_guardado)
+
+        return True  # Señal de abortar el escaneo
+    else:
+        return False  # Señal de continuar evaluando el siguiente timestep
+
+
+def ingresar_radio() -> float:
+    """
+    Solicita de forma interactiva el radio de las partículas y valida la entrada del usuario.
+
+    Implementa un bucle de seguridad que previene la interrupción del script (crashes)
+    en caso de ingresos no numéricos. Adicionalmente, se encarga de estandarizar
+    las unidades físicas, convirtiendo el valor ingresado de micrómetros [um] a metros [m].
+
+    Args:
+        None
+
+    Returns:
+        float: Valor del radio de los granos expresado en metros [m].
+    """
+    # --- BLINDAJE DEL INPUT DEL RADIO ---
+    while True:
+        try:
+            entrada_r = input("Ingrese el valor de radio de los granos en [um]: ")
+            R = float(entrada_r) * 1e-6
+            break  # Si el número es válido, rompe el bucle y sigue
+        except ValueError:
+            limpiar_pantalla()
+            print(
+                "Error: Entrada inválida. Por favor, ingrese un número (ej: 10 o 15.5)\n"
+            )
+    return R
+
+
 def data_analysis():
     """
     Orquestador principal que ejecuta el flujo completo de análisis del ensayo de erosión.
@@ -412,119 +642,109 @@ def data_analysis():
         None
     """
     ruta, datos = generar_carpeta()
+    fecha_hora = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-    # Entrada de calibración manual del radio de grano y conversión a metros
-    R = float(input("Ingrese el valor de radio de los granos en [um]: ")) * 1e-6
+    if not verificar_analisis_previo(datos):
+        return
+
+    R = ingresar_radio()
     limpiar_pantalla()
 
-    # Identificación y recopilación de los archivos de volcado de la simulación
-    archivos = [d for d in os.listdir(ruta) if ("output." in d) and (".gz" in d)]
-
-    # Ordenamiento alfanumérico estricto asegurando el orden cronológico de los pasos temporales
-    archivos.sort(key=lambda x: "{0:0>19}".format(x).lower())
+    # Genera una lista con los archivos ordenados, da la cantidad de steps que hay entre
+    # archivos, cuantos archivos hay y una
+    archivos, paso_int, LenTotal = preparar_archivos(ruta)
 
     # Verificación de consistencia volumétrica de la caja entre el estado inicial y final
-    limites_i = extractor_de_borde(ruta, archivos[0])
-    limites_f = extractor_de_borde(ruta, archivos[-1])
+    limites_i, limites_f = (
+        extractor_de_borde(ruta, archivos[0]),
+        extractor_de_borde(ruta, archivos[-1]),
+    )
 
-    usar_caja = True
+    usar_caja = control_caja(limites_i, limites_f, archivos)
 
-    # Gestión de divergencia en los límites del volumen de control (ej. condiciones NPT)
-    if limites_f != limites_i:
-        while True:
-            seguir = input(
-                f"""Los bordes de las caja cambiaron entre {archivos[0]} y {archivos[-1]}
-    En {archivos[0]} son:
-    {limites_i}
-    En {archivos[-1]} son:
-    {limites_f}
-    ¿Deseás aun así usar los bordes de la caja para el cálculo? (Y/N): """
-            )
-            if seguir in "Nn":
-                usar_caja = False
-                break
-            elif seguir in "Yy":
-                break
-            else:
-                limpiar_pantalla()
-                print("(No se registró ninguna entrada válida. Por favor, usar Y o N)")
-
-    # Extracción de la frecuencia de volcado de datos iterando los sufijos de archivo
-    paso_str = archivos[1].replace("output.", "").replace(".gz", "")
-    paso_int = int(paso_str)
-
-    LenTotal = len(archivos)
     columnas = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 
     # Calibración del nivel basal en el timestep 0
-    altura = max_altura(ruta, R)
-    lista_resultados = []
+    altura, lista_resultados = max_altura(ruta, R), []
 
     pipeline_global = inicializar_pipeline_ovito(cutoff=R)
 
-    lista_lf = [Lector(f"{ruta}/{f}", columnas) for f in archivos]
-    # Ciclo principal de procesamiento temporal
+    # --- VARIABLES PARA EL CONTROL DE LA ONDA ---
+    onda_detectada, paso_corte = False, LenTotal
+
+    # === FASE 1: BÚSQUEDA RÁPIDA DE LA ONDA ===
     for i, file in enumerate(archivos):
         progress(i, LenTotal)
 
-        # Evaluación de propagación de la onda de choque en el timestep actual
+        ruta_archivo = str(Path(ruta) / file)
+        archivo_lf = Lector(ruta_archivo, columnas)
+
         lf_onda, df_res_onda = detector_de_ondas(
-            lista_lf[i], R, altura, limites_f, usar_caja
+            archivo_lf, R, altura, limites_f, usar_caja
         )
 
-        # TODO: Evaluar la optimización computacional realizando este análisis iterando
-        # desde el último archivo hacia atrás (Reverse iteration) para localizar la onda más rápido.
-
-        # Extracción de métricas críticas para el criterio de parada
         cantidad = df_res_onda.item(0, "cantidad")
         max_v2 = df_res_onda.item(0, "v^2_max")
-        bool_v2_max = (max_v2 >= 4e-2) if isinstance(max_v2, float) else False
+        bool_v2_max = (max_v2 >= UMBRAL_V2_MAX) if isinstance(max_v2, float) else False
 
         # Criterio de impacto crítico (Trigger de la onda)
-        if cantidad > 3000 or bool_v2_max:
-            print(f"""\nSe analizaron {i} archivos y en el archivo {file}:
-                  Se detectó una onda masiva de {cantidad} partículas
-                  Con una v² máxima absoluta de {max_v2}""")
-
-            ruta_guardado = f"./resultados/{datos}_ONDA_{i}.parquet"
-            lf_onda.sink_parquet(ruta_guardado)
+        if cortar_analisis_onda(
+            cantidad, bool_v2_max, max_v2, i, file, datos, fecha_hora, lf_onda
+        ):
+            paso_corte = i
+            onda_detectada = True
             break
-    limpiar_pantalla()
-    for i, file in enumerate(archivos):
-        progress(i, LenTotal, 0)
-        parametros = datos.split("_")
-        df_procesados = analisis_ovito(lista_lf[i], pipeline_global, altura)
 
-        # Enriquecimiento del DataFrame con la parametrización del caso de estudio
+    progress(100, 100)
+    print("")
+    limpiar_pantalla()
+
+    # === FASE 2: ANÁLISIS PESADO CON OVITO ===
+
+    # Al hacer slicing hasta 'paso_corte', si la onda se detectó en i=80,
+    # la lista tomará del 0 al 79 (justo el archivo anterior a la onda, como querías).
+    # Si no hubo onda, paso_corte es igual a LenTotal y procesa todos.
+    archivos_fase2 = archivos[:paso_corte]
+    LenFase2 = len(archivos_fase2)
+    parametros = datos.split("_")
+
+    for i, file in enumerate(archivos_fase2):
+        progress(i, LenFase2, 0)
+        ruta_archivo = str(Path(ruta) / file)
+        archivo_lf = Lector(ruta_archivo, columnas)
+
+        df_procesados = analisis_ovito(archivo_lf, pipeline_global, altura)
+
+        # Enriquecimiento del DataFrame usando kwargs (código más limpio)
         df_procesados_final = df_procesados.with_columns(
-            [
-                pl.lit(parametros[1]).alias("ff"),
-                pl.lit(parametros[3]).alias("np"),
-                pl.lit(parametros[5]).alias("vel0"),
-                pl.lit(parametros[-5]).alias("angulo"),
-                pl.lit(parametros[-3]).alias("posx"),
-                pl.lit(parametros[-2]).alias("posy"),
-                pl.lit(parametros[-1]).alias("posz"),
-                pl.lit(paso_int).alias("paso"),
-                pl.lit(i).alias("i"),
-            ]
+            ff=pl.lit(parametros[1]),
+            np=pl.lit(parametros[3]),
+            vel0=pl.lit(parametros[5]),
+            angulo=pl.lit(parametros[-5]),
+            posx=pl.lit(parametros[-3]),
+            posy=pl.lit(parametros[-2]),
+            posz=pl.lit(parametros[-1]),
+            paso=pl.lit(paso_int),
+            i=pl.lit(i),
+            onda=pl.lit(onda_detectada),
         )
 
-        # Concatenación vertical de la serie temporal usando relajación de tipos
         lista_resultados.append(df_procesados_final)
 
     # Evaluación post-ciclo para escenarios sin evento erosivo
     if not lista_resultados:
-        with open(f"./resultados/{datos}_NADA.txt", "w") as archivo:
+        with open(f"./resultados/{datos}_NADA_{fecha_hora}.txt", "w") as archivo:
             archivo.write("No se obtuvo erosión significativa en esta simulación")
     else:
         df_temp = pl.concat(lista_resultados, how="vertical_relaxed")
         # Serialización de los resultados consolidados a formato Parquet
-        df_temp.write_parquet(f"./resultados/{datos}_TOTAL.parquet")
+        df_temp.write_parquet(f"./resultados/{datos}_TOTAL_{fecha_hora}.parquet")
 
-    progress(100, 100)
+    if LenFase2 > 0:
+        progress(100, 100, 0)
+
     print("\nSe terminó el análisis exitosamente")
-    print("Datos guardados en: ./resultados/")
+    print("Datos guardados en: ./resultados")
 
 
 # Punto de entrada de la ejecución
