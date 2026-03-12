@@ -26,8 +26,7 @@ RADIO_DEFAULT_UM = 0.76
 
 # Umbrales de filtrado por defecto para el criterio de erosión
 UMBRAL_VZ_MIN = 0.0  # Velocidad vertical mínima [m/s]
-UMBRAL_ENERGIA_MIN = 0.0  # Energía cinética mínima para rama B [m²/s²]
-UMBRAL_DESPLAZAMIENTO_LATERAL = 0.0  # Desplazamiento lateral mínimo [m]
+UMBRAL_ENERGIA_MIN = 0.0072  # Energía cinética mínima [m²/s²] (default JKR)
 
 
 def solicitar_entrada_segura(
@@ -541,11 +540,9 @@ def guardar_resultados(
                 pl.lit(
                     umbrales_filtro.get("umbral_energia_min", UMBRAL_ENERGIA_MIN)
                 ).alias("umbral_energia_min"),
-                pl.lit(
-                    umbrales_filtro.get(
-                        "umbral_desplazamiento_lateral", UMBRAL_DESPLAZAMIENTO_LATERAL
-                    )
-                ).alias("umbral_desplazamiento_lateral"),
+                pl.lit(umbrales_filtro.get("umbral_techo_radios", 5)).alias(
+                    "umbral_techo_radios"
+                ),
             )
 
         # Serialización de los resultados consolidados a formato Parquet
@@ -560,12 +557,10 @@ def configurar_umbrales_filtro(
     config: dict[str, Any] | None = None,
 ) -> dict[str, float]:
     """
-    Solicita al usuario los umbrales de filtrado para el criterio de erosión compuesto.
+    Carga los umbrales de filtrado para el criterio de erosión desde config.yaml.
 
-    Permite configurar los parámetros que definen cuándo una partícula se considera
-    erosionada, incluyendo velocidad vertical mínima, energía cinética mínima,
-    y desplazamiento lateral. Los valores por defecto se obtienen de config.yaml
-    si se proporciona.
+    Los umbrales definen cuándo una partícula se considera erosionada.
+    NO hay interacción con el usuario - todos los valores se cargan del YAML.
 
     Args:
         config (dict[str, Any] | None): Configuración cargada desde config.yaml.
@@ -575,64 +570,21 @@ def configurar_umbrales_filtro(
         dict[str, float]: Diccionario con los umbrales configurados:
             - umbral_vz_min: Velocidad vertical mínima [m/s]
             - umbral_energia_min: Energía cinética mínima [m²/s²]
-            - umbral_desplazamiento_lateral: Desplazamiento lateral mínimo [m]
+            - umbral_techo_radios: Márgen de seguridad en número de radios (Z)
     """
-    # Obtener valores por defecto de config o usar constantes
+    # Obtener valores desde config o usar defaults
     if config:
         filtros = config.get("filtros", {})
-        default_vz = filtros.get("umbral_vz_min", UMBRAL_VZ_MIN)
-        default_energia = filtros.get("umbral_energia_min", UMBRAL_ENERGIA_MIN)
-        default_desplazamiento = filtros.get(
-            "umbral_desplazamiento_lateral", UMBRAL_DESPLAZAMIENTO_LATERAL
-        )
+        umbral_vz_min = filtros.get("umbral_vz_min", 0.0)
+        umbral_energia_min = filtros.get("umbral_energia_min", 0.0072)
+        umbral_techo_radios = filtros.get("umbral_techo_radios", 5)
     else:
-        default_vz = UMBRAL_VZ_MIN
-        default_energia = UMBRAL_ENERGIA_MIN
-        default_desplazamiento = UMBRAL_DESPLAZAMIENTO_LATERAL
-
-    print("\n--- Configuración de Umbrales de Filtro ---")
-    print(
-        "Estos umbrales definen el criterio compuesto para detectar partículas erosionadas."
-    )
-    print("Presione Enter para usar los valores por defecto.\n")
-
-    # Umbral de velocidad vertical
-    while True:
-        try:
-            entrada = input(
-                f"Velocidad vertical mínima (vz_min) en [m/s] (default: {default_vz}): "
-            ).strip()
-            umbral_vz_min = float(entrada) if entrada else default_vz
-            break
-        except ValueError:
-            print("Error: Ingrese un número válido.")
-
-    # Umbral de energía cinética
-    while True:
-        try:
-            entrada = input(
-                f"Energía cinética mínima (v²_min) en [m²/s²] (default: {default_energia}): "
-            ).strip()
-            umbral_energia_min = float(entrada) if entrada else default_energia
-            break
-        except ValueError:
-            print("Error: Ingrese un número válido.")
-
-    # Umbral de desplazamiento lateral
-    while True:
-        try:
-            entrada = input(
-                f"Desplazamiento lateral mínimo [m] (default: {default_desplazamiento}): "
-            ).strip()
-            umbral_desplazamiento_lateral = (
-                float(entrada) if entrada else default_desplazamiento
-            )
-            break
-        except ValueError:
-            print("Error: Ingrese un número válido.")
+        umbral_vz_min = 0.0
+        umbral_energia_min = 0.0072
+        umbral_techo_radios = 5
 
     return {
         "umbral_vz_min": umbral_vz_min,
         "umbral_energia_min": umbral_energia_min,
-        "umbral_desplazamiento_lateral": umbral_desplazamiento_lateral,
+        "umbral_techo_radios": umbral_techo_radios,
     }

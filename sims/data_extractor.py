@@ -99,6 +99,15 @@ def data_analysis() -> None:
         print(f"Procesando: {ruta.name}")
         print(f"{'=' * 50}")
 
+        # Validar que la carpeta sea una simulación válida
+        if not ruta.name.startswith("erosion_bed_SI_"):
+            print(f"\n⚠ La carpeta '{ruta.name}' no tiene el formato esperado.")
+            print(
+                "   Se esperan carpetas con nombre: erosion_bed_SI_ff_*_np_*_vel_*_..."
+            )
+            print("   Saltando...")
+            continue
+
         datos = ruta.name.replace("erosion_bed_SI_", "", 1)
         contexto.datos = datos
         contexto.fecha_hora = datetime.now(TZ_ARG).strftime("%Y-%m-%d_%H-%M-%S")
@@ -106,45 +115,30 @@ def data_analysis() -> None:
         # Extraer metadatos de esta simulación individual
         metadatos = extraer_metadatos(datos)
 
-        # Evaluar criticidad para esta simulación específica
-        hacer_onda_simulacion = contexto.hacer_onda  # Default global
+        # Validar que se extrajeron los parámetros esenciales
+        if metadatos.get("ff") == "N/A" or metadatos.get("np") == "N/A":
+            print("\n⚠ No se pudieron extraer los parámetros de la simulación.")
+            print("   Verifique que el nombre de la carpeta tenga el formato correcto.")
+            print("   Saltando...")
+            continue
 
-        if es_simulacion_critica(metadatos, contexto.config):
-            print("\n[!] DETECTADA SIMULACIÓN CRÍTICA")
+        # Análisis de onda AUTOMÁTICO basado en criticidad
+        # NO se pregunta al usuario - se decide automáticamente
+        hacer_onda_simulacion = es_simulacion_critica(metadatos, contexto.config)
+
+        if hacer_onda_simulacion:
+            print("\n[!] SIMULACIÓN CRÍTICA DETECTADA")
             print(
                 f"    v={metadatos.get('vel0', 'N/A')} m/s, "
                 f"np={metadatos.get('np', 'N/A')}, "
                 f"move=({metadatos.get('posx', '0')}, {metadatos.get('posy', '0')}, {metadatos.get('posz', '0')})"
             )
-            print(
-                "\n    El análisis de onda es ALTAMENTE RECOMENDADO para esta simulación."
-            )
-
-            # Si el default global era False, preguntar específicamente para esta simulación
-            if not contexto.hacer_onda:
-                from input_handler import InputHandler
-
-                handler = InputHandler()
-                print(
-                    "\n¿Desea realizar el análisis de onda para ESTA simulación crítica?"
-                )
-                hacer_onda_critica, signal = handler.safe_input(
-                    "    (Y/N, default=Y): ",
-                    tipo=bool,
-                    default=True,
-                    permitir_back=False,
-                    permitir_quit=False,
-                )
-                if signal == "continue" and hacer_onda_critica is not None:
-                    hacer_onda_simulacion = hacer_onda_critica
-                    print(
-                        f"\n✓ Análisis de onda para esta simulación: {'SÍ' if hacer_onda_simulacion else 'NO'}"
-                    )
-            else:
-                print("\n✓ Análisis de onda: SÍ (configuración global)")
+            print("    → Análisis de onda: ACTIVADO AUTOMÁTICAMENTE")
         else:
-            # No es crítica, usar configuración global
-            pass  # hacer_onda_simulacion ya tiene el valor global
+            # No es crítica - usar configuración global como fallback
+            hacer_onda_simulacion = contexto.hacer_onda
+            if contexto.hacer_onda:
+                print("    → Análisis de onda: ACTIVADO (configuración global)")
 
         # Estado VERIFICACION_PREVIA (por simulación)
         continuar, contexto.sobreescribir_todo = verificar_analisis_previo(

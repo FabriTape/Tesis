@@ -32,13 +32,12 @@ class Estado(IntEnum):
     SELECCION_CARPETAS = 0
     CARGAR_CONFIG = 1
     CONFIGURACION_RADIO = 2
-    CONFIGURACION_ONDA = 3
-    CONFIGURACION_FILTROS = 4
-    VERIFICACION_PREVIA = 5
-    EJECUCION_FASE1 = 6
-    EJECUCION_FASE2 = 7
-    EXPORTACION = 8
-    COMPLETADO = 9
+    CONFIGURACION_FILTROS = 3
+    VERIFICACION_PREVIA = 4
+    EJECUCION_FASE1 = 5
+    EJECUCION_FASE2 = 6
+    EXPORTACION = 7
+    COMPLETADO = 8
 
 
 @dataclass
@@ -148,7 +147,6 @@ class StateManager:
             Estado.SELECCION_CARPETAS: self.handler_seleccion_carpetas,
             Estado.CARGAR_CONFIG: self.handler_cargar_config,
             Estado.CONFIGURACION_RADIO: self.handler_configuracion_radio,
-            Estado.CONFIGURACION_ONDA: self.handler_configuracion_onda,
             Estado.CONFIGURACION_FILTROS: self.handler_configuracion_filtros,
             Estado.VERIFICACION_PREVIA: self.handler_verificacion_previa,
             Estado.EJECUCION_FASE1: self.handler_ejecucion_fase1,
@@ -369,59 +367,42 @@ class StateManager:
                 print(f"\n✓ Radio configurado: {radio} µm ({self.contexto.R} m)")
                 break
 
+        # Configurar hacer_onda desde YAML (automático)
+        hacer_onda_config = self.contexto.config.get("defaults", {}).get(
+            "hacer_onda", "auto"
+        )
+        if hacer_onda_config == "auto":
+            self.contexto.hacer_onda = False  # Se decide por simulación individual
+        else:
+            self.contexto.hacer_onda = bool(hacer_onda_config)
+
         return None
 
     def handler_configuracion_onda(self) -> Estado | None:
         """
-        Handler para el estado de configuración del análisis de onda.
-
-        Determina la configuración GLOBAL de análisis de onda.
-        La evaluación de criticidad individual se hace por cada simulación
-        en el loop de procesamiento (data_extractor.py).
+        Handler obsoleto - el análisis de onda ahora es automático.
+        Solo configura el valor desde YAML y continúa.
 
         Returns:
-            Estado | None: El siguiente estado o None para continuar.
+            Estado | None: El siguiente estado.
         """
-        limpiar_pantalla()
-        print("=" * 50)
-        print("CONFIGURACIÓN DEL ANÁLISIS DE ONDA")
-        print("=" * 50)
-
-        # Determinar el default desde configuración global
-        default_hacer_onda = self.contexto.config.get("defaults", {}).get(
-            "hacer_onda", False
+        # Configurar desde YAML automáticamente
+        hacer_onda_config = self.contexto.config.get("defaults", {}).get(
+            "hacer_onda", "auto"
         )
-
-        print("\nEl análisis de onda detecta impactos macroscópicos en la cama.")
-        print("Este análisis es más rápido pero consume más memoria.")
-        print("\nNota: Para simulaciones críticas (v=-50 m/s, np=1 o 3, move!=0),")
-        print("      el análisis de onda se recomendará automáticamente.\n")
-
-        while True:
-            hacer_onda, signal = self.input_handler.safe_input(
-                "¿Desea realizar el análisis de onda para TODAS las simulaciones? (Y/N): ",
-                tipo=bool,
-                default=default_hacer_onda,
-            )
-
-            if signal == "back":
-                return Estado.CONFIGURACION_RADIO
-            elif signal == "quit":
-                return Estado.COMPLETADO
-
-            if hacer_onda is not None:
-                self.contexto.hacer_onda = hacer_onda
-                estado_str = "SÍ" if hacer_onda else "NO"
-                print(
-                    f"\n✓ Análisis de onda: {estado_str} (para todas las simulaciones)"
-                )
-                break
+        if hacer_onda_config == "auto":
+            self.contexto.hacer_onda = False  # Se decide por simulación individual
+        else:
+            self.contexto.hacer_onda = bool(hacer_onda_config)
 
         return None
 
     def handler_configuracion_filtros(self) -> Estado | None:
         """
         Handler para el estado de configuración de umbrales de filtrado.
+
+        Los umbrales se cargan AUTOMÁTICAMENTE desde config.yaml.
+        No hay interacción con el usuario.
 
         Returns:
             Estado | None: El siguiente estado o None para continuar.
@@ -432,10 +413,7 @@ class StateManager:
         print("=" * 50)
         print("CONFIGURACIÓN DE UMBRALES DE FILTRADO")
         print("=" * 50)
-        print(
-            "\nEstos umbrales definen el criterio para detectar partículas erosionadas."
-        )
-        print("Presione Enter para usar los valores por defecto.\n")
+        print("\nCargando umbrales desde config.yaml...")
 
         umbrales = configurar_umbrales_filtro(self.contexto.config)
         self.contexto.umbrales_filtro = umbrales
@@ -443,9 +421,7 @@ class StateManager:
         print("\n✓ Umbrales configurados:")
         print(f"  - vz_min: {umbrales['umbral_vz_min']} m/s")
         print(f"  - energia_min: {umbrales['umbral_energia_min']} m²/s²")
-        print(
-            f"  - desplazamiento_lateral: {umbrales['umbral_desplazamiento_lateral']} m"
-        )
+        print(f"  - techo_radios: {umbrales['umbral_techo_radios']} radios")
 
         return None
 
