@@ -183,7 +183,7 @@ def buscar_carpeta() -> list[Path] | None:
                 ]
 
                 if subcarpetas_erosion:
-                    # La carpeta contiene subcarpetas válidas, preguntar si quiere procesarlas
+                    # La carpeta contiene subcarpetas válidas, procesar todas automáticamente
                     print(
                         f"\nLa carpeta '{ruta.name}' contiene {len(subcarpetas_erosion)} "
                         f"subcarpetas 'erosion_bed_SI_*':"
@@ -192,25 +192,9 @@ def buscar_carpeta() -> list[Path] | None:
                         print(f"  - {sub.name}")
                     if len(subcarpetas_erosion) > 5:
                         print(f"  ... y {len(subcarpetas_erosion) - 5} más")
-
-                    while True:
-                        resp = (
-                            input(
-                                "\n¿Desea procesar TODAS las subcarpetas erosion_bed_SI_*? "
-                                "(Y = todas / N = solo esta carpeta): "
-                            )
-                            .strip()
-                            .lower()
-                        )
-                        if resp in ("y", "yes", "s", "si"):
-                            limpiar_pantalla()
-                            return subcarpetas_erosion
-                        elif resp in ("n", "no"):
-                            # Procesar solo esta carpeta (probablemente será saltada por validación)
-                            limpiar_pantalla()
-                            return [ruta]
-                        else:
-                            print("Por favor, ingrese Y o N.")
+                    print("\n→ Procesando TODAS las subcarpetas automáticamente...\n")
+                    limpiar_pantalla()
+                    return subcarpetas_erosion
                 else:
                     # No hay subcarpetas, procesar esta carpeta
                     limpiar_pantalla()
