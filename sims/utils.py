@@ -175,9 +175,46 @@ def buscar_carpeta() -> list[Path] | None:
             eleccion = int(entrada)
 
             if eleccion == -1:
-                # Confirma la selección de la carpeta actual
-                limpiar_pantalla()
-                return [ruta]
+                # Verificar si la carpeta actual contiene subcarpetas erosion_bed_SI_*
+                subcarpetas_erosion = [
+                    p
+                    for p in ruta.iterdir()
+                    if p.is_dir() and p.name.startswith("erosion_bed_SI_")
+                ]
+
+                if subcarpetas_erosion:
+                    # La carpeta contiene subcarpetas válidas, preguntar si quiere procesarlas
+                    print(
+                        f"\nLa carpeta '{ruta.name}' contiene {len(subcarpetas_erosion)} "
+                        f"subcarpetas 'erosion_bed_SI_*':"
+                    )
+                    for sub in subcarpetas_erosion[:5]:  # Mostrar primeras 5
+                        print(f"  - {sub.name}")
+                    if len(subcarpetas_erosion) > 5:
+                        print(f"  ... y {len(subcarpetas_erosion) - 5} más")
+
+                    while True:
+                        resp = (
+                            input(
+                                "\n¿Desea procesar TODAS las subcarpetas erosion_bed_SI_*? "
+                                "(Y = todas / N = solo esta carpeta): "
+                            )
+                            .strip()
+                            .lower()
+                        )
+                        if resp in ("y", "yes", "s", "si"):
+                            limpiar_pantalla()
+                            return subcarpetas_erosion
+                        elif resp in ("n", "no"):
+                            # Procesar solo esta carpeta (probablemente será saltada por validación)
+                            limpiar_pantalla()
+                            return [ruta]
+                        else:
+                            print("Por favor, ingrese Y o N.")
+                else:
+                    # No hay subcarpetas, procesar esta carpeta
+                    limpiar_pantalla()
+                    return [ruta]
 
             elif eleccion == -2:
                 # Navega al directorio padre (sube un nivel)
