@@ -9,7 +9,7 @@ from ovito.modifiers import ClusterAnalysisModifier, CoordinationAnalysisModifie
 from ovito.pipeline import Pipeline, StaticSource
 
 
-def Lector(archivo_gz: str, datos: list):
+def lector(archivo_gz: str, datos: list):
     nombres_columnas = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 
     df_archivo = pl.scan_csv(
