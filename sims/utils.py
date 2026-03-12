@@ -36,7 +36,7 @@ def solicitar_entrada_segura(
     default: Any = None,
     permitir_back: bool = False,
     permitir_quit: bool = False,
-    validador: callable | None = None,
+    validador: callable = None,
 ) -> Any:
     """
     Solicita entrada al usuario con manejo seguro de comandos globales y valores por defecto.

@@ -34,10 +34,11 @@ import polars as pl
 from lammps_utils import control_caja, extractor_de_borde, max_altura
 from ovito_utils import ejecutar_fase_ovito, inicializar_pipeline_ovito
 from plot import plot_erosion
-from state_manager import Estado, StateManager
+from state_manager import Estado, StateManager, es_simulacion_critica
 from utils import (
     DIR_RESULTADOS,
     TZ_ARG,
+    extraer_metadatos,
     guardar_resultados,
     preparar_archivos,
     verificar_analisis_previo,
@@ -102,6 +103,49 @@ def data_analysis() -> None:
         contexto.datos = datos
         contexto.fecha_hora = datetime.now(TZ_ARG).strftime("%Y-%m-%d_%H-%M-%S")
 
+        # Extraer metadatos de esta simulación individual
+        metadatos = extraer_metadatos(datos)
+
+        # Evaluar criticidad para esta simulación específica
+        hacer_onda_simulacion = contexto.hacer_onda  # Default global
+
+        if es_simulacion_critica(metadatos, contexto.config):
+            print("\n[!] DETECTADA SIMULACIÓN CRÍTICA")
+            print(
+                f"    v={metadatos.get('vel0', 'N/A')} m/s, "
+                f"np={metadatos.get('np', 'N/A')}, "
+                f"move=({metadatos.get('posx', '0')}, {metadatos.get('posy', '0')}, {metadatos.get('posz', '0')})"
+            )
+            print(
+                "\n    El análisis de onda es ALTAMENTE RECOMENDADO para esta simulación."
+            )
+
+            # Si el default global era False, preguntar específicamente para esta simulación
+            if not contexto.hacer_onda:
+                from input_handler import InputHandler
+
+                handler = InputHandler()
+                print(
+                    "\n¿Desea realizar el análisis de onda para ESTA simulación crítica?"
+                )
+                hacer_onda_critica, signal = handler.safe_input(
+                    "    (Y/N, default=Y): ",
+                    tipo=bool,
+                    default=True,
+                    permitir_back=False,
+                    permitir_quit=False,
+                )
+                if signal == "continue" and hacer_onda_critica is not None:
+                    hacer_onda_simulacion = hacer_onda_critica
+                    print(
+                        f"\n✓ Análisis de onda para esta simulación: {'SÍ' if hacer_onda_simulacion else 'NO'}"
+                    )
+            else:
+                print("\n✓ Análisis de onda: SÍ (configuración global)")
+        else:
+            # No es crítica, usar configuración global
+            pass  # hacer_onda_simulacion ya tiene el valor global
+
         # Estado VERIFICACION_PREVIA (por simulación)
         continuar, contexto.sobreescribir_todo = verificar_analisis_previo(
             datos, contexto.umbrales_filtro, contexto.sobreescribir_todo
@@ -142,7 +186,7 @@ def data_analysis() -> None:
         pipeline_global = inicializar_pipeline_ovito(cutoff=contexto.R)
 
         # Estado EJECUCION_FASE1: Búsqueda rápida de la onda (Opcional)
-        if contexto.hacer_onda:
+        if hacer_onda_simulacion:
             from analisis_onda import ejecutar_fase_onda
 
             onda_detectada, paso_corte = ejecutar_fase_onda(

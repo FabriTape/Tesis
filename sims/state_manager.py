@@ -18,7 +18,7 @@ from typing import Any, Callable
 import yaml
 
 from input_handler import InputHandler
-from utils import extraer_metadatos, limpiar_pantalla
+from utils import limpiar_pantalla
 
 
 class Estado(IntEnum):
@@ -375,7 +375,9 @@ class StateManager:
         """
         Handler para el estado de configuración del análisis de onda.
 
-        Evalúa si la simulación es crítica y ajusta el default dinámicamente.
+        Determina la configuración GLOBAL de análisis de onda.
+        La evaluación de criticidad individual se hace por cada simulación
+        en el loop de procesamiento (data_extractor.py).
 
         Returns:
             Estado | None: El siguiente estado o None para continuar.
@@ -385,34 +387,19 @@ class StateManager:
         print("CONFIGURACIÓN DEL ANÁLISIS DE ONDA")
         print("=" * 50)
 
-        # Determinar el default basado en criticidad
+        # Determinar el default desde configuración global
         default_hacer_onda = self.contexto.config.get("defaults", {}).get(
             "hacer_onda", False
         )
 
-        # Si hay una ruta actual, evaluar criticidad
-        if self.contexto.rutas and len(self.contexto.rutas) > 0:
-            # Usamos la primera ruta para evaluar
-            ruta = self.contexto.rutas[0]
-            datos = ruta.name.replace("erosion_bed_SI_", "", 1)
-            metadatos = extraer_metadatos(datos)
-
-            if es_simulacion_critica(metadatos, self.contexto.config):
-                print("\n[!] DETECTADA SIMULACIÓN CRÍTICA")
-                print(
-                    f"    v={metadatos.get('vel0', 'N/A')} m/s, "
-                    f"np={metadatos.get('np', 'N/A')}, "
-                    f"move!=0"
-                )
-                print("\n    Se recomienda realizar el análisis de onda.")
-                default_hacer_onda = True
-
         print("\nEl análisis de onda detecta impactos macroscópicos en la cama.")
-        print("Este análisis es más rápido pero consume más memoria.\n")
+        print("Este análisis es más rápido pero consume más memoria.")
+        print("\nNota: Para simulaciones críticas (v=-50 m/s, np=1 o 3, move!=0),")
+        print("      el análisis de onda se recomendará automáticamente.\n")
 
         while True:
             hacer_onda, signal = self.input_handler.safe_input(
-                "¿Desea realizar el análisis de onda? (Y/N): ",
+                "¿Desea realizar el análisis de onda para TODAS las simulaciones? (Y/N): ",
                 tipo=bool,
                 default=default_hacer_onda,
             )
@@ -425,7 +412,9 @@ class StateManager:
             if hacer_onda is not None:
                 self.contexto.hacer_onda = hacer_onda
                 estado_str = "SÍ" if hacer_onda else "NO"
-                print(f"\n✓ Análisis de onda: {estado_str}")
+                print(
+                    f"\n✓ Análisis de onda: {estado_str} (para todas las simulaciones)"
+                )
                 break
 
         return None
