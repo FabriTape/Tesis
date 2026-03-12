@@ -97,35 +97,23 @@
     │  │ 2. Input: safe_input(tipo=float, default=0.76)                 │  │
     │  │ 3. Validar rango: 0.01 - 1000 µm                               │  │
     │  │ 4. Convertir a metros: R = radio_um * 1e-6                     │  │
+    │  │ 5. Configurar hacer_onda desde YAML (auto)                     │  │
     │  └────────────────────────────────────────────────────────────────┘  │
     │                                                                      │
     │  Salida: contexto.R = float (en metros)                              │
+    │          contexto.hacer_onda = bool (desde YAML)                     │
     └─────────────────┬────────────────────────────────────────────────────┘
                       │
                       ▼
     ┌──────────────────────────────────────────────────────────────────────┐
-    │  ESTADO 3: CONFIGURACION_ONDA (GLOBAL)                               │
+    │  ESTADO 3: CONFIGURACION_FILTROS (AUTOMÁTICO)                        │
     │                                                                      │
     │  ┌────────────────────────────────────────────────────────────────┐  │
-    │  │ 1. Mostrar default desde config                                │  │
-    │  │ 2. Explicar propósito del análisis de onda                     │  │
-    │  │ 3. Input: safe_input(tipo=bool, default=config)                │  │
-    │  │ 4. NOTA: La criticidad individual se evalúa en el loop         │  │
-    │  └────────────────────────────────────────────────────────────────┘  │
-    │                                                                      │
-    │  Salida: contexto.hacer_onda = bool                                  │
-    └─────────────────┬────────────────────────────────────────────────────┘
-                      │
-                      ▼
-    ┌──────────────────────────────────────────────────────────────────────┐
-    │  ESTADO 4: CONFIGURACION_FILTROS                                     │
-    │                                                                      │
-    │  ┌────────────────────────────────────────────────────────────────┐  │
-    │  │ 1. Mostrar defaults desde config.yaml                          │  │
-    │  │ 2. Input de umbrales:                                          │  │
-    │  │    - umbral_vz_min [m/s]                                       │  │
-    │  │    - umbral_energia_min [m²/s²]                                │  │
-    │  │    - umbral_desplazamiento_lateral [m]                         │  │
+    │  │ 1. Cargar umbrales DESDE YAML (SIN input del usuario)          │  │
+    │  │ 2. Umbrales cargados:                                          │  │
+    │  │    - umbral_vz_min = 0.0 m/s                                   │  │
+    │  │    - umbral_energia_min = 0.0072 m²/s²                         │  │
+    │  │    - umbral_techo_radios = 5                                   │  │
     │  └────────────────────────────────────────────────────────────────┘  │
     │                                                                      │
     │  Salida: contexto.umbrales_filtro = dict                             │
@@ -138,13 +126,21 @@
                       │
                       ▼
     ┌──────────────────────────────────────────────────────────────────────┐
-    │  ESTADO 5: VERIFICACION_PREVIA (por simulación)                      │
+    │  ESTADO 4: VERIFICACION_PREVIA + VALIDACIÓN (por simulación)         │
     │                                                                      │
     │  ┌────────────────────────────────────────────────────────────────┐  │
-    │  │ 1. datos = ruta.name.replace("erosion_bed_SI_", "", 1)         │  │
-    │  │ 2. Buscar archivos previos en resultados/                      │  │
-    │  │ 3. Si existe → mostrar estado y preguntar sobreescribir        │  │
-    │  │ 4. Comparar umbrales de filtro si existen                      │  │
+    │  │ 1. VALIDAR: ruta.name.startswith("erosion_bed_SI_")            │  │
+    │  │    → Si NO → Saltar con advertencia                            │  │
+    │  │                                                                 │  │
+    │  │ 2. datos = ruta.name.replace("erosion_bed_SI_", "", 1)         │  │
+    │  │ 3. metadatos = extraer_metadatos(datos)                        │  │
+    │  │                                                                 │  │
+    │  │ 4. VALIDAR: ff != "N/A" AND np != "N/A"                        │  │
+    │  │    → Si NO → Saltar con advertencia                            │  │
+    │  │                                                                 │  │
+    │  │ 5. Buscar archivos previos en resultados/                      │  │
+    │  │ 6. Si existe → mostrar estado y preguntar sobreescribir        │  │
+    │  │ 7. Comparar umbrales de filtro si existen                      │  │
     │  └────────────────────────────────────────────────────────────────┘  │
     │                                                                      │
     │  Salida: continuar = bool, sobreescribir_todo = bool                 │
@@ -160,7 +156,7 @@
          │            │            │
          ▼            │            ▼
     ┌─────────┐       │    ┌───────────────────────────────────────────────┐
-    │ Saltar  │       │    │  EVALUACIÓN DE CRITICIDAD (INDIVIDUAL)        │
+    │ Saltar  │       │    │  EVALUACIÓN DE CRITICIDAD (AUTOMÁTICA)        │
     │ simul.  │       │    │                                               │
     └─────────┘       │    │  ┌─────────────────────────────────────────┐  │
                       │    │  │ 1. metadatos = extraer_metadatos(datos) │  │
@@ -183,19 +179,20 @@
                       │            │          │          │
                       │            │          ▼          │
                       │            │  ┌─────────────────┐│
-                      │            │  │ [!] DETECTADA  ││
-                      │            │  │ SIMULACIÓN     ││
+                      │            │  │ [!] SIMULACIÓN ││
                       │            │  │ CRÍTICA        ││
+                      │            │  │ DETECTADA      ││
                       │            │  │                ││
-                      │            │  │ Si default=False:│
-                      │            │  │ preguntar override│
+                      │            │  │ → Onda:        ││
+                      │            │  │   ACTIVADA     ││
+                      │            │  │   AUTOMÁTICA   ││
                       │            │  └─────────────────┘│
                       │            │          │          │
                       │            └──────────┼──────────┘
                       │                       │
                       ▼                       ▼
     ┌───────────────────────────────────────────────────────────────────────┐
-    │  ESTADO 6: PREPARACIÓN DE ARCHIVOS                                    │
+    │  ESTADO 5: PREPARACIÓN DE ARCHIVOS                                    │
     │                                                                       │
     │  ┌─────────────────────────────────────────────────────────────────┐  │
     │  │ 1. archivos = preparar_archivos(ruta)                           │  │
@@ -208,10 +205,10 @@
                       │
                       ▼
     ┌───────────────────────────────────────────────────────────────────────┐
-    │  ESTADO 7: EJECUCION_FASE1 (detección de onda)                        │
+    │  ESTADO 6: EJECUCION_FASE1 (detección de onda)                        │
     │                                                                       │
     │  ┌─────────────────────────────────────────────────────────────────┐  │
-    │  │ ¿hacer_onda_simulacion?                                         │  │
+    │  │ ¿hacer_onda_simulacion? (DECISIÓN AUTOMÁTICA)                   │  │
     │  │                                                                  │  │
     │  │ SI → ejecutar_fase_onda()                                       │  │
     │  │       • Iterar sobre archivos                                    │  │
@@ -230,7 +227,7 @@
                       │
                       ▼
     ┌───────────────────────────────────────────────────────────────────────┐
-    │  ESTADO 8: EJECUCION_FASE2 (análisis OVITO)                           │
+    │  ESTADO 7: EJECUCION_FASE2 (análisis OVITO)                           │
     │                                                                       │
     │  ┌─────────────────────────────────────────────────────────────────┐  │
     │  │ 1. pipeline = inicializar_pipeline_ovito(cutoff=R)              │  │
@@ -251,14 +248,17 @@
                       │
                       ▼
     ┌───────────────────────────────────────────────────────────────────────┐
-    │  ESTADO 9: EXPORTACION                                                │
+    │  ESTADO 8: EXPORTACION                                                │
     │                                                                       │
     │  ┌─────────────────────────────────────────────────────────────────┐  │
     │  │ 1. guardar_resultados(lista_resultados, datos, fecha_hora)      │  │
     │  │    • Si NO hay resultados → crear archivo _NADA_.txt            │  │
     │  │    • Si HAY resultados →                                        │  │
     │  │      - Concatenar DataFrames                                    │  │
-    │  │      - Inyectar umbrales como columnas                          │  │
+    │  │      - Inyectar umbrales como columnas:                         │  │
+    │  │        * umbral_vz_min                                          │  │
+    │  │        * umbral_energia_min                                     │  │
+    │  │        * umbral_techo_radios                                    │  │
     │  │      - Guardar como {datos}_TOTAL_{fecha_hora}.parquet          │  │
     │  │                                                                  │  │
     │  │ 2. Generar gráfico:                                             │  │
@@ -283,7 +283,7 @@
          │            │            │
          └────────────┘            ▼
                       │    ┌───────────────────────────────────────────────┐
-                      │    │  ESTADO 10: COMPLETADO                        │
+                      │    │  ESTADO 9: COMPLETADO                         │
                       │    │                                               │
                       │    │  - Mostrar mensaje de éxito                   │
                       │    │  - Imprimir directorio de resultados          │
@@ -316,6 +316,10 @@ Ejemplo de carpeta:
     ┌─────────────────────────────────────────────────────────────────────┐
     │  data_extractor.py (línea ~101)                                     │
     │                                                                     │
+    │  VALIDACIÓN: ¿ruta.name.startswith("erosion_bed_SI_")?              │
+    │  → SI: continuar                                                     │
+    │  → NO:  ⚠ La carpeta no tiene el formato esperado. Saltando...      │
+    │                                                                     │
     │  datos = ruta.name.replace("erosion_bed_SI_", "", 1)                │
     │                                                                     │
     │  Resultado: "ff_0.15_np_1_vel_-50_angle_0_move_0.1_0_0"             │
@@ -331,6 +335,9 @@ Ejemplo de carpeta:
     │  • vel0:   r"vel_([^_]+)"        → "-50"                            │
     │  • angulo: r"angle_([^_]+)"      → "0"                              │
     │  • move:   r"move_([^_]+)_([^_]+)_([^_]+)" → ("0.1", "0", "0")      │
+    │                                                                     │
+    │  VALIDACIÓN: ¿ff != "N/A" AND np != "N/A"?                          │
+    │  → NO: ⚠ No se pudieron extraer los parámetros. Saltando...         │
     └─────────────────┬───────────────────────────────────────────────────┘
                       │
                       ▼
@@ -352,12 +359,14 @@ Ejemplo de carpeta:
     ┌─────────────────────────────────────────────────────────────────────┐
     │  state_manager.py → es_simulacion_critica(metadatos, config)        │
     │                                                                     │
-    │  Evaluación:                                                        │
+    │  Evaluación AUTOMÁTICA (SIN input del usuario):                     │
     │  1. |vel0 - (-50.0)| < 0.1  →  |-50 - (-50)| = 0 < 0.1  ✓           │
     │  2. np ∈ [1, 3]             →  1 ∈ [1, 3]                ✓           │
     │  3. ||move|| > 1e-6         →  √(0.1² + 0² + 0²) = 0.1 > 1e-6  ✓    │
     │                                                                     │
-    │  Resultado: TRUE → ¡SIMULACIÓN CRÍTICA!                             │
+    │  Resultado: TRUE → hacer_onda_simulacion = TRUE                     │
+    │  Mensaje: [!] SIMULACIÓN CRÍTICA DETECTADA                          │
+    │           → Análisis de onda: ACTIVADO AUTOMÁTICAMENTE              │
     └─────────────────┬───────────────────────────────────────────────────┘
                       │
                       ▼
@@ -386,9 +395,9 @@ Ejemplo de carpeta:
     │  {datos}_TOTAL_{fecha_hora}.parquet                                 │
     │                                                                     │
     │  Columnas adicionales:                                              │
-    │  • umbral_vz_min                                                    │
-    │  • umbral_energia_min                                               │
-    │  • umbral_desplazamiento_lateral                                    │
+    │  • umbral_vz_min = 0.0                                              │
+    │  • umbral_energia_min = 0.0072                                      │
+    │  • umbral_techo_radios = 5                                          │
     └─────────────────┬───────────────────────────────────────────────────┘
                       │
                       ▼
@@ -414,7 +423,7 @@ Ejemplo de carpeta:
 
 ---
 
-## Evaluación de Criticidad
+## Evaluación de Criticidad (AUTOMÁTICA)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -485,9 +494,9 @@ Entrada:
               ┌───────────┐   ┌───────────────────┐     │
               │ RETORNA:  │   │ RETORNA: TRUE     │     │
               │ FALSE     │   │                   │     │
-              │           │   │ [!] DETECTADA     │     │
-              │           │   │ SIMULACIÓN        │     │
-              │           │   │ CRÍTICA           │     │
+              │           │   │ [!] SIMULACIÓN    │     │
+              │           │   │ CRÍTICA DETECTADA │     │
+              │           │   │ → Onda: ACTIVADA  │     │
               └───────────┘   └───────────────────┘     │
                                                         │
                                                         │
@@ -499,18 +508,14 @@ Entrada:
     │                                                                   │
     │  Si es_critica = TRUE:                                            │
     │  ┌─────────────────────────────────────────────────────────────┐  │
-    │  │ [!] DETECTADA SIMULACIÓN CRÍTICA                            │  │
+    │  │ [!] SIMULACIÓN CRÍTICA DETECTADA                            │  │
     │  │     v=-50 m/s, np=1, move=(0.1, 0, 0)                       │  │
-    │  │                                                             │  │
-    │  │     El análisis de onda es ALTAMENTE RECOMENDADO            │  │
-    │  │                                                             │  │
-    │  │     ¿Desea realizar el análisis de onda para ESTA           │  │
-    │  │     simulacion crítica?                                     │  │
-    │  │     (Y/N, default=Y): _                                     │  │
+    │  │     → Análisis de onda: ACTIVADO AUTOMÁTICAMENTE            │  │
     │  └─────────────────────────────────────────────────────────────┘  │
     │                                                                   │
     │  Si es_critica = FALSE:                                           │
-    │  → Usar configuración global sin preguntar                        │
+    │  → Usar configuración global (default: False)                     │
+    │  → NO se pregunta al usuario                                      │
     └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -541,7 +546,7 @@ En CUALQUIER punto del programa donde se solicite input al usuario:
 │                                                                              │
 │  Ejemplo:                                                                    │
 │  - En CONFIGURACION_RADIO → presiona 'b' → vuelve a SELECCION_CARPETAS      │
-│  - En CONFIGURACION_FILTROS → presiona 'b' → vuelve a CONFIGURACION_ONDA    │
+│  - En CONFIGURACION_FILTROS → presiona 'b' → vuelve a CONFIGURACION_RADIO   │
 └──────────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -573,7 +578,6 @@ En CUALQUIER punto del programa donde se solicite input al usuario:
 │                                                                              │
 │  Ejemplos:                                                                   │
 │  - Radio [µm] (default: 0.76): [ENTER] → usa 0.76                           │
-│  - ¿Análisis de onda? (Y/N, default=Y): [ENTER] → usa True                  │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -605,10 +609,10 @@ resultados/
 │   ├─ i = 0, 1, 2, ...
 │   ├─ onda = True/False
 │   │
-│   └─ Umbrales de filtro (desde config.yaml):
+│   └─ Umbrales de filtro (DESDE config.yaml):
 │      ├─ umbral_vz_min = 0.0
-│      ├─ umbral_energia_min = 0.0
-│      └─ umbral_desplazamiento_lateral = 0.0
+│      ├─ umbral_energia_min = 0.0072
+│      └─ umbral_techo_radios = 5
 │
 ├── ff_0.15_np_1_vel_-50_angle_0_move_0.1_0_0_ONDA_80_2026-03-12_18-30-00.parquet
 │   │
@@ -652,15 +656,14 @@ resultados/
 |----|--------|-------------|------------------|-----------------|
 | 0 | `SELECCION_CARPETAS` | Navegación y selección de directorios | - | `contexto.rutas` |
 | 1 | `CARGAR_CONFIG` | Carga de config.yaml | - | `contexto.config` |
-| 2 | `CONFIGURACION_RADIO` | Ingreso del radio | default desde config | `contexto.R` |
-| 3 | `CONFIGURACION_ONDA` | Configuración global de onda | default desde config | `contexto.hacer_onda` |
-| 4 | `CONFIGURACION_FILTROS` | Umbrales de erosión | defaults desde config | `contexto.umbrales_filtro` |
-| 5 | `VERIFICACION_PREVIA` | Check de análisis previos | `contexto.umbrales_filtro` | `continuar`, `sobreescribir_todo` |
-| 6 | `PREPARACION` | Archivos y caja | - | `archivos`, `limites`, `altura` |
-| 7 | `EJECUCION_FASE1` | Detección de onda | `hacer_onda_simulacion` | `onda_detectada`, `paso_corte` |
-| 8 | `EJECUCION_FASE2` | Análisis OVITO | - | `lista_resultados` |
-| 9 | `EXPORTACION` | Guardado + plot | - | archivos .parquet + .svg |
-| 10 | `COMPLETADO` | Fin del procesamiento | - | - |
+| 2 | `CONFIGURACION_RADIO` | Ingreso del radio + config onda | default desde config | `contexto.R`, `contexto.hacer_onda` |
+| 3 | `CONFIGURACION_FILTROS` | Carga automática de umbrales | config.yaml | `contexto.umbrales_filtro` |
+| 4 | `VERIFICACION_PREVIA` | Check de análisis previos + validación | `contexto.umbrales_filtro` | `continuar`, `sobreescribir_todo` |
+| 5 | `PREPARACION` | Archivos y caja | - | `archivos`, `limites`, `altura` |
+| 6 | `EJECUCION_FASE1` | Detección de onda | `hacer_onda_simulacion` (auto) | `onda_detectada`, `paso_corte` |
+| 7 | `EJECUCION_FASE2` | Análisis OVITO | - | `lista_resultados` |
+| 8 | `EXPORTACION` | Guardado + plot | - | archivos .parquet + .svg |
+| 9 | `COMPLETADO` | Fin del procesamiento | - | - |
 
 ---
 
@@ -668,10 +671,19 @@ resultados/
 
 1. **Trazabilidad completa**: Todos los parámetros físicos (ff, np, vel, angle, move) se extraen del nombre de CADA carpeta individual y se guardan como columnas en los archivos Parquet.
 
-2. **Criticidad individual**: La evaluación de simulaciones críticas se hace POR CADA simulación, no globalmente. Esto permite que el programa recomiende análisis de onda solo para las simulaciones que realmente lo necesitan.
+2. **Criticidad AUTOMÁTICA**: La evaluación de simulaciones críticas se hace POR CADA simulación AUTOMÁTICAMENTE. NO se pregunta al usuario. Si es crítica → onda activada automáticamente.
 
-3. **Navegación hacia atrás**: El comando 'b' permite retroceder al estado anterior sin perder los datos ya ingresados, que se mantienen en el `contexto`.
+3. **Umbrales desde YAML**: Los umbrales de filtrado (vz_min, energia_min, techo_radios) se cargan AUTOMÁTICAMENTE desde config.yaml. NO hay interacción con el usuario.
 
-4. **Metadatos en gráficos**: Los archivos SVG generados incluyen toda la información de la simulación en el título y en una leyenda, facilitando la identificación posterior.
+4. **Validación de carpetas**: Se saltan automáticamente las carpetas que:
+   - No empiezan con `erosion_bed_SI_*`
+   - No tienen parámetros esenciales (ff, np)
+   Esto evita procesar carpetas maestras/contenedoras.
 
-5. **Configuración externalizada**: Todos los valores por defecto, umbrales y parámetros físicos están en `config.yaml`, permitiendo modificar el comportamiento del programa sin tocar el código.
+5. **Navegación hacia atrás**: El comando 'b' permite retroceder al estado anterior sin perder los datos ya ingresados, que se mantienen en el `contexto`.
+
+6. **Metadatos en gráficos**: Los archivos SVG generados incluyen toda la información de la simulación en el título y en una leyenda, facilitando la identificación posterior.
+
+7. **Configuración externalizada**: Todos los valores por defecto, umbrales y parámetros físicos están en `config.yaml`, permitiendo modificar el comportamiento del programa sin tocar el código.
+
+8. **Default de energía JKR**: `umbral_energia_min = 0.0072 m²/s²` es el valor por defecto para el modelo JKR de sílice.
