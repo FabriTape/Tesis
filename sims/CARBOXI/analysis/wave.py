@@ -23,7 +23,7 @@ from ..io.result_writer import save_wave_data
 from ..utils import print_progress
 
 # Columnas mínimas necesarias para el análisis de onda.
-_WAVE_COLUMNS: list[str] = ["x", "y", "z", "vx", "vy", "vz"]
+_WAVE_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 
 
 def is_critical_simulation(metadata: dict[str, str], config: Config) -> bool:
@@ -98,7 +98,7 @@ def detect_wave_particles(
       (proximidad a paredes en X o Y), indicando propagación macroscópica.
 
     Args:
-        lf: LazyFrame con columnas ``["x", "y", "z", "vx", "vy", "vz"]``.
+        lf: LazyFrame con columnas ``["id", "type","x", "y", "z", "vx", "vy", "vz"]``.
         radius: Radio físico de las partículas [m].
         max_height: Altura máxima basal de la cama en reposo [m].
         box_limits: Diccionario ``{"x": [min, max], "y": [min, max]}`` con
