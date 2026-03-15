@@ -33,8 +33,8 @@ analisis_onda:
 # Estos valores se cargan automáticamente al inicio del programa.
 filtros:
   umbral_vz_min: 0.0 # Velocidad vertical mínima [m/s]
-  umbral_energia_min: 0.0072 # Energía cinética mínima [m²/s²] (default JKR)
-  umbral_techo_radios: 5 # Márgen de seguridad en número de radios (Z)
+  umbral_energia_min: 0.0002 # Energía cinética mínima [m²/s²] (default JKR)
+  umbral_techo_radios: 3 # Márgen de seguridad en número de radios (Z)
 
 # -----------------------------------------------------------------------------
 # PARÁMETROS FÍSICOS DEL MATERIAL (SÍLICE)

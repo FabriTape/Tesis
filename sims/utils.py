@@ -26,7 +26,7 @@ RADIO_DEFAULT_UM = 0.76
 
 # Umbrales de filtrado por defecto para el criterio de erosión
 UMBRAL_VZ_MIN = 0.0  # Velocidad vertical mínima [m/s]
-UMBRAL_ENERGIA_MIN = 0.0072  # Energía cinética mínima [m²/s²] (default JKR)
+UMBRAL_ENERGIA_MIN = 0.0002  # Energía cinética mínima [m²/s²] (default JKR)
 
 
 def solicitar_entrada_segura(
@@ -126,7 +126,6 @@ def buscar_carpeta() -> list[Path] | None:
     mensaje = """\nIngrese el numero de la carpeta a la que desea acceder
 [-1] Seleccionar carpeta actual
 [-2] Volver atrás
-[-3] Procesar todas las carpetas 'erosion_bed_SI_*' en este directorio
 [Q] Salir del programa: """
 
     # Define el directorio de inicio resolviendo su ruta absoluta
@@ -204,14 +203,6 @@ def buscar_carpeta() -> list[Path] | None:
                 # Navega al directorio padre (sube un nivel)
                 ruta = ruta.parent
                 limpiar_pantalla()
-
-            elif eleccion == -3:
-                if not carpetas_erosion:
-                    limpiar_pantalla()
-                    print("No hay carpetas 'erosion_bed_SI_*' en este directorio.")
-                    continue
-                limpiar_pantalla()
-                return carpetas_erosion
 
             elif 1 <= eleccion <= len(items):
                 # Navega hacia el subdirectorio seleccionado

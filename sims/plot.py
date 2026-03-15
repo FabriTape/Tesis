@@ -113,7 +113,7 @@ def plot_erosion(
         texto_parametros,
         transform=plt.gca().transAxes,
         fontsize=9,
-        verticalalignment="top",
+        verticalalignment="bottom",
         horizontalalignment="right",
         bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
     )

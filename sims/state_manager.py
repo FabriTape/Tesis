@@ -201,18 +201,6 @@ class StateManager:
                 "umbral_desplazamiento_lateral": 0.0,
                 "umbral_techo_radios": 5,
             },
-            "material": {
-                "nombre": "Silice",
-                "densidad": 2200.0,
-                "modulo_young": 7.0e10,
-                "coeficiente_poisson": 0.17,
-                "energia_superficie": 0.032,
-            },
-            "jkr": {
-                "usar_modelo": True,
-                "cutoff_coordinacion": None,
-                "factor_cutoff": 1.5,
-            },
             "onda": {
                 "umbral_v2_min": 0.0004,
                 "umbral_v2_max": 0.04,

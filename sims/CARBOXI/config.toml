@@ -1,0 +1,66 @@
+# =============================================================================
+# CONFIGURACIÓN CENTRALIZADA - ANÁLISIS DE SIMULACIONES LAMMPS
+# =============================================================================
+# Archivo de configuración en formato TOML (leído con tomllib, stdlib Python 3.11+).
+# Reemplaza config.yaml sin dependencias externas.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# VALORES POR DEFECTO DE LA INTERFAZ
+# -----------------------------------------------------------------------------
+[defaults]
+radio_um     = 0.76   # Radio de partícula en micrómetros (se convierte a metros)
+usar_caja    = true   # Usar límites fijos de la caja vs bordes dinámicos
+
+# -----------------------------------------------------------------------------
+# PARÁMETROS DE CRITICIDAD PARA ANÁLISIS DE ONDA AUTOMÁTICO
+# -----------------------------------------------------------------------------
+# Cuando una simulación cumple estas condiciones, el análisis de onda
+# se activa AUTOMÁTICAMENTE.
+[analisis_onda]
+v_objetivo       = -50.0       # Velocidad exacta de impacto [m/s]
+tolerancia_v     = 0.1         # Margen de error para comparación de velocidad
+np_criticos      = [1, 3]      # Cantidad de partículas del proyectil críticas
+move_referencia  = [0.0, 0.0, 0.0]   # Vector de reposo para comparación
+tolerancia_move  = 1      # Tolerancia para considerar move != 0
+
+# -----------------------------------------------------------------------------
+# UMBRALES DE FILTRADO PARA EROSIÓN
+# -----------------------------------------------------------------------------
+[filtros]
+umbral_vz_min       = 0.0     # Velocidad vertical mínima [m/s]
+umbral_energia_min  = 0.0002  # Energía cinética mínima [m²/s²]
+umbral_techo_radios = 3       # Margen de seguridad en número de radios (Z)
+
+# -----------------------------------------------------------------------------
+# PARÁMETROS FÍSICOS DEL MATERIAL (SÍLICE)
+# -----------------------------------------------------------------------------
+[material]
+nombre              = "Silice"
+densidad            = 2200.0  # [kg/m³]
+modulo_young        = 7.0e10  # [Pa]
+coeficiente_poisson = 0.17
+energia_superficie  = 0.032   # [J/m²] - Parámetro JKR
+
+# -----------------------------------------------------------------------------
+# PARÁMETROS DEL MODELO JKR (Johnson-Kendall-Roberts)
+# -----------------------------------------------------------------------------
+[jkr]
+factor_cutoff = 1  # Factor multiplicador sobre el radio para cutoff de OVITO
+
+# -----------------------------------------------------------------------------
+# PARÁMETROS DE DETECCIÓN DE ONDA
+# -----------------------------------------------------------------------------
+[onda]
+umbral_v2_min      = 0.0004  # Energía cinética mínima de partícula activa [m²/s²]
+umbral_v2_max      = 0.04    # Energía cinética máxima para impacto crítico [m²/s²]
+particulas_criticas = 3000   # Cantidad de partículas para onda macroscópica
+umbral_techo       = 3       # Radios de tolerancia respecto a la altura de la cama
+umbral_pared       = 20      # Radios de proximidad requerida a las paredes laterales
+
+# -----------------------------------------------------------------------------
+# RUTAS Y DIRECTORIOS (relativas al directorio de ejecución)
+# -----------------------------------------------------------------------------
+[rutas]
+resultados = "./resultados"
+imagenes   = "./resultados/Imagenes"
