@@ -23,7 +23,6 @@ from .analysis.topology import build_ovito_pipeline, run_topology_analysis
 from .analysis.wave import is_critical_simulation, run_wave_scan
 from .config import Config
 from .io.lammps_reader import (
-    get_max_bed_height,
     get_timestep_interval,
     list_dump_files,
     read_box_limits,
@@ -200,13 +199,7 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
     limits_final = read_box_limits(dump_files[-1])
     use_static_box = _resolve_use_static_box(limits_initial, limits_final, config)
 
-    try:
-        max_height = get_max_bed_height(dump_files[0], config.radio_m)
-    except ValueError as exc:
-        print(f"  Error al calcular altura de la cama: {exc}. Saltando...")
-        return
-
-    # --- 3. Decisión automática de análisis de onda ---
+    # --- 3. Extracción de metadatos y altura de la cama ---
     metadata = extraer_metadatos(sim_id)
 
     if (
@@ -217,6 +210,17 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         print("  No se pudieron extraer metadatos del nombre de carpeta. Saltando...")
         return
 
+    # Seleccionar altura de cama según valor de ff
+    ff_value = metadata.get("ff", "N/A")
+    if ff_value == "0.15":
+        max_height = config.bed_height_ff_015
+    elif ff_value == "0.35":
+        max_height = config.bed_height_ff_035
+    else:
+        print(f"  Advertencia: ff={ff_value} no reconocido, usando ff_0.15 por defecto.")
+        max_height = config.bed_height_ff_015
+
+    # --- 4. Decisión automática de análisis de onda ---
     run_wave = is_critical_simulation(metadata, config)
     if run_wave:
         print(
@@ -226,7 +230,7 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
             f"pos=({metadata.get('posx')}, {metadata.get('posy')}, {metadata.get('posz')})"
         )
 
-    # --- 4. Fase 1: Detección de onda (opcional) ---
+    # --- 5. Fase 1: Detección de onda (opcional) ---
     cutoff = config.radio_m * config.factor_cutoff
     pipeline = build_ovito_pipeline(cutoff=cutoff)
 
@@ -246,7 +250,7 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         wave_detected = False
         cut_index = len(dump_files)
 
-    # --- 5. Fase 2: Análisis topológico con OVITO ---
+    # --- 6. Fase 2: Análisis topológico con OVITO ---
     files_fase2 = dump_files[:cut_index]
     results = run_topology_analysis(
         dump_files=files_fase2,
@@ -257,7 +261,7 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         wave_detected=wave_detected,
     )
 
-    # --- 6. Exportación directa de resultados (sin verificar previos) ---
+    # --- 7. Exportación directa de resultados (sin verificar previos) ---
     filter_thresholds = {
         "umbral_vz_min": config.filters.umbral_vz_min,
         "umbral_energia_min": config.filters.umbral_energia_min,

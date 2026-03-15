@@ -9,8 +9,10 @@
 # VALORES POR DEFECTO DE LA INTERFAZ
 # -----------------------------------------------------------------------------
 [defaults]
-radio_um     = 0.76   # Radio de partícula en micrómetros (se convierte a metros)
-usar_caja    = true   # Usar límites fijos de la caja vs bordes dinámicos
+radio_um              = 0.76   # Radio de partícula en micrómetros (se convierte a metros)
+usar_caja             = true   # Usar límites fijos de la caja vs bordes dinámicos
+bed_height_ff_015     = 9.99989e-5   # Altura máxima cama para ff=0.15 [m]
+bed_height_ff_035     = 9.99999e-5   # Altura máxima cama para ff=0.35 [m]
 
 # -----------------------------------------------------------------------------
 # PARÁMETROS DE CRITICIDAD PARA ANÁLISIS DE ONDA AUTOMÁTICO

@@ -92,43 +92,6 @@ def read_box_limits(path: Path) -> dict[str, list[float]]:
     return limits
 
 
-def get_max_bed_height(path: Path, radius: float, margin_radii: int = 5) -> float:
-    """Calcula la altura máxima de la cama de partículas en el estado inicial.
-
-    Filtra las partículas de tipo 1 (material de la cama) en el frame inicial
-    y devuelve su coordenada Z máxima más un margen de seguridad expresado
-    en número de radios.
-
-    Args:
-        path: Ruta al archivo dump inicial, típicamente ``output.0.gz``.
-        radius: Radio físico de las partículas [m].
-        margin_radii: Número de radios añadidos como margen de tolerancia
-            sobre la altura máxima. Por defecto es ``5``.
-
-    Returns:
-        Altura de corte [m] usada como umbral para clasificar partículas
-        como erosionadas (``z > max_height``).
-
-    Raises:
-        ValueError: Si no se encuentran partículas de tipo 1 en el archivo,
-            lo que indica un formato de simulación no compatible.
-
-    Example:
-        >>> h = get_max_bed_height(Path("sim/output.0.gz"), radius=7.6e-7)
-        >>> print(f"Altura de cama: {h:.4e} m")
-    """
-    lf = read_dump(path, ["type", "z"])
-    max_z = lf.filter(pl.col("type") == 1).select(pl.col("z").max()).collect().item()
-
-    if max_z is None:
-        raise ValueError(
-            "No se encontraron partículas de tipo 1. "
-            "Verifique los IDs de partículas en el archivo dump."
-        )
-
-    return float(max_z) + margin_radii * radius
-
-
 def list_dump_files(directory: Path) -> list[Path]:
     """Lista y ordena cronológicamente los archivos dump de una simulación.
 
