@@ -13,6 +13,8 @@ radio_um              = 0.76   # Radio de partícula en micrómetros (se convier
 usar_caja             = true   # Usar límites fijos de la caja vs bordes dinámicos
 bed_height_ff_015     = 9.99989e-5   # Altura máxima cama para ff=0.15 [m]
 bed_height_ff_035     = 9.99999e-5   # Altura máxima cama para ff=0.35 [m]
+caja_x                = 1e-4   # Tamaño caja en X [m]
+caja_y                = 1e-4   # Tamaño caja en Y [m]
 
 # -----------------------------------------------------------------------------
 # PARÁMETROS DE CRITICIDAD PARA ANÁLISIS DE ONDA AUTOMÁTICO

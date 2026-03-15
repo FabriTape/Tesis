@@ -85,6 +85,8 @@ class Config:
     usar_caja: bool
     bed_height_ff_015: float
     bed_height_ff_035: float
+    caja_x: float
+    caja_y: float
     wave: WaveConfig
     filters: FilterConfig
     factor_cutoff: float
@@ -192,6 +194,8 @@ def _build_config(raw: dict) -> Config:
         usar_caja=bool(raw["defaults"].get("usar_caja", True)),
         bed_height_ff_015=float(raw["defaults"]["bed_height_ff_015"]),
         bed_height_ff_035=float(raw["defaults"]["bed_height_ff_035"]),
+        caja_x=float(raw["defaults"]["caja_x"]),
+        caja_y=float(raw["defaults"]["caja_y"]),
         wave=wave,
         filters=filters,
         factor_cutoff=float(raw["jkr"]["factor_cutoff"]),

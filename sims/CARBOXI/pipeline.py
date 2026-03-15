@@ -25,7 +25,6 @@ from .config import Config
 from .io.lammps_reader import (
     get_timestep_interval,
     list_dump_files,
-    read_box_limits,
 )
 from .io.result_writer import (
     save_erosion_results,
@@ -194,10 +193,9 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
 
     timestep_interval = get_timestep_interval(dump_files)
 
-    # --- 2. Límites de la caja y altura de la cama ---
-    limits_initial = read_box_limits(dump_files[0])
-    limits_final = read_box_limits(dump_files[-1])
-    use_static_box = _resolve_use_static_box(limits_initial, limits_final, config)
+    # --- 2. Límites de la caja (fijos desde config) ---
+    box_limits = {"x": [0.0, config.caja_x], "y": [0.0, config.caja_y]}
+    use_static_box = True  # Siempre usamos caja fija
 
     # --- 3. Extracción de metadatos y altura de la cama ---
     metadata = extraer_metadatos(sim_id)
@@ -239,7 +237,7 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
             dump_files=dump_files,
             radius=config.radio_m,
             max_height=max_height,
-            box_limits=limits_final,
+            box_limits=box_limits,
             use_static_box=use_static_box,
             sim_id=sim_id,
             timestamp=timestamp,
@@ -406,36 +404,36 @@ def _clear() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Helper privado del pipeline
+# Helper privado del pipeline (comentado - referencia futura)
 # ---------------------------------------------------------------------------
 
 
-def _resolve_use_static_box(
-    limits_initial: dict[str, list[float]],
-    limits_final: dict[str, list[float]],
-    config: Config,
-) -> bool:
-    """Determina si usar los límites estáticos de la caja de simulación.
-
-    Si los límites no cambiaron entre el frame inicial y el final, usa la
-    caja fija. Si cambiaron, aplica el valor de ``config.usar_caja`` y
-    emite una advertencia informativa sin interacción con el usuario.
-
-    Args:
-        limits_initial: Límites espaciales del primer frame de la simulación.
-        limits_final: Límites espaciales del último frame de la simulación.
-        config: Configuración del programa con el valor por defecto de
-            ``usar_caja``.
-
-    Returns:
-        ``True`` si se deben usar los límites fijos de la caja; ``False`` para
-        bordes dinámicos basados en la posición de las partículas.
-    """
-    if limits_initial == limits_final:
-        return True
-
-    print(
-        f"  ⚠  Los límites de la caja cambiaron entre frame inicial y final.\n"
-        f"     Usando configuración: usar_caja={config.usar_caja}"
-    )
-    return config.usar_caja
+# def _resolve_use_static_box(
+#     limits_initial: dict[str, list[float]],
+#     limits_final: dict[str, list[float]],
+#     config: Config,
+# ) -> bool:
+#     """Determina si usar los límites estáticos de la caja de simulación.
+#
+#     Si los límites no cambiaron entre el frame inicial y el final, usa la
+#     caja fija. Si cambiaron, aplica el valor de ``config.usar_caja`` y
+#     emite una advertencia informativa sin interacción con el usuario.
+#
+#     Args:
+#         limits_initial: Límites espaciales del primer frame de la simulación.
+#         limits_final: Límites espaciales del último frame de la simulación.
+#         config: Configuración del programa con el valor por defecto de
+#             ``usar_caja``.
+#
+#     Returns:
+#         ``True`` si se deben usar los límites fijos de la caja; ``False`` para
+#         bordes dinámicos basados en la posición de las partículas.
+#     """
+#     if limits_initial == limits_final:
+#         return True
+#
+#     print(
+#         f"  ⚠  Los límites de la caja cambiaron entre frame inicial y final.\n"
+#         f"     Usando configuración: usar_caja={config.usar_caja}"
+#     )
+#     return config.usar_caja
