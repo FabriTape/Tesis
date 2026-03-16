@@ -59,7 +59,7 @@ factor_cutoff = 1  # Factor multiplicador sobre el radio para cutoff de OVITO
 umbral_v2_min      = 0.0004  # Energía cinética mínima de partícula activa [m²/s²]
 umbral_v2_max      = 0.04    # Energía cinética máxima para impacto crítico [m²/s²]
 particulas_criticas = 3000   # Cantidad de partículas para onda macroscópica
-umbral_techo       = 3       # Radios de tolerancia respecto a la altura de la cama
+umbral_techo       = 5       # Radios de tolerancia respecto a la altura de la cama
 umbral_pared       = 20      # Radios de proximidad requerida a las paredes laterales
 
 # -----------------------------------------------------------------------------

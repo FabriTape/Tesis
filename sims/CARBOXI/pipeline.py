@@ -218,6 +218,9 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         print(f"  Advertencia: ff={ff_value} no reconocido, usando ff_0.15 por defecto.")
         max_height = config.bed_height_ff_015
 
+    # Agregar radios al umbral de altura para el análisis de erosión
+    max_height = max_height + config.filters.umbral_techo_radios * config.radio_m
+
     # --- 4. Decisión automática de análisis de onda ---
     run_wave = is_critical_simulation(metadata, config)
     if run_wave:
