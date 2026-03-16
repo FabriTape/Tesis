@@ -1,313 +1,261 @@
-#!/home/tutturuu/spyder-env/bin python3
 # -*- coding: utf-8 -*-
-import os
-from datetime import datetime, timedelta, UTC
+"""
+Extractor de datos para el análisis de simulaciones LAMMPS de erosión.
+
+Este módulo orquesta el pipeline completo de análisis de datos utilizando
+una arquitectura basada en máquina de estados. Coordina las dos fases de
+procesamiento (detección de onda y análisis topológico) y exportando los
+resultados para su posterior visualización.
+
+Arquitectura:
+    - Máquina de estados controlada por StateManager
+    - Contexto compartido para persistencia de datos entre estados
+    - Input wrapper con validación y comandos globales (b/q)
+    - Configuración externalizada en config.yaml
+
+Flujo de ejecución:
+    1. SELECCION_CARPETAS: Navegación y selección de directorios
+    2. CARGAR_CONFIG: Carga de configuración YAML
+    3. CONFIGURACION_RADIO: Ingreso del radio de partículas
+    4. CONFIGURACION_ONDA: Opción de análisis de onda (con detección de criticidad)
+    5. CONFIGURACION_FILTROS: Umbrales de filtrado de erosión
+    6. VERIFICACION_PREVIA: Check de análisis previos por simulación
+    7. EJECUCION_FASE1: Detección de onda (FASE 1)
+    8. EJECUCION_FASE2: Análisis OVITO (FASE 2)
+    9. EXPORTACION: Guardado de resultados + plot
+    10. COMPLETADO: Fin del procesamiento
+"""
+
+from datetime import datetime
 from pathlib import Path
 
 import polars as pl
 
-from ovito.data import DataCollection
-from ovito.pipeline import Pipeline, StaticSource
-from ovito.modifiers import CoordinationAnalysisModifier
-from ovito.modifiers import ClusterAnalysisModifier
-from ovito.data import SimulationCell
+from lammps_utils import control_caja, extractor_de_borde, max_altura
+from ovito_utils import ejecutar_fase_ovito, inicializar_pipeline_ovito
+from plot import plot_erosion
+from state_manager import Estado, StateManager, es_simulacion_critica
+from utils import (
+    DIR_RESULTADOS,
+    TZ_ARG,
+    extraer_metadatos,
+    guardar_resultados,
+    preparar_archivos,
+    verificar_analisis_previo,
+)
 
 
+def data_analysis() -> None:
+    """
+    Orquestador principal que ejecuta el pipeline de extracción utilizando
+    máquina de estados.
 
-def Lector(archivo_gz: str, datos: list):
-    nombres_columnas = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "wx", "wy", "wz"]
-    
-    df_archivo = pl.scan_csv(
-        archivo_gz, 
-        skip_rows=9,
-        has_header=False,
-        new_columns=nombres_columnas,
-        separator=" ",         # Cambiamos tab por espacio
-        truncate_ragged_lines=True, # Ignora espacios extra al final de la línea
-        infer_schema_length=10000,
-        schema_overrides={
-            "type": pl.UInt8,
-            "id": pl.UInt64
-        }
-    )
-    
-    return df_archivo.select(datos)
+    Esta función actúa como puente entre la máquina de estados y la lógica
+    de procesamiento real. Los handlers de StateManager gestionan la UI y
+    navegación, mientras que este módulo ejecuta el procesamiento pesado.
 
-def limpiar_pantalla():
-    ''' Limpia la terminal según el sistema operativo (Windows o Linux/macOS).
     Args:
         None
+
     Returns:
-        None
-    '''
-    # 'nt' es Windows, 'posix' es Linux/macOS
-    os.system('cls' if os.name == 'nt' else 'clear')
-    
-def rreplace(s, old, new="", ocurrence=1):
-    ''' Reemplaza una subcadena buscando desde el final del string (derecha).
-    Args:
-        s (str) : Cadena de texto original.
-        old (str) : Subcadena que se desea reemplazar.
-        new (str) : Subcadena nueva que reemplazará a la antigua.
-        ocurrence (int) : Cantidad de veces que se realizará el reemplazo.
-    Returns:
-        (str) : Cadena de texto con los reemplazos realizados.
-    '''
-    li = s.rsplit(old, ocurrence)
-    return new.join(li)
-# Funcion obtenida de 
-# https://www.geeksforgeeks.org/python/delete-a-directory-or-file-using-python/
-"""Esta funcion esta en desuso y será removida en suturas versiones"""
-def borrar_dir(ruta):
-    ''' Elimina todos los archivos de un directorio y luego la carpeta misma.
-    Args:
-        ruta (str) : Trayectoria de la carpeta que se desea eliminar.
-    Returns:
-        None
-    '''
-    for filename in os.listdir(ruta):
-        file_path = os.path.join(ruta, filename)
-        if os.path.isfile(file_path):
-            os.remove(file_path)  # Remove the file
-    os.rmdir(ruta)
+        None: La función actúa como controlador de flujo y no retorna valores.
+    """
+    # Inicializar la máquina de estados
+    state_manager = StateManager(config_path=Path("./config.yaml"))
+    contexto = state_manager.contexto
 
+    # Estados iniciales (UI interactiva manejada por StateManager)
+    # SELECCION_CARPETAS -> CARGAR_CONFIG -> CONFIGURACION_RADIO ->
+    # CONFIGURACION_ONDA -> CONFIGURACION_FILTROS
 
-def buscar_carpeta():
-    ''' Permite la navegación interactiva usando objetos de ruta (Path). '''
-    
-    mensaje = """\nIngrese el numero de la carpeta a la que desea acceder
-ingresar [-1] para elegir los datos de la carpeta actual
-ingresar [-2] para volver atras : """
-    
-    # Iniciamos con la ruta actual absoluta
-    ruta = Path(".").resolve()
-    
-    while True:
-        # Listar carpetas (filtrando ocultas)
-        carpetas = sorted([d for d in ruta.iterdir() if d.is_dir() and not d.name.startswith(".")])
-        
-        # Listar archivos de simulación (solo para visualización)
-        datos_gz = sorted([f.name for f in ruta.glob("output.*.gz")])
-        
-        print(f"\n--- Ubicación actual: {ruta} ---")
-        print("Carpetas disponibles:")
-        for i, carpeta in enumerate(carpetas, start=1):
-            print(f"[{i}] {carpeta.name}")
-        
-        if datos_gz:
-            print("\nArchivos de datos encontrados (muestra):")
-            for dato in datos_gz[:3]:
-                print(f"  {dato}")
-        
-        try:
-            eleccion = int(input(mensaje))
-            
-            if 1 <= eleccion <= len(carpetas):
-                # Ir hacia adelante
-                ruta = carpetas[eleccion-1]
-                limpiar_pantalla()
-                
-            elif eleccion == -1:
-                # Seleccionar carpeta actual
-                limpiar_pantalla()
-                return str(ruta) # Retornamos como string para que el resto del código no cambie
-            
-            elif eleccion == -2:
-                # Ir hacia atrás de forma segura
-                ruta = ruta.parent
-                limpiar_pantalla()
-                
-            else:
-                limpiar_pantalla()
-                print("Número inválido, intente de nuevo.")
-                
-        except ValueError:
-            print("Entrada inválida, por favor ingrese un número.")
-            
-def generar_carpeta():
-    ''' Crea una carpeta para los resultados gestionando la sobreescritura.
-    Args:
-        None
-    Returns:
-        ruta (str) : Ruta de la carpeta de origen de los datos.
-        base (str) : Ruta de la carpeta de destino para el análisis.
-    '''
-    ruta = buscar_carpeta()
-    base = os.path.join(ruta,"datos_analisis") 
+    # Ejecutar estados iniciales de configuración
+    while state_manager.estado_actual < Estado.VERIFICACION_PREVIA:
+        handler = state_manager.handlers.get(state_manager.estado_actual)
+        if handler is None:
+            print(f"Error: No hay handler para el estado {state_manager.estado_actual}")
+            return
 
-    base += (datetime.now(UTC) + timedelta(hours=-3)
-           ).strftime('_%Y-%m-%d_%H:%M')
-    os.mkdir(base)
-    return ruta, base
-
-def progress(i, N):
-    ''' Imprime una barra de progreso visual en la terminal.
-    Args:
-        i (int) : Iteración actual del proceso.
-        N (int) : Cantidad total de iteraciones.
-    Returns:
-        None
-    '''
-    print("\r", 
-          "{:03d}".format(int((i * 100 / N) // 1)), 
-          "/100%[", 
-          int((i  * 100 / N) // 5) * "_" + "@ï", 
-          sep="", 
-          end=""
-          )
-    
-def detector_de_ondas(lf, R, altura):
-    ''' Filtra partículas de la onda de choque y calcula métricas de interés.
-    Args:
-        lf (pl.LazyFrame) : Datos de la simulación cargados en modo Lazy.
-        R (float) : Radio de los granos de la simulación.
-        altura (float) : Altura de corte h_max calculada inicialmente.
-    Returns:
-        lf_onda (pl.LazyFrame) : Partículas filtradas que componen la onda.
-        df_res_onda (pl.DataFrame) : Conteo y velocidad máxima de la onda.
-    '''
-    lf_onda = ( lf
-     .with_columns((pl.col("vx") ** 2 + pl.col("vy") ** 2 + pl.col("vz") ** 2)
-                   .alias("v^2"))
-     
-     .filter((pl.col("z") < altura - 4 * R) &
-             (pl.col("v^2") > 4e-4) &
-             (
-             (pl.col("x") < 10 * R) | 
-             (pl.col("x").max() - 10 * R < pl.col("x")) |
-             (pl.col("y") < 10 * R) |
-             (pl.col("y").max() - 10 * R < pl.col("y")))
-             )
-     )
-    df_res_onda = (lf_onda
-           .select([ pl.len()
-                    .alias("cantidad"),
-                    pl.col("v^2").max()
-                    .alias("v^2_max") ])
-           .collect()
-           )
-    return lf_onda, df_res_onda
-
-def analisis_ovito(lf: pl.LazyFrame, cutoff: float) -> pl.LazyFrame:
-    ''' Integra OVITO para calcular coordinación y clusters en partículas.
-    Args:
-        lf (pl.LazyFrame) : Partículas eyectadas para analizar.
-        cutoff (float) : Distancia de corte para los modificadores de OVITO.
-    Returns:
-        (pl.LazyFrame) : Datos originales con columnas de coordinación y cluster.
-    '''
-    # 1. Colectar a DataFrame
-    df = lf.collect()
-    
-    # 2. Extraer posiciones como NumPy array
-    positions = df.select(["x", "y", "z"]).to_numpy()
-    
-    # 3. Crear colección de datos manualmente (la forma correcta para datos 
-    #    en memoria)
-    data = DataCollection()
-    particles = data.create_particles()
-    particles.create_property('Position', data=positions)
-    
-    cell = SimulationCell()
-    cell[:, :] = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]  
-    data.objects.append(cell)
-    # 4. Crear pipeline con fuente estática
-    pipeline = Pipeline(source=StaticSource(data=data))
-    
-    # 5. Agregar modificadores
-    pipeline.modifiers.append(CoordinationAnalysisModifier(cutoff=cutoff))
-    pipeline.modifiers.append(ClusterAnalysisModifier(cutoff=cutoff))
-    
-    # 6. Computar
-    computed_data = pipeline.compute()
-    
-    # 7. Extraer resultados
-    coordinacion = computed_data.particles['Coordination'][:]
-    cluster = computed_data.particles['Cluster'][:]
-    
-    # 8. Agregar columnas y devolver LazyFrame
-    return df.with_columns([
-        pl.Series("coordinacion", coordinacion),
-        pl.Series("cluster", cluster)
-    ]).lazy()
-
-
-
-def data_analysis():
-    ''' Orquestador principal que ejecuta el flujo de análisis completo.
-    Args:
-        None
-    Returns:
-        None
-    '''
-    ruta, base = generar_carpeta()
-    # Radio de los granos
-    R = float(input("""ingrese el valor de radio de los granos en [m]
-(se puede usar formato xe-y [m]): """))
-    limpiar_pantalla()
-    
-    archivos = [d for d in os.listdir(ruta) if ("output." in d) 
-                and (".gz" in d)]
-    
-    archivos.sort(key = lambda x: '{0:0>19}'.format(x).lower())
-
-    LenTotal = len(archivos)
-    # Variables constantes fuera del bucle
-    lf0 = Lector(f"{ruta}/output.0.gz", ["type", "z"])
-    
-    # Filtramos donde type == 1 y buscamos el maximo de z
-    altura = 4 * R + (lf0
-                     .filter(pl.col("type") == 1)
-                     .select(pl.col("z").max())
-                     .collect()
-                     .item()
-                     )
-    ## Estas son las columnas que se van a leer en el bucle for
-    columnas = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
-    # --- FASE 2: EL BUCLE DE PROCESAMIENTO ---
-    print("Iniciando análisis de datos")
-    print("000/100%[", 22 * "·", "]", sep="", end="")
-
-    for i, file in enumerate(archivos):
-        progress(i, LenTotal)
-        
-        # Lectura de los datos con columnas espcificas
-        
-        lf_datos = Lector(f"{ruta}/{file}", columnas)
-        
-    	# Buscamos si la onda llego al borde
-        lf_onda, df_res_onda = detector_de_ondas(lf_datos, R, altura)
-        
-        cantidad = df_res_onda.item(0, "cantidad")
-        max_v2   = df_res_onda.item(0, "v^2_max")
-        bool_v2_max = (max_v2 >= 4e-2) if isinstance(max_v2,float) else False
-        
-        if cantidad > 3000 or bool_v2_max:
-            
-            print(f"""\nSe analizaron {i} archivos y en el archivo {file}:
-                  Se detectó una onda de {cantidad} partículas
-                  Con una v² máxima de {max_v2}""")
-            ruta_guardado = os.path.join(base, f"onda.{i}.parquet")
-            lf_onda.sink_parquet(ruta_guardado)
-            break
+        siguiente_estado = handler()
+        if siguiente_estado is not None:
+            state_manager.estado_actual = siguiente_estado
         else:
-            lf_eyectados = ( lf_datos
-                            .filter(pl.col("z") > altura)
-                            .filter(pl.col("vz") > 0)
-                            )
-            ruta_guardado = os.path.join(base, f"salida.{i}.parquet")
-            lf_procesados = analisis_ovito(lf_eyectados, R)
-            lf_procesados.sink_parquet(ruta_guardado)
-            df_eyectados = lf_procesados.filter(pl.col("type") == 2).collect()
-            if df_eyectados.shape[0] == 0:
-                # El proyectil se hundió en la cama
-                lf_proyectil = lf_datos.filter(pl.col("type")==2)
-                ruta_guardado_proyectil = os.path.join(base, 
-                                                      f"proyectil.{i}.parquet")
-                lf_proyectil.sink_parquet(ruta_guardado_proyectil)
-            
-            
-    progress(100, 100)
-    print("\nSe terminó el análisis exitosamente")
-    print(f"{LenTotal} datos guardados en: {base}")
-data_analysis()
+            state_manager.estado_actual += 1
+
+    # Verificar que tenemos los datos necesarios
+    if not contexto.rutas or not contexto.R or not contexto.config:
+        print("Error: Faltan datos de configuración necesarios.")
+        return
+
+    # Crear directorio de resultados
+    DIR_RESULTADOS.mkdir(exist_ok=True)
+
+    # Procesar cada ruta seleccionada
+    for ruta in contexto.rutas:
+        # Resetear datos de simulación
+        contexto.reset_simulacion()
+        contexto.ruta_actual = ruta
+
+        print(f"\n{'=' * 50}")
+        print(f"Procesando: {ruta.name}")
+        print(f"{'=' * 50}")
+
+        # Validar que la carpeta sea una simulación válida
+        if not ruta.name.startswith("erosion_bed_SI_"):
+            print(f"\n⚠ La carpeta '{ruta.name}' no tiene el formato esperado.")
+            print(
+                "   Se esperan carpetas con nombre: erosion_bed_SI_ff_*_np_*_vel_*_..."
+            )
+            print("   Saltando...")
+            continue
+
+        datos = ruta.name.replace("erosion_bed_SI_", "", 1)
+        contexto.datos = datos
+        contexto.fecha_hora = datetime.now(TZ_ARG).strftime("%Y-%m-%d_%H-%M-%S")
+
+        # Extraer metadatos de esta simulación individual
+        metadatos = extraer_metadatos(datos)
+
+        # Validar que se extrajeron los parámetros esenciales
+        if metadatos.get("ff") == "N/A" or metadatos.get("np") == "N/A":
+            print("\n⚠ No se pudieron extraer los parámetros de la simulación.")
+            print("   Verifique que el nombre de la carpeta tenga el formato correcto.")
+            print("   Saltando...")
+            continue
+
+        # Análisis de onda AUTOMÁTICO basado en criticidad
+        # NO se pregunta al usuario - se decide automáticamente
+        hacer_onda_simulacion = es_simulacion_critica(metadatos, contexto.config)
+
+        if hacer_onda_simulacion:
+            print("\n[!] SIMULACIÓN CRÍTICA DETECTADA")
+            print(
+                f"    v={metadatos.get('vel0', 'N/A')} m/s, "
+                f"np={metadatos.get('np', 'N/A')}, "
+                f"move=({metadatos.get('posx', '0')}, {metadatos.get('posy', '0')}, {metadatos.get('posz', '0')})"
+            )
+            print("    → Análisis de onda: ACTIVADO AUTOMÁTICAMENTE")
+        else:
+            # No es crítica - usar configuración global como fallback
+            hacer_onda_simulacion = contexto.hacer_onda
+            if contexto.hacer_onda:
+                print("    → Análisis de onda: ACTIVADO (configuración global)")
+
+        # Estado VERIFICACION_PREVIA (por simulación)
+        continuar, contexto.sobreescribir_todo = verificar_analisis_previo(
+            datos, contexto.umbrales_filtro, contexto.sobreescribir_todo
+        )
+
+        if not continuar:
+            print(f"Saltando {ruta.name}...")
+            continue
+
+        # Preparación de archivos y caja
+        archivos, paso_int, len_total = preparar_archivos(ruta)
+
+        if len_total == 0:
+            print(f"No se encontraron archivos output.*.gz en {ruta.name}. Saltando...")
+            continue
+
+        contexto.archivos = archivos
+        contexto.paso_int = paso_int
+
+        limites_i = extractor_de_borde(ruta, archivos[0])
+        limites_f = extractor_de_borde(ruta, archivos[-1])
+        usar_caja = control_caja(limites_i, limites_f, archivos)
+
+        contexto.limites_i = limites_i
+        contexto.limites_f = limites_f
+        contexto.usar_caja = usar_caja
+
+        columnas = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
+
+        try:
+            altura = max_altura(ruta, contexto.R)
+            contexto.altura = altura
+        except ValueError as e:
+            print(f"Error calculando altura para {ruta.name}: {e}. Saltando...")
+            continue
+
+        # Inicializar pipeline de OVITO
+        pipeline_global = inicializar_pipeline_ovito(cutoff=contexto.R)
+
+        # Estado EJECUCION_FASE1: Búsqueda rápida de la onda (Opcional)
+        if hacer_onda_simulacion:
+            from analisis_onda import ejecutar_fase_onda
+
+            onda_detectada, paso_corte = ejecutar_fase_onda(
+                archivos,
+                ruta,
+                columnas,
+                contexto.R,
+                altura,
+                limites_f,
+                usar_caja,
+                datos,
+                contexto.fecha_hora,
+            )
+            contexto.onda_detectada = onda_detectada
+            contexto.paso_corte = paso_corte
+        else:
+            contexto.onda_detectada = False
+            contexto.paso_corte = len(archivos)
+
+        # Estado EJECUCION_FASE2: Análisis pesado con OVITO
+        archivos_fase2 = archivos[: contexto.paso_corte]
+        lista_resultados = ejecutar_fase_ovito(
+            archivos_fase2,
+            ruta,
+            columnas,
+            pipeline_global,
+            altura,
+            datos,
+            paso_int,
+            contexto.onda_detectada,
+        )
+
+        contexto.lista_resultados = lista_resultados
+
+        # Estado EXPORTACION: Exportación de Datos + Plot
+        guardar_resultados(
+            lista_resultados, datos, contexto.fecha_hora, contexto.umbrales_filtro
+        )
+
+        # Generación automática de gráficos
+        if lista_resultados:
+            print("\nGenerando gráfico de erosión...")
+            df_concat = pl.concat(lista_resultados, how="vertical_relaxed")
+
+            # Extraer metadatos del DataFrame para el nombre del archivo
+            try:
+                ff = float(df_concat["ff"].item(0))
+                np_ = float(df_concat["np"].item(0))
+                vel = float(df_concat["vel0"].item(0))
+                angle = float(df_concat["angulo"].item(0))
+                move1 = float(df_concat["posx"].item(0))
+                move2 = float(df_concat["posy"].item(0))
+                move3 = float(df_concat["posz"].item(0))
+
+                plot_erosion(
+                    df_concat,
+                    ff,
+                    np_,
+                    vel,
+                    angle,
+                    move1,
+                    move2,
+                    move3,
+                    DIR_RESULTADOS,
+                )
+            except (KeyError, ValueError) as e:
+                print(f"No se pudieron extraer los metadatos para el gráfico: {e}")
+
+    # Estado COMPLETADO
+    print("\n" + "=" * 50)
+    print("ANÁLISIS COMPLETADO EXITOSAMENTE")
+    print("=" * 50)
+    print(f"Datos guardados en: {DIR_RESULTADOS}")
+
+
+# Punto de entrada de la ejecución
+if __name__ == "__main__":
+    data_analysis()
