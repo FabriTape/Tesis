@@ -32,6 +32,9 @@ LEGACY_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 # Líneas de header estándar LAMMPS a saltar.
 _LAMMPS_HEADER_ROWS = 9
 
+# Tamaño mínimo para considerar que un archivo tiene datos (header ~200 bytes).
+_MIN_FILE_SIZE_BYTES = 500
+
 # Regex para archivos mixtos: output.<step>.<core>.txt
 _MIXED_PATTERN = re.compile(r"^output\.(\d+)\.\d+\.txt$")
 
@@ -66,8 +69,9 @@ def convert_step(
 ) -> int:
     """Convierte archivos mixtos de un paso a un .gz legacy.
 
-    Lee todos los archivos del paso, extrae las 8 columnas originales
-    y escribe un archivo gzip con header LAMMPS estándar.
+    Lee cada archivo individualmente (filtrando vacíos por tamaño),
+    extrae las 8 columnas originales y escribe un archivo gzip con
+    header LAMMPS estándar.
 
     Args:
         file_paths: Archivos mixtos del mismo timestep.
@@ -77,16 +81,28 @@ def convert_step(
     Returns:
         Número de átomos escritos.
     """
-    df = pl.read_csv(
-        file_paths,
-        separator=" ",
-        has_header=False,
-        skip_rows=_LAMMPS_HEADER_ROWS,
-        new_columns=MIXED_COLUMNS,
-        truncate_ragged_lines=True,
-        comment_prefix=None,
-    ).select(LEGACY_COLUMNS)
+    dfs: list[pl.DataFrame] = []
 
+    for fpath in file_paths:
+        if fpath.stat().st_size < _MIN_FILE_SIZE_BYTES:
+            continue
+
+        dfs.append(
+            pl.read_csv(
+                fpath,
+                separator=" ",
+                has_header=False,
+                skip_rows=_LAMMPS_HEADER_ROWS,
+                new_columns=MIXED_COLUMNS,
+                truncate_ragged_lines=True,
+                comment_prefix=None,
+            ).select(LEGACY_COLUMNS)
+        )
+
+    if not dfs:
+        return 0
+
+    df = pl.concat(dfs, how="vertical_relaxed")
     n_atoms = df.height
 
     with gzip.open(output_path, "wt") as f:
