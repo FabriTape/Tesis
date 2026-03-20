@@ -61,10 +61,22 @@ Contenido (máximo 400–500 palabras, conciso):
 - Decisiones de diseño importantes (ej: "se eligió clase Config en vez de dict global", "se eliminó back-navigation por SRP")
 - Razones breves por las que se rechazó otra alternativa
 
-**Cuándo consultar engram:**
+**Cuándo consultar engram (obligatorio antes de cualquier edición de código):**
 
-- Antes de empezar a trabajar en un archivo que ya existe en la carpeta CARBOXI
+- Antes de empezar a trabajar en un archivo que ya existe
 - Antes de proponer cualquier cambio estructural que pueda contradecir una decisión anterior
+- Antes de crear una función o clase nueva que pueda duplicar algo existente
 
 Instrucción literal que el agente debe seguir:  
 “Primero busco en engram si existe entrada para este archivo o tema. Si existe, la leo completa antes de escribir cualquier línea.”
+
+## Flujo de trabajo obligatorio
+
+Cada vez que se edita, crea o revisa código, se deben seguir estos pasos en orden:
+
+1. **Consultar engram** — buscar entradas previas sobre el archivo/tema antes de escribir nada
+2. **Leer skill/reference** correspondiente según la situación (ver tabla Skills)
+3. **Implementar** siguiendo SOLID/KISS/YAGNI
+4. **Ejecutar Ruff** (`ruff check`) para verificar calidad del código
+5. **Commitear** con mensaje descriptivo (qué, por qué, archivos afectados)
+6. **Guardar en enram** checkpoint si fue refactorización completa o decisión de arquitectura
