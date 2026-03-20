@@ -129,13 +129,16 @@ def compute_cluster_physics(
     ).item()
 
     if has_any_projectile:
-        projectile_cluster = df.filter(
-            pl.col("type") == 2
-        ).select("Cluster_ID").unique()
+        projectile_cluster_ids = (
+            df.filter(pl.col("type") == 2)
+            .select("Cluster_ID")
+            .unique()
+            .to_series()
+        )
 
         ballistic = ballistic.with_columns(
             pl.col("Cluster_ID")
-            .is_in(projectile_cluster.select("Cluster_ID"))
+            .is_in(projectile_cluster_ids)
             .alias("proyectil_erosion")
         )
     else:
