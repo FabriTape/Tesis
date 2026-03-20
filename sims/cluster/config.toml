@@ -16,6 +16,7 @@ np              = 3          # Número de partículas del proyectil
 ndumps          = 25000      # Frecuencia de dump [timesteps]
 nthermo         = 5000       # Frecuencia de thermo [timesteps]
 cores           = 64         # Núcleos MPI
+processors      = [8, 8, 1]  # [Px, Py, Pz], producto debe ser = cores
 exe             = "lmp_g++_openmpi-4.0.2_stableSep2021"
 
 [sweep]

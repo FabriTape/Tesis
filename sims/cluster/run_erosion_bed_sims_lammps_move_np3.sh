@@ -90,6 +90,9 @@ do
 							   -v poisson "$POISSON" \
 							   -v surface_energy "$SURFACE_ENERGY" \
 							   -v density_proj "$DENSITY" \
+							   -v proc_x "$PROC_X" \
+							   -v proc_y "$PROC_Y" \
+							   -v proc_z "$PROC_Z" \
 							   > salida.log
 					cd ..
 				fi

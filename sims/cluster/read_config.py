@@ -53,6 +53,12 @@ def generate_shell_vars(raw: dict, output_path: Path) -> None:
 
         lines.append(f"# [{section}]")
         for key, value in values.items():
+            if key == "processors" and isinstance(value, list) and len(value) == 3:
+                lines.append(f"PROC_X={value[0]}")
+                lines.append(f"PROC_Y={value[1]}")
+                lines.append(f"PROC_Z={value[2]}")
+                continue
+
             var_name = key.upper()
             lines.append(f"{var_name}={_format_value(value)}")
         lines.append("")
