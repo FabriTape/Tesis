@@ -98,12 +98,28 @@ def _resolve_config_path(path: Path) -> Path:
 def _build_config(raw: dict) -> Config:
     """Construye la instancia Config desde el diccionario TOML parseado.
 
+    Soporta dos formatos de config.toml:
+
+    - Formato local (``[defaults]`` + ``[rutas]``): usado cuando
+      CARBOXIMINI tiene su propio config.toml.
+    - Formato compartido (``[analysis]``): usado cuando se lee el
+      config.toml centralizado del proyecto.
+
     Args:
         raw: Diccionario crudo de tomllib.
 
     Returns:
         Instancia inmutable de Config.
     """
+    if "analysis" in raw:
+        section = raw["analysis"]
+        return Config(
+            radio_m=float(section["radio_um"]) * 1e-6,
+            factor_cutoff=float(section["factor_cutoff"]),
+            tolerancia_fz=float(section["tolerancia_fz"]),
+            dir_resultados=Path(section["resultados"]),
+        )
+
     defaults = raw["defaults"]
     rutas = raw["rutas"]
 
