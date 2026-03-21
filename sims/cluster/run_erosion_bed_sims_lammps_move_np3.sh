@@ -22,11 +22,11 @@ R=$GRAIN_RADIUS_UM
 XMOVE=()
 YMOVE=()
 
-for mv in "${MOVES[@]}"; do
-	xmove=$(echo "$mv * $R" | bc)
-	ymove=0
-	XMOVE+=( "$xmove" )
-	YMOVE+=( "$ymove" )
+for mx in "${MOVES[@]}"; do
+	for my in "${MOVES[@]}"; do
+		XMOVE+=( "$(echo "$mx * $R" | bc)" )
+		YMOVE+=( "$(echo "$my * $R" | bc)" )
+	done
 done
 
 # Configuración MPI
