@@ -158,7 +158,7 @@ if "${is_critical} == 1" then &
     "compute count_wave all reduce sum v_is_wave" &
     "compute peak_v2_wave all reduce max v_v2_filtered" &
     "variable stop_condition equal '(c_count_wave > v_n_max) || (c_peak_v2_wave >= v_v2_max)'" &
-    "fix wave_trigger all halt 2000 v_stop_condition > 0"
+    "fix wave_trigger all halt 25000 v_stop_condition > 0"
 
 # ---------------------------------------------------------
 # 3. AHORA SI, LANZAMOS EL IMPACTO

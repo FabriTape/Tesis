@@ -8,10 +8,12 @@
 
 INPUT="collision_erosion_bed.input"
 BASE_DIR=$(pwd)
-
+#PY311="/home/fbazzoni/.venv/bin/python"
+source ~/miniconda/bin/activate tesis_env
+PY311="python"
 # Cargar configuración centralizada
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-python3.11 ${SCRIPT_DIR}/read_config.py ${SCRIPT_DIR}/config.toml
+$PY311 ${SCRIPT_DIR}/read_config.py ${SCRIPT_DIR}/config.toml
 source config_vars.sh
 
 # Variables derivadas
@@ -31,7 +33,7 @@ done
 
 # Configuración MPI
 MPIRUN="mpirun --allow-run-as-root -np $CORES ${BASE_DIR}/$EXE"
-OUTDIR="./Transitoria/sims_SI_erosion_bed_100um_ff_${FILLS// /_}_vel_${VELS// /_}_move_${MOVES// /_}_NP_${NP}_cores_${CORES}"
+OUTDIR="./Buffer/sims_SI_erosion_bed_100um_ff_${FILLS// /_}_vel_${VELS// /_}_move_${MOVES// /_}_NP_${NP}_cores_${CORES}"
 COUNTER=0
 
 mkdir -p "$OUTDIR"
@@ -109,4 +111,4 @@ echo "========================================"
 echo "  Simulaciones completadas."
 echo "  Ejecutando análisis..."
 echo "========================================"
-python3.11 ~/analyze.py "$OUTDIR"
+$PY311 ~/analyze.py "$OUTDIR"
