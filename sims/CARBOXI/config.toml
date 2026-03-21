@@ -34,7 +34,7 @@ tolerancia_move  = 1      # Tolerancia para considerar move != 0
 [filtros]
 umbral_vz_min       = 0.0     # Velocidad vertical mínima [m/s]
 umbral_energia_min  = 0.0002  # Energía cinética mínima [m²/s²]
-umbral_techo_radios = 3       # Margen de seguridad en número de radios (Z)
+umbral_techo_radios = 2       # Margen de seguridad en número de radios (Z)
 
 # -----------------------------------------------------------------------------
 # PARÁMETROS FÍSICOS DEL MATERIAL (SÍLICE)
@@ -50,7 +50,7 @@ energia_superficie  = 0.032   # [J/m²] - Parámetro JKR
 # PARÁMETROS DEL MODELO JKR (Johnson-Kendall-Roberts)
 # -----------------------------------------------------------------------------
 [jkr]
-factor_cutoff = 1  # Factor multiplicador sobre el radio para cutoff de OVITO
+factor_cutoff = 2  # Factor multiplicador sobre el radio para cutoff de OVITO
 
 # -----------------------------------------------------------------------------
 # PARÁMETROS DE DETECCIÓN DE ONDA

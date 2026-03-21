@@ -60,7 +60,7 @@ class FilterConfig:
 
     umbral_vz_min: float
     umbral_energia_min: float
-    umbral_techo_radios: int
+    umbral_techo_radios: float
 
 
 @dataclass(frozen=True)
@@ -185,7 +185,7 @@ def _build_config(raw: dict) -> Config:
     filters = FilterConfig(
         umbral_vz_min=float(filtros_raw["umbral_vz_min"]),
         umbral_energia_min=float(filtros_raw["umbral_energia_min"]),
-        umbral_techo_radios=int(filtros_raw["umbral_techo_radios"]),
+        umbral_techo_radios=float(filtros_raw["umbral_techo_radios"]),
     )
 
     rutas = raw["rutas"]
