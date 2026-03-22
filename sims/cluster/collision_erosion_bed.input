@@ -136,35 +136,41 @@ dump 2 all custom ${ndumps} output_cama.*.%.txt id type x y z vx vy vz omegax om
 dump_modify 2 thresh v_es_cama == 1
 
 # ==========================================================
-# DETECTOR DE ONDA (partículas de cama cerca de los bordes)
+# DETECTOR DE ONDA (solo para simulaciones críticas)
 # ==========================================================
 
-variable v2_wave atom "(vx*vx)+(vy*vy)+(vz*vz)"
-variable is_wave atom "(type == 1) && (v_v2_wave > v_v2_min) && (z <= v_z_filtro) && ((x < v_umbral_xy) || (x > (v_x_max - v_umbral_xy)) || (y < v_umbral_xy) || (y > (v_y_max - v_umbral_xy)))"
-compute n_wave all reduce sum v_is_wave
+variable vel_num equal ${velocity}
+variable xm_num equal ${xmove}
+variable ym_num equal ${ymove}
+variable zm_num equal ${zmove}
+variable move_max equal "abs(v_xm_num) + abs(v_ym_num) + abs(v_zm_num)"
+variable is_critical equal "(v_vel_num == -50) && (v_move_max > 0)"
 
-# GATILLO DE PARADA
-variable stop_cond equal "(c_n_wave > v_n_max) && (step > 50000)"
-shell "rm -f /dev/shm/lammps_halt_flag"
-fix wave_trigger all halt 25000 v_stop_cond > 0 "shell 'touch /dev/shm/lammps_halt_flag'"
+if "${is_critical} == 1" then &
+    "variable v2_wave atom '(vx*vx)+(vy*vy)+(vz*vz)'" &
+    "variable is_wave atom '(type == 1) && (v_v2_wave > v_v2_min) && (z <= v_z_filtro) && ((x < v_umbral_xy) || (x > (v_x_max - v_umbral_xy)) || (y < v_umbral_xy) || (y > (v_y_max - v_umbral_xy)))'" &
+    "compute n_wave all reduce sum v_is_wave" &
+    "variable stop_cond equal '(c_n_wave > v_n_max) && (step > 50000)'" &
+    "fix wave_trigger all halt 25000 v_stop_cond > 0"
 
 # ----------------------------------------------------------
 # LANZAMIENTO DEL IMPACTO + TRAMPA
 # El loop corre exactamente nsteps pasos en bloques de 10000
 # Cada iteración congela partículas que superan 250 um
-# El halt de onda (25000) y los dumps (ndumps) corren dentro de cada run
-# El flag /tmp/lammps_halt_flag indica si el halt ya se activó
+# El halt de onda (25000) solo se activa para simulaciones críticas
 # ----------------------------------------------------------
 label trampa
-    variable halt_flag equal "file_exists('/dev/shm/lammps_halt_flag')"
-    if "${halt_flag}" then "jump SELF fin"
     region r_trampa block INF INF INF INF 2.5e-4 INF
     group  gr_trampa region r_trampa
     velocity gr_trampa set 0.0 0.0 0.0
     run    10000
     region r_trampa delete
     group  gr_trampa delete
+
+    # Solo verificar halt si la simulación es crítica
+    if "${is_critical} == 1" then &
+        "if \"$(v_stop_cond)\" then \"jump SELF fin\""
+
     next   a
     jump   SELF trampa
 label fin
-shell "rm -f /dev/shm/lammps_halt_flag"
