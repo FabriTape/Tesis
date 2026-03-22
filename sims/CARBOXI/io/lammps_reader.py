@@ -18,7 +18,7 @@ from pathlib import Path
 import polars as pl
 
 # Nombres de columna estándar en los archivos dump de esta simulación.
-_ALL_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
+_ALL_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]
 
 # Líneas del encabezado donde se encuentran los límites de la caja.
 # Índice base-0: línea 5 = eje X, línea 6 = eje Y.
@@ -36,14 +36,15 @@ def read_dump(path: Path, columns: list[str] | None = None) -> pl.LazyFrame:
         path: Ruta al archivo ``.gz`` a leer.
         columns: Lista de columnas a seleccionar. Si es ``None``, devuelve
             todas las columnas estándar: ``["id", "type", "x", "y", "z",
-            "vx", "vy", "vz"]``.
+            "vx", "vy", "vz", "fz"]``.
 
     Returns:
         LazyFrame con las columnas solicitadas y tipos inferidos. La columna
         ``"type"`` se almacena como ``UInt8`` para eficiencia de memoria.
+        ``"fz"`` es la fuerza Z neta por partícula [N].
 
     Example:
-        >>> lf = read_dump(Path("sim/output.100.gz"), ["x", "y", "z", "vz"])
+        >>> lf = read_dump(Path("sim/output.100.gz"), ["x", "y", "z", "vz", "fz"])
         >>> df = lf.collect()
     """
     lf = pl.scan_csv(
