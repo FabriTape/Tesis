@@ -140,9 +140,15 @@ dump 2 all custom ${ndumps} output_cama.*.%.txt id type x y z vx vy vz omegax om
 dump_modify 2 thresh v_es_cama == 1
 
 # ==========================================================
-# DETECTOR DE ONDA (solo para simulaciones críticas)
+# DEFINICIÓN DE TRAMPA Y DETECTOR DE ONDA
 # ==========================================================
 
+# 1. Definición de la Región y Grupo Dinámico
+# Esto reemplaza el ciclo manual. LAMMPS actualizará el grupo cada 10000 pasos.
+region r_trampa block INF INF INF INF 2.5e-4 INF
+group gr_trampa dynamic all region r_trampa every 10000
+
+# 2. Configuración del Detector de Onda (Solo si es crítico)
 variable vel_num equal ${velocity}
 variable xm_num equal ${xmove}
 variable ym_num equal ${ymove}
@@ -151,31 +157,21 @@ variable move_max equal "abs(v_xm_num) + abs(v_ym_num) + abs(v_zm_num)"
 variable is_critical equal "(v_vel_num == -50) && (v_move_max > 0)"
 
 if "${is_critical} == 1" then &
-    "variable v2_wave atom '(vx*vx)+(vy*vy)+(vz*vz)'" &
+    "variable v2_wave atom (vx*vx)+(vy*vy)+(vz*vz)" &
     "variable is_wave atom '(type == 1) && (v_v2_wave > v_v2_min) && (z <= v_z_filtro) && ((x < v_umbral_xy) || (x > (v_x_max - v_umbral_xy)) || (y < v_umbral_xy) || (y > (v_y_max - v_umbral_xy)))'" &
     "compute n_wave all reduce sum v_is_wave" &
     "variable stop_cond equal '(c_n_wave > v_n_max) && (step > 50000)'" &
     "fix wave_trigger all halt 25000 v_stop_cond > 0"
 
-# ----------------------------------------------------------
-# LANZAMIENTO DEL IMPACTO + TRAMPA
-# El loop corre exactamente nsteps pasos en bloques de 10000
-# Cada iteración congela partículas que superan 250 um
-# Si el halt de onda se activó, el run se corta antes de 10000 pasos
-# ----------------------------------------------------------
-label trampa
-    variable step_before equal step
-    region r_trampa block INF INF INF INF 2.5e-4 INF
-    group  gr_trampa region r_trampa
-    velocity gr_trampa set 0.0 0.0 0.0
-    run    10000
-    region r_trampa delete
-    group  gr_trampa delete
+# ==========================================================
+# EJECUCIÓN UNIFICADA
+# ==========================================================
 
-    # Si el halt se activó, el run se cortó antes de los 10000 pasos
-    variable step_after equal $(step)
-    variable delta_step equal "v_step_after - v_step_before"
-    if "${delta_step} < 10000" then "jump SELF fin"
-    next   a
-    jump   SELF trampa
-label fin
+# El comando 'every' ejecuta el comando entre comillas cada N pasos.
+# Esto asegura que las partículas en la trampa se detengan sin romper el flujo del tiempo.
+# La simulación correrá hasta ${nsteps} o hasta que el 'fix halt' (si existe) se active.
+
+run ${nsteps} every 10000 "velocity gr_trampa set 0.0 0.0 0.0"
+
+# Guardado final de seguridad
+write_data post-run_final.data
