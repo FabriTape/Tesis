@@ -145,31 +145,27 @@ compute n_wave all reduce sum v_is_wave
 
 # GATILLO DE PARADA
 variable stop_cond equal "(c_n_wave > v_n_max) && (step > 50000)"
-fix wave_trigger all halt 25000 v_stop_cond > 0
+shell "rm -f /tmp/lammps_halt_flag"
+fix wave_trigger all halt 25000 v_stop_cond > 0 "shell 'touch /tmp/lammps_halt_flag'"
 
 # ----------------------------------------------------------
 # LANZAMIENTO DEL IMPACTO + TRAMPA
 # El loop corre exactamente nsteps pasos en bloques de 10000
 # Cada iteración congela partículas que superan 250 um
 # El halt de onda (25000) y los dumps (ndumps) corren dentro de cada run
+# El flag /tmp/lammps_halt_flag indica si el halt ya se activó
 # ----------------------------------------------------------
-compute check_wave all reduce sum v_is_wave
-
 label trampa
+    variable halt_flag equal "file_exists('/tmp/lammps_halt_flag')"
+    if "${halt_flag}" then "jump SELF fin"
     region r_trampa block INF INF INF INF 2.5e-4 INF
     group  gr_trampa region r_trampa
     velocity gr_trampa set 0.0 0.0 0.0
     run    10000
     region r_trampa delete
     group  gr_trampa delete
-
-    # Verificar si el halt de onda ya se activó
-    uncompute check_wave
-    compute check_wave all reduce sum v_is_wave
-    if "$(c_check_wave) > $(v_n_max)" then "jump SELF fin"
-    uncompute check_wave
-
     next   a
     jump   SELF trampa
 label fin
+shell "rm -f /tmp/lammps_halt_flag"
 
