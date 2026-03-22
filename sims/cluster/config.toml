@@ -35,7 +35,7 @@ timestep        = 5e-11      # Paso temporal [s]
 z_filtro        = 1.046e-4   # Altura filtro aire/cama [m] (alt max + 7 radios)
 v2_min          = 6.4e-3     # Energía mínima onda [m²/s²]
 v2_max          = 4e-2       # Energía máxima onda [m²/s²]
-n_max           = 3000       # Partículas para onda macroscópica
+n_max           = 3500       # Partículas para onda macroscópica
 umbral_xy       = 1.52e-5    # Proximidad a paredes [m] (20 radios)
 
 [material]

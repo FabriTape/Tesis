@@ -229,7 +229,7 @@ def _find_simulations(base_dir: Path) -> list[Path]:
     for subdir in sorted(base_dir.iterdir()):
         if subdir.is_dir() and not subdir.name.startswith("."):
             sub_mixed = [
-                f for f in subdir.glob("output.*.txt")
+                f for f in subdir.glob("output_cama.*.txt")
                 if _MIXED_PATTERN.match(f.name)
             ]
             if sub_mixed:
