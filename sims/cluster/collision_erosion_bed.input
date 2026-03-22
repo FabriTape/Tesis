@@ -160,6 +160,14 @@ label trampa
     run    10000
     region r_trampa delete
     group  gr_trampa delete
+
+    # Verificar si el halt de onda ya se activó
+    uncompute check_wave
+    compute check_wave all reduce sum v_is_wave
+    if "$(c_check_wave) > $(v_n_max)" then "jump SELF fin"
+    uncompute check_wave
+
     next   a
     jump   SELF trampa
+label fin
 
