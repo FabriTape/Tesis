@@ -61,10 +61,6 @@ read_data ${data}
 #TODO: EDITAR TAMAÑO DE CAJA EN DATA y NUMERO DE GRANOS a 2
 
 change_box all z final -1e-5 0.000410
-# Guardar zhi original antes de extender
-variable z_orig equal zhi
-# Extender caja 20 radios arriba (buffer para atrapar partículas que escapan)
-change_box all z final -1e-5 $(v_z_orig + 15.2e-6)
 #TODO: GRANOS EN POSICION original con centro de la caja en 0 0 0
 
 #1 1 1.52e-6 2000 0.76e-6 0 0
@@ -127,22 +123,7 @@ velocity sphere set 0.0 0.0 ${velocity} units box
 
 
 thermo ${nthermo}
-thermo_modify lost ignore
-
-# ==========================================================
-# TRAMPA PARA PARTÍCULAS QUE ESCAPAN DE LA CAJA
-# ==========================================================
-
-# Región trampa: último tramo de la caja (buffer de 20 radios)
-region r_trampa block INF INF INF INF $(v_z_orig) INF
-
-# Grupo dinámico: partículas de cama que cruzan z_orig
-group gr_trampa dynamic bloque region r_trampa every 500
-
-# Congelar: sin fuerzas + sin velocidad
-fix f_trampa gr_trampa setforce 0.0 0.0 0.0
-variable en_trampa atom "z > v_z_orig"
-velocity all set 0.0 0.0 0.0 v_en_trampa
+thermo_modify lost warn
 
 # Dump de aire: partículas por encima del filtro (aire + congeladas)
 variable es_aire atom "(z > v_z_filtro) && (type == 1)"
@@ -170,4 +151,18 @@ fix wave_trigger all halt 1000 v_stop_cond > 0
 # LANZAMIENTO DEL IMPACTO
 # ----------------------------------------------------------
 run ${nsteps}
+
+# ----------------------------------------------------------
+# LOOP DE TRAMPA: congela partículas que superan 250 um
+# Cada iteración = 10000 pasos. Total = nsteps/10000 * 10000 = nsteps
+# ----------------------------------------------------------
+label trampa
+    region r_trampa block INF INF INF INF 2.5e-4 INF
+    group  gr_trampa region r_trampa
+    velocity gr_trampa set 0.0 0.0 0.0
+    run    10000
+    region r_trampa delete
+    group  gr_trampa delete
+    next   a
+    jump   SELF trampa
 
