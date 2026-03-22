@@ -70,23 +70,23 @@ change_box all z final -1e-5 0.000410
 ##### crea granos del proyectil
 
 #create_atoms 2 single 73.26e-6 72.5e-6 152e-6 
-#create_atoms 2 single 71.74e-6 72.5e-6 152e-6
+#create_atoms 2 single 71.74e-6 72.5e-6 152e-6 
 #create_atoms 2 single 72.5e-6 73.82e-6 152e-6
 
 
 #NP1
 #create_atoms 2 single 50e-5 50e-5 105e-5 
-#create_atoms 2 single 5e-5 5e-5 10.3e-5
+#create_atoms 2 single 5e-5 5e-5 10.3e-5 
 #create_atoms 2 single 72.5e-6 72.5e-6 152e-6 
 
 
 #NP3
 #create_atoms 2 single 73.26e-6 72.5e-6 152e-6 
-#create_atoms 2 single 71.74e-6 72.5e-6 152e-6
+#create_atoms 2 single 71.74e-6 72.5e-6 152e-6 
 #create_atoms 2 single 72.5e-6 73.816e-6 152e-6
 #Esto lo pongo para que las 3 particulas queden en el centro
 create_atoms 2 single 50.76e-6 50e-6 152e-6 
-create_atoms 2 single 49.24e-6 50e-6 152e-6
+create_atoms 2 single 49.24e-6 50e-6 152e-6 
 create_atoms 2 single 50e-6 51.316e-6 152e-6
 
 set type 2 diameter 1.52e-6
@@ -168,4 +168,3 @@ label trampa
     jump   SELF trampa
 label fin
 shell "rm -f /tmp/lammps_halt_flag"
-
