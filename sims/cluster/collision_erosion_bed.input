@@ -61,6 +61,10 @@ read_data ${data}
 #TODO: EDITAR TAMAÑO DE CAJA EN DATA y NUMERO DE GRANOS a 2
 
 change_box all z final -1e-5 0.000410
+# Guardar zhi original antes de extender
+variable z_orig equal zhi
+# Extender caja 20 radios arriba (buffer para atrapar partículas que escapan)
+change_box all z final -1e-5 $(v_z_orig + 15.2e-6)
 #TODO: GRANOS EN POSICION original con centro de la caja en 0 0 0
 
 #1 1 1.52e-6 2000 0.76e-6 0 0
@@ -121,61 +125,44 @@ compute 1 all ke/atom
 velocity bloque create 10.0 83921
 velocity sphere set 0.0 0.0 ${velocity} units box
 
-# Aca dividimos los archivos de trabajo entre aire y cama
-variable es_aire atom "(z > v_z_filtro) && (vz > 0) || (type == 2)"
-variable es_cama atom "(z <= v_z_filtro) && (type == 1)"
 
-# Guardado aire
-dump 1 all custom ${ndumps} output_aire.*.%.txt id type x y z vx vy vz omegax omegay omegaz fz
+thermo ${nthermo}
+thermo_modify lost ignore
+
+# ==========================================================
+# TRAMPA PARA PARTÍCULAS QUE ESCAPAN DE LA CAJA
+# ==========================================================
+
+# Región trampa: último tramo de la caja (buffer de 20 radios)
+region r_trampa block INF INF INF INF $(v_z_orig) INF
+
+# Grupo dinámico: partículas de cama que cruzan z_orig
+group gr_trampa dynamic bloque region r_trampa every 500
+
+# Congelar: sin fuerzas + sin velocidad
+fix f_trampa gr_trampa setforce 0.0 0.0 0.0
+variable en_trampa atom "z > v_z_orig"
+velocity all set 0.0 0.0 0.0 v_en_trampa
+
+# Dump de aire: partículas por encima del filtro (aire + congeladas)
+variable es_aire atom "(z > v_z_filtro) && (type == 1)"
+dump 1 all custom ${ndumps} output_aire.*.%.txt id type x y z vx vy vz omegax omegay omegaz
 dump_modify 1 thresh v_es_aire == 1
 
-# Guardado cama
+# Dump de cama: partículas de cama (z <= z_filtro)
+variable es_cama atom "(z <= v_z_filtro) && (type == 1)"
 dump 2 all custom ${ndumps} output_cama.*.%.txt id type x y z vx vy vz omegax omegay omegaz
 dump_modify 2 thresh v_es_cama == 1
 
-
-thermo ${nthermo}
-thermo_modify lost warn
-# ---------------------------------------------------------
-# 2. DEFINIMOS EL DETECTOR DE ONDA ANTES DE CORRER
-# ---------------------------------------------------------
-# Convertimos el texto a numeros puros para el motor matematico
-variable vel_num equal ${velocity}
-variable xm_num equal ${xmove}
-variable ym_num equal ${ymove}
-variable zm_num equal ${zmove}
-
-# Sumamos los valores absolutos usando las variables limpias
-variable move_max equal "abs(v_xm_num) + abs(v_ym_num) + abs(v_zm_num)"
-
-
-# Ahora comparamos variables nativas puras
-variable is_critical equal "(v_vel_num == -50) && (v_move_max > 0)"
 # ==========================================================
-# LÓGICA DE DETECCIÓN Y OPTIMIZACIÓN DE EYECTA
+# DETECTOR DE ONDA (partículas de cama cerca de los bordes)
 # ==========================================================
 
-# 1. SEGURIDAD: Evita que la simulación aborte si un grano se escapa
-thermo_modify lost ignore
-
-# 2. REGIONES GEOGRÁFICAS
-region r_bordes block ${umbral_xy} $(v_x_max - v_umbral_xy) ${umbral_xy} $(v_y_max - v_umbral_xy) INF ${z_filtro} side out
-region r_aire block INF INF INF INF ${z_filtro} INF
-
-# 3. GRUPO DINÁMICO: "La Aduana"
-group gr_aire dynamic bloque region r_aire every 1000
-
-# 4. GUARDADO Y DESPACHO (The Great Escape)
-dump d_aire gr_aire custom 1000 aire_data.*.txt id type x y z vx vy vz
-# Anulamos fuerzas (gravedad) para que suban sin interactuar hasta salir de la caja y borrarse
-fix f_flotar gr_aire setforce 0.0 0.0 0.0
-
-# 5. SENSOR DE ONDA CORREGIDO (Con matemática pura)
 variable v2_wave atom "(vx*vx)+(vy*vy)+(vz*vz)"
-variable is_wave atom "(type == 1) && (v_v2_wave > v_v2_min) && ((x < v_umbral_xy) || (x > (v_x_max - v_umbral_xy)) || (y < v_umbral_xy) || (y > (v_y_max - v_umbral_xy)))"
+variable is_wave atom "(type == 1) && (v_v2_wave > v_v2_min) && (z <= v_z_filtro) && ((x < v_umbral_xy) || (x > (v_x_max - v_umbral_xy)) || (y < v_umbral_xy) || (y > (v_y_max - v_umbral_xy)))"
 compute n_wave all reduce sum v_is_wave
 
-# 6. GATILLO DE PARADA
+# GATILLO DE PARADA
 variable stop_cond equal "(c_n_wave > v_n_max) && (step > 50000)"
 fix wave_trigger all halt 1000 v_stop_cond > 0
 
