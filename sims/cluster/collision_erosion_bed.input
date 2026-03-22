@@ -145,8 +145,8 @@ compute n_wave all reduce sum v_is_wave
 
 # GATILLO DE PARADA
 variable stop_cond equal "(c_n_wave > v_n_max) && (step > 50000)"
-shell "rm -f /tmp/lammps_halt_flag"
-fix wave_trigger all halt 25000 v_stop_cond > 0 "shell 'touch /tmp/lammps_halt_flag'"
+shell "rm -f /dev/shm/lammps_halt_flag"
+fix wave_trigger all halt 25000 v_stop_cond > 0 "shell 'touch /dev/shm/lammps_halt_flag'"
 
 # ----------------------------------------------------------
 # LANZAMIENTO DEL IMPACTO + TRAMPA
@@ -156,7 +156,7 @@ fix wave_trigger all halt 25000 v_stop_cond > 0 "shell 'touch /tmp/lammps_halt_f
 # El flag /tmp/lammps_halt_flag indica si el halt ya se activó
 # ----------------------------------------------------------
 label trampa
-    variable halt_flag equal "file_exists('/tmp/lammps_halt_flag')"
+    variable halt_flag equal "file_exists('/dev/shm/lammps_halt_flag')"
     if "${halt_flag}" then "jump SELF fin"
     region r_trampa block INF INF INF INF 2.5e-4 INF
     group  gr_trampa region r_trampa
@@ -167,4 +167,4 @@ label trampa
     next   a
     jump   SELF trampa
 label fin
-shell "rm -f /tmp/lammps_halt_flag"
+shell "rm -f /dev/shm/lammps_halt_flag"
