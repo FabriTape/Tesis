@@ -145,16 +145,13 @@ compute n_wave all reduce sum v_is_wave
 
 # GATILLO DE PARADA
 variable stop_cond equal "(c_n_wave > v_n_max) && (step > 50000)"
-fix wave_trigger all halt 1000 v_stop_cond > 0
+fix wave_trigger all halt 25000 v_stop_cond > 0
 
 # ----------------------------------------------------------
-# LANZAMIENTO DEL IMPACTO
-# ----------------------------------------------------------
-run ${nsteps}
-
-# ----------------------------------------------------------
-# LOOP DE TRAMPA: congela partículas que superan 250 um
-# Cada iteración = 10000 pasos. Total = nsteps/10000 * 10000 = nsteps
+# LANZAMIENTO DEL IMPACTO + TRAMPA
+# El loop corre exactamente nsteps pasos en bloques de 10000
+# Cada iteración congela partículas que superan 250 um
+# El halt de onda (25000) y los dumps (ndumps) corren dentro de cada run
 # ----------------------------------------------------------
 label trampa
     region r_trampa block INF INF INF INF 2.5e-4 INF
