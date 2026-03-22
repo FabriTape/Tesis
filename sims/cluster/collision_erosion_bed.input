@@ -148,36 +148,39 @@ variable zm_num equal ${zmove}
 # Sumamos los valores absolutos usando las variables limpias
 variable move_max equal "abs(v_xm_num) + abs(v_ym_num) + abs(v_zm_num)"
 
+
 # Ahora comparamos variables nativas puras
 variable is_critical equal "(v_vel_num == -50) && (v_move_max > 0)"
+# ==========================================================
+# LÓGICA DE DETECCIÓN Y OPTIMIZACIÓN DE EYECTA
+# ==========================================================
 
-if "${is_critical} == 1" then &
-    "variable v2_wave atom (vx*vx)+(vy*vy)" &
-    "variable is_wave atom '(z < v_z_filtro) && (v_v2_wave > v_v2_min) && ((x < v_umbral_xy) || (x > (v_x_max - v_umbral_xy)) || (y < v_umbral_xy) || (y > (v_y_max - v_umbral_xy)))'" &
-    "variable v2_filtered atom 'v_v2_wave * v_is_wave'" &
-    "compute count_wave all reduce sum v_is_wave" &
-    "compute peak_v2_wave all reduce max v_v2_filtered" &
-    "variable stop_condition equal '(c_count_wave > v_n_max) || (c_peak_v2_wave >= v_v2_max)'" &
-    "fix wave_trigger all halt 25000 v_stop_condition > 0"
+# 1. SEGURIDAD: Evita que la simulación aborte si un grano se escapa
+thermo_modify lost ignore
 
-# ---------------------------------------------------------
-# 3. AHORA SI, LANZAMOS EL IMPACTO
-# ---------------------------------------------------------
+# 2. REGIONES GEOGRÁFICAS
+region r_bordes block ${umbral_xy} $(v_x_max - v_umbral_xy) ${umbral_xy} $(v_y_max - v_umbral_xy) INF ${z_filtro} side out
+region r_aire block INF INF INF INF ${z_filtro} INF
+
+# 3. GRUPO DINÁMICO: "La Aduana"
+group gr_aire dynamic bloque region r_aire every 1000
+
+# 4. GUARDADO Y DESPACHO (The Great Escape)
+dump d_aire gr_aire custom 1000 aire_data.*.txt id type x y z vx vy vz
+# Anulamos fuerzas (gravedad) para que suban sin interactuar hasta salir de la caja y borrarse
+fix f_flotar gr_aire setforce 0.0 0.0 0.0
+
+# 5. SENSOR DE ONDA CORREGIDO (Con matemática pura)
+variable v2_wave atom "(vx*vx)+(vy*vy)+(vz*vz)"
+variable is_wave atom "(type == 1) && (v_v2_wave > v_v2_min) && ((x < v_umbral_xy) || (x > (v_x_max - v_umbral_xy)) || (y < v_umbral_xy) || (y > (v_y_max - v_umbral_xy)))"
+compute n_wave all reduce sum v_is_wave
+
+# 6. GATILLO DE PARADA
+variable stop_cond equal "(c_n_wave > v_n_max) && (step > 50000)"
+fix wave_trigger all halt 1000 v_stop_cond > 0
+
+# ----------------------------------------------------------
+# LANZAMIENTO DEL IMPACTO
+# ----------------------------------------------------------
 run ${nsteps}
-label loop
-    variable steps equal 10000
 
-    region wallzup  block -1 1 -1 1 2.5e-4 1
-
-    group bordesg region wallzup
-
-    velocity bordesg set 0.0 0.0 0.0 units box
-
-    run ${steps}    
-
-    region wallzup delete
-
-    next a 
-
-jump SELF loop 
- 

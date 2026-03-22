@@ -20,12 +20,12 @@ processors      = [8, 8, 1]  # [Px, Py, Pz], producto debe ser = cores
 exe             = "lmp_g++_openmpi-4.0.2_stableSep2021"
 
 [sweep]
-fills           = [0.15, 0.35]
+fills           = [0.15]
 vels            = [-50]
 angles          = [0, 90, 180]
 moves           = [-3, 0, 3]
 total_steps     = [1300000]   # Un valor por cada combinación fill×vel×angle
-grain_radius_um = 1.52       # Radio del grano [μm] (para cálculo de desplazamiento)
+grain_radius_um = 0.76        # Radio del grano [μm] (para cálculo de desplazamiento)
 xrotate         = 1
 yrotate         = 0
 zrotate         = 0
@@ -33,7 +33,7 @@ zrotate         = 0
 [lammps]
 timestep        = 5e-11      # Paso temporal [s]
 z_filtro        = 1.046e-4   # Altura filtro aire/cama [m] (alt max + 7 radios)
-v2_min          = 1.8e-4     # Energía mínima onda [m²/s²]
+v2_min          = 6.4e-3     # Energía mínima onda [m²/s²]
 v2_max          = 4e-2       # Energía máxima onda [m²/s²]
 n_max           = 3000       # Partículas para onda macroscópica
 umbral_xy       = 1.52e-5    # Proximidad a paredes [m] (20 radios)
