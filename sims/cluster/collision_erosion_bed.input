@@ -173,7 +173,7 @@ label trampa
     group  gr_trampa delete
 
     # Si el halt se activó, el run se cortó antes de los 10000 pasos
-    variable step_after equal step
+    variable step_after equal $(step)
     variable delta_step equal "v_step_after - v_step_before"
     if "${delta_step} < 10000" then "jump SELF fin"
     next   a
