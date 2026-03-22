@@ -157,9 +157,10 @@ if "${is_critical} == 1" then &
 # LANZAMIENTO DEL IMPACTO + TRAMPA
 # El loop corre exactamente nsteps pasos en bloques de 10000
 # Cada iteración congela partículas que superan 250 um
-# El halt de onda (25000) solo se activa para simulaciones críticas
+# Si el halt de onda se activó, el run se corta antes de 10000 pasos
 # ----------------------------------------------------------
 label trampa
+    variable step_before equal ${step}
     region r_trampa block INF INF INF INF 2.5e-4 INF
     group  gr_trampa region r_trampa
     velocity gr_trampa set 0.0 0.0 0.0
@@ -167,9 +168,9 @@ label trampa
     region r_trampa delete
     group  gr_trampa delete
 
-    # Solo verificar halt si la simulación es crítica
-    if "${is_critical} == 1" then &
-        "if \"$(v_stop_cond)\" then \"jump SELF fin\""
+    # Si el halt se activó, el run se cortó antes de los 10000 pasos
+    variable step_after equal ${step}
+    if "${step_after} < ${step_before} + 10000" then "jump SELF fin"
 
     next   a
     jump   SELF trampa
