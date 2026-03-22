@@ -153,6 +153,8 @@ fix wave_trigger all halt 25000 v_stop_cond > 0
 # Cada iteración congela partículas que superan 250 um
 # El halt de onda (25000) y los dumps (ndumps) corren dentro de cada run
 # ----------------------------------------------------------
+compute check_wave all reduce sum v_is_wave
+
 label trampa
     region r_trampa block INF INF INF INF 2.5e-4 INF
     group  gr_trampa region r_trampa
