@@ -13,13 +13,13 @@ echo "========================================="
 echo "  VELOCIDADES (Últimos 15 pasos)"
 echo "========================================="
 
-# 2. Buscamos los últimos 15 timesteps únicos, aislando bien el nombre del archivo
-TIMESTEPS=$(ls -t "$DIR"/output_cama.*.0.txt 2>/dev/null | head -n 15 | awk -F'/' '{print $NF}' | cut -d'.' -f2)
+# 2. Buscamos los últimos 15 timesteps únicos desde archivos .gz
+TIMESTEPS=$(ls -t "$DIR"/output.*.gz 2>/dev/null | head -n 15 | awk -F'/' '{print $NF}' | sed 's/output\.//;s/\.gz//')
 
-if [ ! -z "$TIMESTEPS" ]; then
+if [ -n "$TIMESTEPS" ]; then
     # 3. Hacemos el bucle calculando máximo y promedio
     for TS in $TIMESTEPS; do
-        awk -v ts="$TS" 'NR>9 {
+        gzip -dc "$DIR/output.${TS}.gz" | awk -v ts="$TS" 'NR>9 {
             v = sqrt($6*$6 + $7*$7 + $8*$8);
             sum += v;
             count++;
@@ -27,7 +27,7 @@ if [ ! -z "$TIMESTEPS" ]; then
         } END {
             avg = (count > 0) ? sum / count : 0;
             printf "Paso %8s -> Max: %.4f m/s | Prom: %.6f m/s\n", ts, max, avg
-        }' "$DIR"/output_cama.$TS.*.txt
+        }'
     done
 else
     echo "Esperando a que LAMMPS escriba los primeros dumps..."

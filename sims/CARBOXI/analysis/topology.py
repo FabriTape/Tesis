@@ -27,7 +27,7 @@ from ..io.lammps_reader import read_dump
 from ..utils import extraer_metadatos, print_progress
 
 # Columnas necesarias para el análisis topológico completo.
-_ANALYSIS_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
+_ANALYSIS_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]
 
 
 def build_ovito_pipeline(cutoff: float) -> Pipeline:
@@ -69,23 +69,29 @@ def analyze_erosion(
     lf: pl.LazyFrame,
     pipeline: Pipeline,
     max_height: float,
+    tolerancia_fz: float,
 ) -> pl.DataFrame:
     """Calcula coordinación y clusters para las partículas erosionadas de un timestep.
 
-    Aplica el criterio de erosión (``z > max_height`` AND ``vz > 0``) y pasa
-    las partículas candidatas a OVITO para calcular sus propiedades topológicas.
-    El proyectil (tipo 2) siempre se incluye en el resultado independientemente
-    de si fue eyectado.
+    Aplica el criterio de erosión (``z > max_height`` AND ``vz > 0``), ejecuta
+    cluster analysis con OVITO y luego filtra por vuelo balístico: solo se
+    conservan los clusters cuya fuerza Z neta es cercana a cero
+    (``|Σfz| < tolerancia_fz``), indicando que no están en contacto activo
+    con la cama.
+
+    El proyectil (tipo 2) siempre se incluye en el resultado.
 
     Args:
-        lf: LazyFrame con las columnas estándar del dump LAMMPS:
-            ``["id", "type", "x", "y", "z", "vx", "vy", "vz"]``.
+        lf: LazyFrame con las columnas del dump LAMMPS incluyendo ``fz``:
+            ``["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]``.
         pipeline: Pipeline de OVITO ya inicializado con ``build_ovito_pipeline``.
         max_height: Umbral vertical de la cama [m]. Las partículas con
             ``z > max_height`` y ``vz > 0`` se consideran eyectadas.
+        tolerancia_fz: Tolerancia de fuerza Z neta por cluster [N]. Un cluster
+            se considera en vuelo balístico si ``|Σfz| < tolerancia_fz``.
 
     Returns:
-        DataFrame con todas las partículas de interés (erosionadas + proyectil),
+        DataFrame con las partículas erosionadas balísticas + proyectil,
         incluyendo las columnas adicionales:
 
         - ``"coordinacion"`` (Float64): número de vecinos dentro del cutoff.
@@ -96,8 +102,8 @@ def analyze_erosion(
 
     Example:
         >>> pipeline = build_ovito_pipeline(cutoff=1.14e-6)
-        >>> df = analyze_erosion(lf_timestep, pipeline, max_height=5.2e-5)
-        >>> df.filter(pl.col("coordinacion") == 0)  # partículas aisladas
+        >>> df = analyze_erosion(lf_timestep, pipeline, max_height=5.2e-5,
+        ...                      tolerancia_fz=1e-6)
     """
     lf = lf.with_columns(
         ((pl.col("z") > max_height) & (pl.col("vz") > 0)).alias("eroded")
@@ -121,6 +127,16 @@ def analyze_erosion(
         )
     )
 
+    ballistic_ids = _filter_ballistic_clusters(df_eroded, tolerancia_fz)
+
+    if ballistic_ids:
+        df_eroded = df_eroded.filter(
+            pl.col("cluster").is_in(ballistic_ids)
+            | (pl.col("type") == 2)
+        )
+    else:
+        df_eroded = df_eroded.filter(pl.col("type") == 2)
+
     df_not_eroded = df_not_eroded.with_columns(
         pl.lit(None).cast(pl.Float64).alias("coordinacion"),
         pl.lit(None).cast(pl.UInt32).alias("cluster"),
@@ -142,14 +158,14 @@ def run_topology_analysis(
     max_height: float,
     sim_id: str,
     timestep_interval: int,
-    wave_detected: bool,
+    tolerancia_fz: float,
 ) -> list[pl.DataFrame]:
     """Ejecuta el análisis topológico completo sobre una lista de archivos dump.
 
     Procesa secuencialmente cada archivo de volcado LAMMPS, aplica el criterio
-    de erosión y calcula coordinación y clusters con OVITO. Inyecta los
-    metadatos de la simulación en cada DataFrame resultado para garantizar
-    trazabilidad en el archivo Parquet final.
+    de erosión con filtro balístico por fuerza Z neta y calcula coordinación
+    y clusters con OVITO. Inyecta los metadatos de la simulación en cada
+    DataFrame resultado para garantizar trazabilidad en el archivo Parquet final.
 
     Args:
         dump_files: Lista de rutas a los archivos ``output.*.gz`` a procesar,
@@ -160,22 +176,14 @@ def run_topology_analysis(
             ``erosion_bed_SI_``). Se usa para extraer metadatos con regex.
         timestep_interval: Intervalo de volcado entre archivos consecutivos
             (frecuencia de dump en timesteps LAMMPS).
-        wave_detected: ``True`` si la Fase 1 detectó una onda macroscópica.
-            Se almacena como columna ``"onda"`` en los resultados.
+        tolerancia_fz: Tolerancia de fuerza Z neta por cluster [N] para el
+            filtro balístico.
 
     Returns:
         Lista de DataFrames, uno por cada archivo procesado. Cada DataFrame
         contiene las partículas erosionadas del timestep con sus propiedades
         topológicas y metadatos de simulación inyectados como columnas literales.
         Retorna lista vacía si ``dump_files`` está vacío.
-
-    Example:
-        >>> pipeline = build_ovito_pipeline(cutoff=1.14e-6)
-        >>> results = run_topology_analysis(
-        ...     dump_files[:50], pipeline, max_height, sim_id,
-        ...     timestep_interval=10000, wave_detected=True
-        ... )
-        >>> df_total = pl.concat(results, how="vertical_relaxed")
     """
     if not dump_files:
         return []
@@ -188,13 +196,12 @@ def run_topology_analysis(
         print_progress(i, total, label="erosión")
 
         lf = read_dump(file_path, _ANALYSIS_COLUMNS)
-        df = analyze_erosion(lf, pipeline, max_height)
+        df = analyze_erosion(lf, pipeline, max_height, tolerancia_fz)
 
         df = df.with_columns(
             **{k: pl.lit(v) for k, v in metadata.items()},
             paso=pl.lit(timestep_interval),
             i=pl.lit(i),
-            onda=pl.lit(wave_detected),
         )
         results.append(df)
 
@@ -207,6 +214,34 @@ def run_topology_analysis(
 # ---------------------------------------------------------------------------
 # Helpers privados
 # ---------------------------------------------------------------------------
+
+
+def _filter_ballistic_clusters(
+    df: pl.DataFrame, tolerancia_fz: float
+) -> list[int]:
+    """Identifica clusters en vuelo balístico por fuerza Z neta cercana a cero.
+
+    Agrupa por ``cluster`` y calcula la suma de ``fz`` para cada cluster.
+    Un cluster se considera balístico (libre de contacto con la cama) si
+    la fuerza Z neta es menor que la tolerancia.
+
+    Args:
+        df: DataFrame con columnas ``"cluster"`` y ``"fz"``.
+        tolerancia_fz: Umbral absoluto de fuerza Z neta [N].
+
+    Returns:
+        Lista de IDs de clusters que pasan el filtro balístico.
+    """
+    if df.is_empty() or "cluster" not in df.columns:
+        return []
+
+    cluster_fz = df.group_by("cluster").agg(
+        pl.col("fz").sum().alias("fz_sum")
+    ).filter(
+        pl.col("fz_sum").abs() < tolerancia_fz
+    )
+
+    return cluster_fz["cluster"].cast(pl.Int64).to_list()
 
 
 def _run_ovito(df: pl.DataFrame, pipeline: Pipeline) -> pl.DataFrame:

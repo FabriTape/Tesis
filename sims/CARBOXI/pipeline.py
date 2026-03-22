@@ -236,7 +236,7 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
     pipeline = build_ovito_pipeline(cutoff=cutoff)
 
     if run_wave:
-        wave_detected, cut_index = run_wave_scan(
+        _, cut_index = run_wave_scan(
             dump_files=dump_files,
             radius=config.radio_m,
             max_height=max_height,
@@ -248,7 +248,6 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
             config=config,
         )
     else:
-        wave_detected = False
         cut_index = len(dump_files)
 
     # --- 6. Fase 2: Análisis topológico con OVITO ---
@@ -259,7 +258,7 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         max_height=max_height,
         sim_id=sim_id,
         timestep_interval=timestep_interval,
-        wave_detected=wave_detected,
+        tolerancia_fz=config.filters.tolerancia_fz,
     )
 
     # --- 7. Exportación directa de resultados (sin verificar previos) ---

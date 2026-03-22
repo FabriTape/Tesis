@@ -24,24 +24,11 @@ variable proc_y index 1
 variable proc_z index 1
 
 variable timestep index 1
-variable z_filtro index 1
-variable v2_min index 1
-variable v2_max index 1
-variable n_max index 1
-variable umbral_xy index 1
 
 variable young_modulus index 1
 variable poisson index 1
 variable surface_energy index 1
 variable density_proj index 1
-
-variable nloops equal ceil(${nsteps}/10000.0)
-variable a loop ${nloops}
-
-#limites de la caja
-
-variable x_max equal xhi
-variable y_max equal yhi
 
 
 newton off
@@ -129,47 +116,18 @@ velocity sphere set 0.0 0.0 ${velocity} units box
 thermo ${nthermo}
 thermo_modify lost warn
 
-# Dump de aire: partículas por encima del filtro (aire + congeladas)
-variable es_aire atom "(z > v_z_filtro) && (type == 1)"
-dump 1 all custom ${ndumps} output_aire.*.%.txt id type x y z vx vy vz omegax omegay omegaz
-dump_modify 1 thresh v_es_aire == 1
-
-# Dump de cama: partículas de cama (z <= z_filtro)
-variable es_cama atom "(z <= v_z_filtro) && (type == 1)"
-dump 2 all custom ${ndumps} output_cama.*.%.txt id type x y z vx vy vz omegax omegay omegaz
-dump_modify 2 thresh v_es_cama == 1
+dump 1 all custom ${ndumps} output.*.gz id type x y z vx vy vz fz
 
 # ==========================================================
-# DEFINICIÓN DE TRAMPA Y DETECTOR DE ONDA
+# TRAMPA: congela partículas que escapan de la cama
 # ==========================================================
 
-# 1. Definición de la Región y Grupo Dinámico
-# Esto reemplaza el ciclo manual. LAMMPS actualizará el grupo cada 10000 pasos.
 region r_trampa block INF INF INF INF 2.5e-4 INF
 group gr_trampa dynamic all region r_trampa every 10000
 
-# 2. Configuración del Detector de Onda (Solo si es crítico)
-variable vel_num equal ${velocity}
-variable xm_num equal ${xmove}
-variable ym_num equal ${ymove}
-variable zm_num equal ${zmove}
-variable move_max equal "abs(v_xm_num) + abs(v_ym_num) + abs(v_zm_num)"
-variable is_critical equal "(v_vel_num == -50) && (v_move_max > 0)"
-
-if "${is_critical} == 1" then &
-    "variable v2_wave atom (vx*vx)+(vy*vy)+(vz*vz)" &
-    "variable is_wave atom '(type == 1) && (v_v2_wave > v_v2_min) && (z <= v_z_filtro) && ((x < v_umbral_xy) || (x > (v_x_max - v_umbral_xy)) || (y < v_umbral_xy) || (y > (v_y_max - v_umbral_xy)))'" &
-    "compute n_wave all reduce sum v_is_wave" &
-    "variable stop_cond equal '(c_n_wave > v_n_max) && (step > 50000)'" &
-    "fix wave_trigger all halt 25000 v_stop_cond > 0"
-
 # ==========================================================
-# EJECUCIÓN UNIFICADA
+# EJECUCIÓN
 # ==========================================================
-
-# El comando 'every' ejecuta el comando entre comillas cada N pasos.
-# Esto asegura que las partículas en la trampa se detengan sin romper el flujo del tiempo.
-# La simulación correrá hasta ${nsteps} o hasta que el 'fix halt' (si existe) se active.
 
 run ${nsteps} every 10000 "velocity gr_trampa set 0.0 0.0 0.0"
 
