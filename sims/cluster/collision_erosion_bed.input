@@ -97,7 +97,7 @@ write_data pre-run_with_projectile.data
 
 
 #Settings
-#pair_style gran/easy 2.7e10 0.17 0.5e-9 0.025 0.1e-9 0.736e-5  #you have to modify the values for your implementation
+#pair_style gran/easy 2.7e10 0.17 0.5e-9 0.025 0.1e-9 0.736e-5  
 pair_style granular
 pair_coeff * * jkr ${young_modulus} 1.0e16 ${poisson} ${surface_energy} tangential mindlin NULL 1 0.5 rolling sds 5e09 9.895e-09 0.1 twisting marshall
 

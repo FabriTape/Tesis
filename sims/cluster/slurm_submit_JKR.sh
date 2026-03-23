@@ -2,13 +2,13 @@
 ### Reserve time in slurm queue manager.
 
 #SBATCH -J jkr
-#SBATCH -n 64
+#SBATCH -n 16
 #SBATCH --nodes 1
-#SBATCH --ntasks-per-node=64
+#SBATCH --ntasks-per-node=16
 #SBATCH -o ./logs/job_exec_%j.out
 ##SBATCH --gres=gpu:1
-#SBATCH --nodelist=toko04
-#SBATCH --partition=XL
+#SBATCH --nodelist=gpu2
+#SBATCH --partition=gpu
 
 ## Espacio añadido para ejecutar en gpu2
 CARPETA_TMP="/dev/shm/fbazzoni_tmp_${SLURM_JOB_ID}"

@@ -43,7 +43,7 @@ cp "${SCRIPT_DIR}/config.toml" ./
 
 for fill in "${FILLS[@]}"
 do
-	DATA="box_fill_${fill}_SI.data"
+	DATA="box_fill_${fill}_SI_100um.data"
 	cp "${BASE_DIR}/datas/$DATA" ./
 
 	for vel in "${VELS[@]}"
