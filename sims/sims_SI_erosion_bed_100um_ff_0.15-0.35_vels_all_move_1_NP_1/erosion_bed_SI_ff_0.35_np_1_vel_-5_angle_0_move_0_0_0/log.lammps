@@ -1,0 +1,4343 @@
+LAMMPS (29 Sep 2021 - Update 1)
+# Init
+variable data index 1
+
+variable xrotate index 1
+variable yrotate index 1
+variable zrotate index 1
+variable angle index 1
+
+variable xmove index 1
+variable ymove index 1
+variable zmove index 1
+
+variable velocity index 1
+variable nsteps index 1
+variable ndumps index 1
+variable nthermo index 1
+
+
+newton off
+
+units       si
+dimension   3
+boundary    p p f
+atom_style  sphere
+neighbor  100e-9 bin
+comm_modify mode single vel yes
+processors * * *
+
+
+
+# Atom definition
+read_data ${data}
+read_data ../box_fill_0.35_SI.data
+Reading data file ...
+  orthogonal box = (0.0000000 0.0000000 0.0000000) to (0.00010000000 0.00010000000 0.00010000000)
+  2 by 4 by 4 MPI processor grid
+  reading atoms ...
+  190343 atoms
+  read_data CPU = 0.704 seconds
+#read_data ./box_fill_0.35_SI.data
+
+#TODO: EDITAR TAMAÑO DE CAJA EN DATA y NUMERO DE GRANOS a 2
+change_box all z final -1e-5 0.000410
+Changing box ...
+  orthogonal box = (0.0000000 0.0000000 -1.0000000e-05) to (0.00010000000 0.00010000000 0.00041000000)
+
+#TODO: GRANOS EN POSICION original con centro de la caja en 0 0 0
+#1 1 1.52e-6 2000 0.76e-6 0 0
+#2 1 1.52e-6 2000 -0.76e-6 0 0
+#3 1 1.52e-6 2000 0 1.32e-6 0
+##### crea granos del proyectil
+#create_atoms 2 single 73.26e-6 72.5e-6 152e-6
+#create_atoms 2 single 71.74e-6 72.5e-6 152e-6
+#create_atoms 2 single 72.5e-6 73.82e-6 152e-6
+
+#NP1
+#create_atoms 2 single 50e-5 50e-5 105e-5
+create_atoms 2 single 5e-5 5e-5 10.3e-5
+Created 1 atoms
+  using lattice units in orthogonal box = (0.0000000 0.0000000 -1.0000000e-05) to (0.00010000000 0.00010000000 0.00041000000)
+  create_atoms CPU = 0.000 seconds
+#create_atoms 2 single 72.5e-6 72.5e-6 152e-6
+
+#NP3
+#create_atoms 2 single 73.26e-6 72.5e-6 152e-6
+#create_atoms 2 single 71.74e-6 72.5e-6 152e-6
+#create_atoms 2 single 72.5e-6 73.816e-6 152e-6
+
+set type 2 diameter 1.52e-6
+Setting atom values ...
+  1 settings made for diameter
+set type 2 density 2.0e+03
+Setting atom values ...
+  1 settings made for density
+
+# Groups
+group bloque type 1
+190343 atoms in group bloque
+group sphere type 2
+1 atoms in group sphere
+
+#TODO: CUIDADO CON EL CENTRO DE LA ROTACION, SI CAMBIA EL TAMAÑO DE LA CAJA HAY Q CAMBIAR EL CENTRO
+#displace_atoms sphere rotate 72.5e-6 72.5e-6 152e-6 ${xrotate} ${yrotate} ${zrotate} ${angle}
+displace_atoms sphere move ${xmove} ${ymove} ${zmove}
+displace_atoms sphere move 0e-6 ${ymove} ${zmove}
+displace_atoms sphere move 0e-6 0e-6 ${zmove}
+displace_atoms sphere move 0e-6 0e-6 0e-6
+Displacing atoms ...
+
+
+write_data pre-run_with_projectile.data
+System init for write_data ...
+WARNING: Communication cutoff is 0.0. No ghost atoms will be generated. Atoms may get lost. (../comm_brick.cpp:209)
+
+#Settings
+#pair_style gran/easy 2.7e10 0.17 0.5e-9 0.025 0.1e-9 0.736e-5  #you have to modify the values for your implementation
+pair_style granular
+pair_coeff * * jkr 70.0e09 1.0e16 0.17 0.025 tangential mindlin NULL 1 0.5 rolling sds 5e09 9.895e-09 0.1 twisting marshall
+timestep 5e-11
+
+# fixes & compute
+fix 1 bloque nve/sphere
+fix 2 sphere nve/sphere
+
+compute 1 all ke/atom
+
+velocity bloque create 10.0 83921
+velocity sphere set 0.0 0.0 ${velocity} units box
+velocity sphere set 0.0 0.0 -5 units box
+
+dump 1 all custom ${ndumps} output.*.gz id type x y z vx vy vz omegax omegay omegaz c_1
+dump 1 all custom 25000 output.*.gz id type x y z vx vy vz omegax omegay omegaz c_1
+#dump_modify 1 format "%d %d %2.16g %2.16g %2.16g %2.16g %2.16g %2.16g %2.16g %2.16g %2.16g %2.16g"
+
+thermo ${nthermo}
+thermo 5000
+#run 15000000 upto
+thermo_modify lost warn
+
+#run ${nsteps}
+
+variable nloops equal ${nsteps}/10000
+variable nloops equal 1000000/10000
+variable a loop ${nloops}
+variable a loop 100
+
+
+label loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Neighbor list info ...
+  update every 1 steps, delay 10 steps, check yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 1.6199303e-06
+  ghost atom cutoff = 1.6199303e-06
+  binsize = 8.0996516e-07, bins = 124 124 519
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair granular, perpetual
+      attributes: half, newton off, size, history
+      pair build: half/size/bin/newtoff
+      stencil: full/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 21.84 | 23.60 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+       0    11671.583            0            0 4.6008879e-14   -1.5142136 
+    5000    11664.144            0            0 4.5979555e-14  0.014369945 
+   10000    5150.1719            0            0 2.0301757e-14  0.010969647 
+Loop time of 102.921 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00054266 | 20.195     | 79.804     | 731.8 | 19.62
+Neigh   | 0.0087378  | 0.13774    | 0.51365    |  55.9 |  0.13
+Comm    | 0.21583    | 5.084      | 12.296     | 226.9 |  4.94
+Output  | 0.00050568 | 0.022527   | 0.030581   |   8.3 |  0.02
+Modify  | 0.0018194  | 3.0596     | 14.144     | 299.6 |  2.97
+Other   |            | 74.42      |            |       | 72.31
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1417.09 ave        5124 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.00 ave       38214 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317472
+Ave neighs/atom = 1.6678855
+Neighbor list builds = 47
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 21.84 | 23.60 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+   10000    5150.1719            0            0 2.0301757e-14  0.010973609 
+   15000    3970.2807            0            0 1.5650676e-14 -0.0070520667 
+   20000    2639.5681            0            0 1.0405064e-14   0.01580808 
+Loop time of 102.608 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051496 | 20.187     | 79.636     | 731.7 | 19.67
+Neigh   | 0.0035408  | 0.052816   | 0.19678    |  34.5 |  0.05
+Comm    | 0.089599   | 4.3846     | 9.72       | 207.4 |  4.27
+Output  | 0.00046248 | 0.014265   | 0.019524   |   6.5 |  0.01
+Modify  | 0.0016784  | 3.0642     | 13.974     | 299.4 |  2.99
+Other   |            | 74.91      |            |       | 73.00
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1417.09 ave        5124 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.66 ave       38213 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317461
+Ave neighs/atom = 1.6678277
+Neighbor list builds = 18
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 21.84 | 23.60 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+   20000    2639.5681            0            0 1.0405064e-14  0.015807011 
+   25000    1770.0536            0            0 6.9774752e-15 -0.0042597985 
+   30000    1557.8789            0            0 6.1410917e-15 0.00061674404 
+Loop time of 104.817 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00053    | 20.19      | 79.637     | 731.7 | 19.26
+Neigh   | 0.0025373  | 0.040998   | 0.15298    |  30.5 |  0.04
+Comm    | 0.073129   | 4.2782     | 9.3432     | 204.8 |  4.08
+Output  | 2.2725     | 2.2863     | 2.2916     |   0.5 |  2.18
+Modify  | 0.0017618  | 3.0639     | 13.973     | 299.3 |  2.92
+Other   |            | 74.96      |            |       | 71.51
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.88 ave        5124 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.88 ave       38213 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317468
+Ave neighs/atom = 1.6678645
+Neighbor list builds = 14
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+   30000    1557.8789            0            0 6.1410917e-15 0.00063204451 
+   35000    1414.8106            0            0 5.5771227e-15  0.024766219 
+   40000    1368.3916            0            0 5.3941408e-15  0.010265107 
+Loop time of 102.538 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051021 | 20.194     | 79.648     | 731.8 | 19.69
+Neigh   | 0.0027793  | 0.041064   | 0.15296    |  30.4 |  0.04
+Comm    | 0.072382   | 4.2766     | 9.3268     | 204.8 |  4.17
+Output  | 0.0004557  | 0.014229   | 0.019498   |   6.6 |  0.01
+Modify  | 0.0017603  | 3.0557     | 14.034     | 299.1 |  2.98
+Other   |            | 74.96      |            |       | 73.10
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.97 ave        5124 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.34 ave       38212 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317483
+Ave neighs/atom = 1.6679433
+Neighbor list builds = 14
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+   40000    1368.3916            0            0 5.3941408e-15  0.010278333 
+   45000    1254.0495            0            0 4.9434095e-15 -0.005016706 
+   50000    1195.7961            0            0 4.713777e-15 0.0014041839 
+Loop time of 104.793 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050968 | 20.197     | 79.695     | 731.8 | 19.27
+Neigh   | 0.0028246  | 0.041159   | 0.15286    |  30.4 |  0.04
+Comm    | 0.073476   | 4.2751     | 9.3261     | 204.7 |  4.08
+Output  | 2.2514     | 2.2652     | 2.2705     |   0.5 |  2.16
+Modify  | 0.0017609  | 3.052      | 14.006     | 299.0 |  2.91
+Other   |            | 74.96      |            |       | 71.53
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.97 ave        5124 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.41 ave       38213 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317485
+Ave neighs/atom = 1.6679538
+Neighbor list builds = 14
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+   50000    1195.7961            0            0 4.713777e-15 0.0014026956 
+   55000    543.11306            0            0 2.1409284e-15 -0.0032492501 
+   60000    444.02069            0            0 1.7503105e-15 -0.001289906 
+Loop time of 102.546 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050955 | 20.206     | 79.723     | 731.9 | 19.70
+Neigh   | 0.0016483  | 0.020793   | 0.076491   |  21.3 |  0.02
+Comm    | 0.040096   | 4.1012     | 8.6942     | 201.1 |  4.00
+Output  | 0.00043617 | 0.014226   | 0.019508   |   6.6 |  0.01
+Modify  | 0.0017179  | 3.0394     | 13.997     | 298.4 |  2.96
+Other   |            | 75.16      |            |       | 73.30
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.88 ave        5124 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.44 ave       38212 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317486
+Ave neighs/atom = 1.6679591
+Neighbor list builds = 7
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+   60000    444.02069            0            0 1.7503105e-15 -0.0012789771 
+   65000    431.42221            0            0 1.7006478e-15 0.0025142348 
+   70000    421.84417            0            0 1.6628916e-15 0.0033041199 
+Loop time of 102.436 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050551 | 20.204     | 79.742     | 731.9 | 19.72
+Neigh   | 0.0010934  | 0.014868   | 0.054942   |  18.1 |  0.01
+Comm    | 0.029757   | 4.0356     | 8.48       | 199.7 |  3.94
+Output  | 0.00045134 | 0.014296   | 0.01956    |   6.5 |  0.01
+Modify  | 0.0017584  | 3.0122     | 13.98      | 297.4 |  2.94
+Other   |            | 75.16      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.94 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.38 ave       38212 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317484
+Ave neighs/atom = 1.6679486
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+   70000    421.84417            0            0 1.6628916e-15 0.0032970508 
+   75000     413.5165            0            0 1.6300643e-15  0.010838337 
+   80000    406.01715            0            0 1.6005022e-15 -0.0013169985 
+Loop time of 104.731 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050808 | 20.208     | 79.803     | 732.0 | 19.29
+Neigh   | 0.0012997  | 0.01497    | 0.055078   |  17.9 |  0.01
+Comm    | 0.030669   | 4.0387     | 8.4848     | 199.8 |  3.86
+Output  | 2.2731     | 2.2869     | 2.2922     |   0.5 |  2.18
+Modify  | 0.0017148  | 3.0107     | 13.99      | 297.4 |  2.87
+Other   |            | 75.17      |            |       | 71.78
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1417.00 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.16 ave       38213 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317477
+Ave neighs/atom = 1.6679118
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+   80000    406.01715            0            0 1.6005022e-15 -0.0013038651 
+   85000    402.77359            0            0 1.5877162e-15 -0.00071769147 
+   90000    401.47009            0            0 1.5825779e-15  0.014453093 
+Loop time of 102.442 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050912 | 20.21      | 79.92      | 732.0 | 19.73
+Neigh   | 0.0011712  | 0.014907   | 0.055013   |  18.1 |  0.01
+Comm    | 0.030493   | 4.0351     | 8.4765     | 199.7 |  3.94
+Output  | 0.00041984 | 0.014215   | 0.019477   |   6.6 |  0.01
+Modify  | 0.0017116  | 3.0037     | 14.017     | 297.4 |  2.93
+Other   |            | 75.16      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1417.09 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.03 ave       38214 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317473
+Ave neighs/atom = 1.6678908
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+   90000    401.47009            0            0 1.5825779e-15  0.014463257 
+   95000    330.04602            0            0 1.3010273e-15  0.011339229 
+  100000    326.19196            0            0 1.2858347e-15 0.0016206591 
+Loop time of 104.75 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051073 | 20.214     | 79.869     | 732.1 | 19.30
+Neigh   | 0.0011358  | 0.014905   | 0.054851   |  18.0 |  0.01
+Comm    | 0.030308   | 4.0366     | 8.4825     | 199.7 |  3.85
+Output  | 2.2794     | 2.2932     | 2.2992     |   0.5 |  2.19
+Modify  | 0.0017249  | 3.0139     | 13.95      | 297.5 |  2.88
+Other   |            | 75.18      |            |       | 71.77
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1417.12 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.44 ave       38217 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317486
+Ave neighs/atom = 1.6679591
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  100000    326.19196            0            0 1.2858347e-15 0.0016130328 
+  105000    322.78662            0            0 1.272411e-15 -0.0055386251 
+  110000    319.79743            0            0 1.2606277e-15 -0.00080912346 
+Loop time of 102.561 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050624 | 20.223     | 79.879     | 732.2 | 19.72
+Neigh   | 0.001128   | 0.014865   | 0.054243   |  18.0 |  0.01
+Comm    | 0.031127   | 4.0472     | 8.5051     | 200.0 |  3.95
+Output  | 0.0004661  | 0.014259   | 0.019534   |   6.6 |  0.01
+Modify  | 0.0016934  | 2.9962     | 13.826     | 296.7 |  2.92
+Other   |            | 75.27      |            |       | 73.39
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1417.00 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.81 ave       38215 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317498
+Ave neighs/atom = 1.6680221
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  110000    319.79743            0            0 1.2606277e-15 -0.000814565 
+  115000    317.53386            0            0 1.2517048e-15 -0.00031855607 
+  120000    314.25598            0            0 1.2387836e-15 0.0059475778 
+Loop time of 102.487 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050831 | 20.219     | 79.873     | 732.1 | 19.73
+Neigh   | 0.0013598  | 0.015007   | 0.055115   |  17.9 |  0.01
+Comm    | 0.030691   | 4.0333     | 8.4743     | 199.6 |  3.94
+Output  | 0.00041372 | 0.014224   | 0.019502   |   6.6 |  0.01
+Modify  | 0.0016867  | 3.0042     | 13.908     | 297.2 |  2.93
+Other   |            | 75.2       |            |       | 73.38
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.97 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.34 ave       38212 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317483
+Ave neighs/atom = 1.6679433
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  120000    314.25598            0            0 1.2387836e-15 0.0059407888 
+  125000    241.98512            0            0 9.5389497e-16  0.016160377 
+  130000    238.85016            0            0 9.4153707e-16 -0.0050492354 
+Loop time of 104.819 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051099 | 20.223     | 79.897     | 732.2 | 19.29
+Neigh   | 0.0011381  | 0.014869   | 0.054582   |  18.1 |  0.01
+Comm    | 0.030514   | 4.0328     | 8.4748     | 199.6 |  3.85
+Output  | 2.2751     | 2.2889     | 2.2942     |   0.5 |  2.18
+Modify  | 0.0017339  | 3.0149     | 14.031     | 297.9 |  2.88
+Other   |            | 75.24      |            |       | 71.79
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.94 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.06 ave       38212 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317474
+Ave neighs/atom = 1.6678960
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  130000    238.85016            0            0 9.4153707e-16 -0.0050384877 
+  135000    236.25788            0            0 9.3131844e-16 -0.00037509148 
+  140000    232.71626            0            0 9.1735751e-16 0.0025415833 
+Loop time of 102.542 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050788 | 20.224     | 79.911     | 732.2 | 19.72
+Neigh   | 0.0011705  | 0.014897   | 0.055005   |  18.0 |  0.01
+Comm    | 0.030462   | 4.0336     | 8.475      | 199.6 |  3.93
+Output  | 0.00044574 | 0.014257   | 0.019501   |   6.5 |  0.01
+Modify  | 0.0017076  | 3.0132     | 14.064     | 297.8 |  2.94
+Other   |            | 75.24      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.91 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.91 ave       38210 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317469
+Ave neighs/atom = 1.6678698
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  140000    232.71626            0            0 9.1735751e-16 0.0025475439 
+  145000    230.68897            0            0 9.0936601e-16 -0.0042057419 
+  150000    228.37877            0            0 9.002593e-16 0.0010035634 
+Loop time of 104.792 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051205 | 20.228     | 79.929     | 732.3 | 19.30
+Neigh   | 0.001332   | 0.014962   | 0.055138   |  17.9 |  0.01
+Comm    | 0.031379   | 4.0326     | 8.4744     | 199.6 |  3.85
+Output  | 2.27       | 2.2838     | 2.2891     |   0.5 |  2.18
+Modify  | 0.0017121  | 3.01       | 13.962     | 297.3 |  2.87
+Other   |            | 75.22      |            |       | 71.78
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.84 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.12 ave       38216 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317476
+Ave neighs/atom = 1.6679065
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  150000    228.37877            0            0 9.002593e-16 0.0010492017 
+  155000    226.08214            0            0 8.9120609e-16  0.007676371 
+  160000    223.99048            0            0 8.8296086e-16 -0.0049910808 
+Loop time of 102.537 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051825 | 20.229     | 79.94      | 732.3 | 19.73
+Neigh   | 0.0013435  | 0.014958   | 0.054632   |  17.9 |  0.01
+Comm    | 0.030704   | 4.0346     | 8.4773     | 199.7 |  3.93
+Output  | 0.00045382 | 0.014278   | 0.019548   |   6.5 |  0.01
+Modify  | 0.0017081  | 3.0147     | 13.98      | 297.6 |  2.94
+Other   |            | 75.23      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.84 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.97 ave       38216 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317471
+Ave neighs/atom = 1.6678803
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  160000    223.99048            0            0 8.8296086e-16 -0.0049763946 
+  165000     222.2281            0            0 8.7601365e-16  0.012633754 
+  170000    220.22587            0            0 8.6812093e-16 -0.0081626369 
+Loop time of 102.532 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.0005087  | 20.232     | 79.949     | 732.4 | 19.73
+Neigh   | 0.0011352  | 0.014916   | 0.054694   |  18.0 |  0.01
+Comm    | 0.030431   | 4.0313     | 8.4714     | 199.6 |  3.93
+Output  | 0.0004263  | 0.014269   | 0.019553   |   6.6 |  0.01
+Modify  | 0.0017056  | 3.0121     | 13.986     | 297.4 |  2.94
+Other   |            | 75.23      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.88 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.06 ave       38216 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317474
+Ave neighs/atom = 1.6678960
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  170000    220.22587            0            0 8.6812093e-16 -0.0081593116 
+  175000    217.27514            0            0 8.5648929e-16 -0.0056205565 
+  180000     215.2774            0            0 8.4861426e-16 0.0067039536 
+Loop time of 104.617 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050644 | 20.25      | 79.891     | 732.7 | 19.36
+Neigh   | 0.0011623  | 0.014908   | 0.054014   |  18.0 |  0.01
+Comm    | 0.030848   | 4.0507     | 8.5072     | 200.1 |  3.87
+Output  | 2.3703     | 2.3841     | 2.3893     |   0.5 |  2.28
+Modify  | 0.001709   | 2.9119     | 12.657     | 290.4 |  2.78
+Other   |            | 75.01      |            |       | 71.70
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.84 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.44 ave       38223 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317486
+Ave neighs/atom = 1.6679591
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  180000     215.2774            0            0 8.4861426e-16 0.0067166839 
+  185000    214.36622            0            0 8.4502244e-16 0.00015689341 
+  190000    213.03622            0            0 8.3977964e-16 0.0059101586 
+Loop time of 101.916 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050994 | 20.264     | 79.908     | 733.1 | 19.88
+Neigh   | 0.0013452  | 0.015007   | 0.054266   |  17.9 |  0.01
+Comm    | 0.030535   | 4.0631     | 8.5379     | 200.4 |  3.99
+Output  | 0.00043622 | 0.014259   | 0.019482   |   6.5 |  0.01
+Modify  | 0.0017674  | 2.786      | 12.174     | 284.0 |  2.73
+Other   |            | 74.77      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.97 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.34 ave       38226 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317483
+Ave neighs/atom = 1.6679433
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  190000    213.03622            0            0 8.3977964e-16 0.0059063706 
+  195000    211.47337            0            0 8.3361895e-16 0.0025827786 
+  200000    210.40317            0            0 8.2940025e-16  0.004400226 
+Loop time of 104.172 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051031 | 20.266     | 79.906     | 733.1 | 19.45
+Neigh   | 0.001127   | 0.014915   | 0.054463   |  18.1 |  0.01
+Comm    | 0.030782   | 4.0633     | 8.5355     | 200.4 |  3.90
+Output  | 2.2459     | 2.2597     | 2.265      |   0.5 |  2.17
+Modify  | 0.0017484  | 2.7856     | 12.204     | 284.0 |  2.67
+Other   |            | 74.78      |            |       | 71.79
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.97 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.06 ave       38226 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317474
+Ave neighs/atom = 1.6678960
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  200000    210.40317            0            0 8.2940025e-16 0.0044012556 
+  205000    210.81921            0            0 8.3104026e-16 -0.0098947923 
+  210000    208.36064            0            0 8.213487e-16 -0.0060090161 
+Loop time of 101.976 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050566 | 20.272     | 79.942     | 733.3 | 19.88
+Neigh   | 0.0011366  | 0.014897   | 0.054308   |  18.0 |  0.01
+Comm    | 0.030533   | 4.0688     | 8.5428     | 200.5 |  3.99
+Output  | 0.00050921 | 0.014319   | 0.019585   |   6.5 |  0.01
+Modify  | 0.0017426  | 2.7908     | 12.205     | 284.2 |  2.74
+Other   |            | 74.81      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.91 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.94 ave       38228 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317470
+Ave neighs/atom = 1.6678750
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  210000    208.36064            0            0 8.213487e-16 -0.0059913879 
+  215000    207.42828            0            0 8.1767336e-16 0.0011163939 
+  220000    207.06086            0            0 8.1622503e-16 0.0084787816 
+Loop time of 101.98 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050927 | 20.273     | 79.957     | 733.3 | 19.88
+Neigh   | 0.0012665  | 0.014908   | 0.054063   |  17.9 |  0.01
+Comm    | 0.030394   | 4.0676     | 8.54       | 200.5 |  3.99
+Output  | 0.00048602 | 0.014267   | 0.019556   |   6.6 |  0.01
+Modify  | 0.0017145  | 2.7943     | 12.207     | 284.4 |  2.74
+Other   |            | 74.82      |            |       | 73.36
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.88 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.22 ave       38233 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317479
+Ave neighs/atom = 1.6679223
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  220000    207.06086            0            0 8.1622503e-16 0.0084943682 
+  225000    207.23184            0            0 8.1689903e-16 -0.0064151108 
+  230000    206.38987            0            0 8.1358003e-16 -0.0043479174 
+Loop time of 104.217 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051041 | 20.278     | 79.957     | 733.4 | 19.46
+Neigh   | 0.0013203  | 0.014959   | 0.054545   |  17.9 |  0.01
+Comm    | 0.030397   | 4.0682     | 8.5411     | 200.5 |  3.90
+Output  | 2.2431     | 2.2571     | 2.2624     |   0.5 |  2.17
+Modify  | 0.0017463  | 2.7856     | 12.2       | 283.9 |  2.67
+Other   |            | 74.81      |            |       | 71.79
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.84 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.00 ave       38230 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317472
+Ave neighs/atom = 1.6678855
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  230000    206.38987            0            0 8.1358003e-16 -0.0043319445 
+  235000    203.64814            0            0 8.0277225e-16 -0.011522213 
+  240000     203.9938            0            0 8.041348e-16 -0.0040095754 
+Loop time of 101.983 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050869 | 20.278     | 79.979     | 733.4 | 19.88
+Neigh   | 0.0011538  | 0.014892   | 0.054634   |  18.0 |  0.01
+Comm    | 0.030498   | 4.0689     | 8.5416     | 200.5 |  3.99
+Output  | 0.00043693 | 0.014367   | 0.019622   |   6.5 |  0.01
+Modify  | 0.0017788  | 2.7858     | 12.245     | 284.0 |  2.73
+Other   |            | 74.82      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.81 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.84 ave       38228 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317467
+Ave neighs/atom = 1.6678592
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  240000     203.9938            0            0 8.041348e-16 -0.0040095129 
+  245000    203.42402            0            0 8.0188877e-16 -0.0018157863 
+  250000    202.85405            0            0 7.9964196e-16 0.0067403984 
+Loop time of 104.268 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051258 | 20.279     | 79.99      | 733.4 | 19.45
+Neigh   | 0.0011279  | 0.014875   | 0.054283   |  18.0 |  0.01
+Comm    | 0.030673   | 4.0681     | 8.5397     | 200.5 |  3.90
+Output  | 2.2466     | 2.2604     | 2.2657     |   0.5 |  2.17
+Modify  | 0.0017104  | 2.7998     | 12.254     | 284.5 |  2.69
+Other   |            | 74.85      |            |       | 71.78
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.62 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.78 ave       38229 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317465
+Ave neighs/atom = 1.6678487
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  250000    202.85405            0            0 7.9964196e-16 0.0067544042 
+  255000    202.26922            0            0 7.9733657e-16 0.0041094822 
+  260000     202.8307            0            0 7.9954991e-16 -0.0034477645 
+Loop time of 102.01 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051016 | 20.285     | 80.014     | 733.5 | 19.89
+Neigh   | 0.0013455  | 0.014982   | 0.054469   |  17.9 |  0.01
+Comm    | 0.030336   | 4.0657     | 8.5422     | 200.4 |  3.99
+Output  | 0.00047093 | 0.014311   | 0.019573   |   6.5 |  0.01
+Modify  | 0.0017203  | 2.7841     | 12.232     | 283.9 |  2.73
+Other   |            | 74.85      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.62 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.81 ave       38228 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317466
+Ave neighs/atom = 1.6678540
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  260000     202.8307            0            0 7.9954991e-16 -0.0034494392 
+  265000    201.69161            0            0 7.9505969e-16 -0.0017325068 
+  270000    201.45394            0            0 7.941228e-16 0.0071241922 
+Loop time of 102.038 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051127 | 20.286     | 80.017     | 733.5 | 19.88
+Neigh   | 0.0011422  | 0.014889   | 0.05472    |  18.0 |  0.01
+Comm    | 0.030306   | 4.0652     | 8.5414     | 200.4 |  3.98
+Output  | 0.00048479 | 0.014377   | 0.019637   |   6.5 |  0.01
+Modify  | 0.0017492  | 2.7939     | 12.249     | 284.4 |  2.74
+Other   |            | 74.86      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.62 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.00 ave       38229 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317472
+Ave neighs/atom = 1.6678855
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  270000    201.45394            0            0 7.941228e-16 0.0071072253 
+  275000    201.25662            0            0 7.9334496e-16 -0.00031767536 
+  280000    200.91243            0            0 7.9198816e-16 -0.00058346912 
+Loop time of 104.285 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.000505   | 20.285     | 79.995     | 733.5 | 19.45
+Neigh   | 0.0010273  | 0.014839   | 0.054295   |  18.1 |  0.01
+Comm    | 0.030422   | 4.0657     | 8.5374     | 200.4 |  3.90
+Output  | 2.2397     | 2.2536     | 2.2589     |   0.5 |  2.16
+Modify  | 0.0017261  | 2.8003     | 12.291     | 284.6 |  2.69
+Other   |            | 74.87      |            |       | 71.79
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.62 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.38 ave       38230 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317452
+Ave neighs/atom = 1.6677804
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  280000    200.91243            0            0 7.9198816e-16 -0.00056677994 
+  285000    200.20069            0            0 7.8918253e-16 0.0021515043 
+  290000      200.445            0            0 7.9014558e-16 0.0015832418 
+Loop time of 101.981 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050905 | 20.285     | 80.031     | 733.5 | 19.89
+Neigh   | 0.0013155  | 0.014936   | 0.054378   |  17.9 |  0.01
+Comm    | 0.030686   | 4.0668     | 8.5356     | 200.5 |  3.99
+Output  | 0.00044097 | 0.0143     | 0.019578   |   6.5 |  0.01
+Modify  | 0.0017196  | 2.7758     | 12.237     | 283.5 |  2.72
+Other   |            | 74.82      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.53 ave        5124 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.31 ave       38227 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317450
+Ave neighs/atom = 1.6677699
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  290000      200.445            0            0 7.9014558e-16 0.0015970848 
+  295000    199.55208            0            0 7.8662573e-16 -0.0024227129 
+  300000    201.23626            0            0 7.9326469e-16 -0.0077313561 
+Loop time of 104.242 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050799 | 20.286     | 80.05      | 733.5 | 19.46
+Neigh   | 0.0013756  | 0.014985   | 0.054522   |  17.9 |  0.01
+Comm    | 0.030428   | 4.0641     | 8.5352     | 200.4 |  3.90
+Output  | 2.24       | 2.2538     | 2.2591     |   0.5 |  2.16
+Modify  | 0.0017384  | 2.7811     | 12.261     | 283.8 |  2.67
+Other   |            | 74.84      |            |       | 71.80
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.50 ave        5124 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.38 ave       38230 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317452
+Ave neighs/atom = 1.6677804
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  300000    201.23626            0            0 7.9326469e-16 -0.0077366107 
+  305000    199.44159            0            0 7.8619018e-16 0.0020570046 
+  310000    199.84736            0            0 7.877897e-16 -0.0063454534 
+Loop time of 101.968 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.0005155  | 20.289     | 80.055     | 733.6 | 19.90
+Neigh   | 0.0011047  | 0.014868   | 0.05437    |  18.0 |  0.01
+Comm    | 0.030419   | 4.0628     | 8.5329     | 200.4 |  3.98
+Output  | 0.00042779 | 0.014366   | 0.019658   |   6.5 |  0.01
+Modify  | 0.0017321  | 2.7609     | 12.197     | 282.8 |  2.71
+Other   |            | 74.83      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.44 ave        5124 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.16 ave       38231 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317445
+Ave neighs/atom = 1.6677437
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  310000    199.84736            0            0 7.877897e-16 -0.0063265669 
+  315000    199.74857            0            0 7.874003e-16 -0.005885076 
+  320000    199.45707            0            0 7.8625121e-16 0.0048829478 
+Loop time of 101.984 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051327 | 20.288     | 80.074     | 733.6 | 19.89
+Neigh   | 0.0011298  | 0.014877   | 0.054267   |  18.0 |  0.01
+Comm    | 0.030776   | 4.0641     | 8.5346     | 200.4 |  3.99
+Output  | 0.00044725 | 0.014271   | 0.019553   |   6.6 |  0.01
+Modify  | 0.0016792  | 2.7713     | 12.233     | 283.4 |  2.72
+Other   |            | 74.83      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.38 ave        5123 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9919.88 ave       38228 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317436
+Ave neighs/atom = 1.6676964
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  320000    199.45707            0            0 7.8625121e-16 0.0048895273 
+  325000    199.89843            0            0 7.8799103e-16 -0.021664776 
+  330000    199.46312            0            0 7.8627507e-16 -0.015600873 
+Loop time of 104.223 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050866 | 20.291     | 80.065     | 733.6 | 19.47
+Neigh   | 0.0013301  | 0.014957   | 0.054689   |  17.9 |  0.01
+Comm    | 0.030734   | 4.0599     | 8.5318     | 200.3 |  3.90
+Output  | 2.2627     | 2.2766     | 2.2818     |   0.5 |  2.18
+Modify  | 0.0016578  | 2.7636     | 12.233     | 283.1 |  2.65
+Other   |            | 74.82      |            |       | 71.79
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.38 ave        5124 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.06 ave       38228 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317442
+Ave neighs/atom = 1.6677279
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  330000    199.46312            0            0 7.8627507e-16 -0.015536278 
+  335000    198.66357            0            0 7.8312327e-16 -0.00065796018 
+  340000    199.07179            0            0 7.8473244e-16  0.002258357 
+Loop time of 102.046 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050953 | 20.297     | 80.06      | 733.7 | 19.89
+Neigh   | 0.0011225  | 0.014889   | 0.054561   |  18.0 |  0.01
+Comm    | 0.030612   | 4.056      | 8.5336     | 200.2 |  3.97
+Output  | 0.00047137 | 0.014329   | 0.019642   |   6.6 |  0.01
+Modify  | 0.001669   | 2.7829     | 12.317     | 283.9 |  2.73
+Other   |            | 74.88      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.41 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.06 ave       38231 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317442
+Ave neighs/atom = 1.6677279
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  340000    199.07179            0            0 7.8473244e-16 0.0022705277 
+  345000    196.43568            0            0 7.7434102e-16 0.00013415778 
+  350000    194.07037            0            0 7.6501709e-16 -0.00079828309 
+Loop time of 104.282 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051082 | 20.3       | 80.11      | 733.8 | 19.47
+Neigh   | 0.0011471  | 0.0149     | 0.054177   |  18.0 |  0.01
+Comm    | 0.030528   | 4.055      | 8.5314     | 200.2 |  3.89
+Output  | 2.2475     | 2.2613     | 2.2666     |   0.5 |  2.17
+Modify  | 0.00168    | 2.7773     | 12.326     | 283.7 |  2.66
+Other   |            | 74.87      |            |       | 71.80
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.41 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9919.97 ave       38229 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317439
+Ave neighs/atom = 1.6677121
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  350000    194.07037            0            0 7.6501709e-16 -0.00078089312 
+  355000    193.33389            0            0 7.6211388e-16 0.0033169203 
+  360000    192.02131            0            0 7.5693976e-16 -0.00013021536 
+Loop time of 102.05 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051528 | 20.303     | 80.077     | 733.8 | 19.89
+Neigh   | 0.0013939  | 0.014978   | 0.054417   |  17.9 |  0.01
+Comm    | 0.030364   | 4.0461     | 8.5176     | 200.0 |  3.96
+Output  | 0.00042249 | 0.01432    | 0.019577   |   6.5 |  0.01
+Modify  | 0.0016951  | 2.7796     | 12.327     | 283.8 |  2.72
+Other   |            | 74.89      |            |       | 73.39
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.41 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.53 ave       38229 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317457
+Ave neighs/atom = 1.6678067
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  360000    192.02131            0            0 7.5693976e-16 -0.00011332228 
+  365000    191.36953            0            0 7.5437046e-16 -0.002579819 
+  370000    190.84176            0            0 7.5229003e-16 -0.0025918485 
+Loop time of 102.083 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050911 | 20.301     | 80.106     | 733.8 | 19.89
+Neigh   | 0.0013627  | 0.014974   | 0.054656   |  17.9 |  0.01
+Comm    | 0.030753   | 4.0493     | 8.5231     | 200.0 |  3.97
+Output  | 0.00041447 | 0.014351   | 0.019624   |   6.5 |  0.01
+Modify  | 0.001735   | 2.7976     | 12.336     | 284.6 |  2.74
+Other   |            | 74.91      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.53 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.75 ave       38225 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317464
+Ave neighs/atom = 1.6678435
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  370000    190.84176            0            0 7.5229003e-16 -0.0025678892 
+  375000    191.63683            0            0 7.5542415e-16 0.0058538072 
+  380000    186.80228            0            0 7.3636657e-16 0.00084044242 
+Loop time of 104.23 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050895 | 20.303     | 80.143     | 733.8 | 19.48
+Neigh   | 0.0011806  | 0.014873   | 0.054374   |  18.0 |  0.01
+Comm    | 0.030865   | 4.0537     | 8.5263     | 200.1 |  3.89
+Output  | 2.2276     | 2.2415     | 2.2468     |   0.5 |  2.15
+Modify  | 0.0017386  | 2.7592     | 12.292     | 282.9 |  2.65
+Other   |            | 74.86      |            |       | 71.82
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.59 ave        5124 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.78 ave       38226 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317465
+Ave neighs/atom = 1.6678487
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  380000    186.80228            0            0 7.3636657e-16 0.00085492776 
+  385000    184.77235            0            0 7.2836467e-16 -0.0024258793 
+  390000    182.71903            0            0 7.2027059e-16 0.0027121591 
+Loop time of 102.023 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050743 | 20.305     | 80.146     | 733.9 | 19.90
+Neigh   | 0.00114    | 0.014859   | 0.054281   |  18.0 |  0.01
+Comm    | 0.030896   | 4.0537     | 8.5246     | 200.1 |  3.97
+Output  | 0.00046932 | 0.014329   | 0.019585   |   6.5 |  0.01
+Modify  | 0.0016745  | 2.7601     | 12.276     | 282.9 |  2.71
+Other   |            | 74.88      |            |       | 73.39
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.56 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.34 ave       38228 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317483
+Ave neighs/atom = 1.6679433
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  390000    182.71903            0            0 7.2027059e-16 0.0027240956 
+  395000    181.45482            0            0 7.1528713e-16  0.013363773 
+  400000    180.53109            0            0 7.1164579e-16 -0.0092122243 
+Loop time of 104.328 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050964 | 20.31      | 80.194     | 733.9 | 19.47
+Neigh   | 0.0013405  | 0.014985   | 0.054629   |  17.9 |  0.01
+Comm    | 0.030991   | 4.0549     | 8.5271     | 200.2 |  3.89
+Output  | 2.2381     | 2.252      | 2.2573     |   0.5 |  2.16
+Modify  | 0.0017034  | 2.7767     | 12.301     | 283.7 |  2.66
+Other   |            | 74.92      |            |       | 71.81
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.44 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.28 ave       38228 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317481
+Ave neighs/atom = 1.6679328
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  400000    180.53109            0            0 7.1164579e-16 -0.009175126 
+  405000    181.20892            0            0 7.1431777e-16 -0.001102297 
+  410000    179.85764            0            0 7.089911e-16 -0.0049955169 
+Loop time of 102.149 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051106 | 20.312     | 80.214     | 734.0 | 19.88
+Neigh   | 0.0011632  | 0.01489    | 0.054448   |  18.0 |  0.01
+Comm    | 0.030725   | 4.0611     | 8.5402     | 200.3 |  3.98
+Output  | 0.00044554 | 0.01433    | 0.019576   |   6.5 |  0.01
+Modify  | 0.0017548  | 2.7951     | 12.331     | 284.5 |  2.74
+Other   |            | 74.95      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.44 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.25 ave       38228 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317480
+Ave neighs/atom = 1.6679275
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  410000    179.85764            0            0 7.089911e-16 -0.0049793977 
+  415000    180.15677            0            0 7.1017026e-16 -0.0016292805 
+  420000    179.43579            0            0 7.0732819e-16 -0.0077281949 
+Loop time of 102.112 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.0005095  | 20.311     | 80.238     | 733.9 | 19.89
+Neigh   | 0.0011489  | 0.014887   | 0.054208   |  18.0 |  0.01
+Comm    | 0.030821   | 4.0553     | 8.5301     | 200.2 |  3.97
+Output  | 0.00043551 | 0.014345   | 0.019602   |   6.5 |  0.01
+Modify  | 0.0017457  | 2.791      | 12.33      | 284.3 |  2.73
+Other   |            | 74.93      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.44 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.75 ave       38231 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317496
+Ave neighs/atom = 1.6680116
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  420000    179.43579            0            0 7.0732819e-16 -0.0076949943 
+  425000    178.81387            0            0 7.048766e-16 -0.00036236852 
+  430000    179.56084            0            0 7.0782112e-16 0.00020108133 
+Loop time of 104.338 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051652 | 20.314     | 80.282     | 734.0 | 19.47
+Neigh   | 0.0013673  | 0.014978   | 0.054194   |  17.9 |  0.01
+Comm    | 0.030412   | 4.0492     | 8.5239     | 200.0 |  3.88
+Output  | 2.2554     | 2.2693     | 2.2746     |   0.5 |  2.17
+Modify  | 0.0017592  | 2.7707     | 12.295     | 283.4 |  2.66
+Other   |            | 74.92      |            |       | 71.80
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.47 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.84 ave       38227 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317499
+Ave neighs/atom = 1.6680274
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  430000    179.56084            0            0 7.0782112e-16 0.00023264769 
+  435000    178.35855            0            0 7.0308173e-16 0.0060048843 
+  440000    177.98799            0            0  7.01621e-16 -0.0027755988 
+Loop time of 102.061 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051038 | 20.315     | 80.295     | 734.0 | 19.90
+Neigh   | 0.0013823  | 0.014981   | 0.054762   |  17.9 |  0.01
+Comm    | 0.030651   | 4.0505     | 8.526      | 200.1 |  3.97
+Output  | 0.00048024 | 0.014384   | 0.019646   |   6.5 |  0.01
+Modify  | 0.001785   | 2.7675     | 12.293     | 283.4 |  2.71
+Other   |            | 74.9       |            |       | 73.39
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.50 ave        5124 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.75 ave       38229 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317496
+Ave neighs/atom = 1.6680116
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  440000    177.98799            0            0  7.01621e-16 -0.0027567834 
+  445000    177.94646            0            0 7.0145731e-16 -0.0069646749 
+  450000    179.64632            0            0 7.0815807e-16 -0.014423233 
+Loop time of 104.378 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051142 | 20.318     | 80.27      | 734.1 | 19.47
+Neigh   | 0.00107    | 0.014859   | 0.05439    |  18.0 |  0.01
+Comm    | 0.03109    | 4.0596     | 8.5375     | 200.3 |  3.89
+Output  | 2.2143     | 2.2281     | 2.2334     |   0.5 |  2.13
+Modify  | 0.001751   | 2.7937     | 12.274     | 284.5 |  2.68
+Other   |            | 74.96      |            |       | 71.82
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.50 ave        5124 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9922.38 ave       38228 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317516
+Ave neighs/atom = 1.6681167
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  450000    179.64632            0            0 7.0815807e-16   -0.0143909 
+  455000    178.80971            0            0 7.0486019e-16 -0.0091549443 
+  460000    178.69834            0            0 7.0442119e-16 0.0021257484 
+Loop time of 102.127 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050728 | 20.323     | 80.283     | 734.2 | 19.90
+Neigh   | 0.0011162  | 0.014855   | 0.054309   |  18.0 |  0.01
+Comm    | 0.030478   | 4.0618     | 8.5397     | 200.4 |  3.98
+Output  | 0.00046697 | 0.014364   | 0.019631   |   6.5 |  0.01
+Modify  | 0.0017537  | 2.7784     | 12.248     | 283.8 |  2.72
+Other   |            | 74.93      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.59 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9922.34 ave       38228 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317515
+Ave neighs/atom = 1.6681114
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  460000    178.69834            0            0 7.0442119e-16 0.0021305399 
+  465000    178.44719            0            0 7.0343115e-16 -0.0054984448 
+  470000    178.60919            0            0 7.0406975e-16 -0.00025846429 
+Loop time of 102.219 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050969 | 20.328     | 80.288     | 734.3 | 19.89
+Neigh   | 0.0013558  | 0.01496    | 0.054571   |  17.9 |  0.01
+Comm    | 0.031016   | 4.0618     | 8.5389     | 200.3 |  3.97
+Output  | 0.0004467  | 0.014366   | 0.019638   |   6.5 |  0.01
+Modify  | 0.0017655  | 2.7981     | 12.229     | 284.6 |  2.74
+Other   |            | 75         |            |       | 73.37
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.59 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9922.34 ave       38225 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317515
+Ave neighs/atom = 1.6681114
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  470000    178.60919            0            0 7.0406975e-16 -0.00025573074 
+  475000    178.34694            0            0 7.0303599e-16 -0.0079835502 
+  480000    178.49879            0            0 7.0363457e-16 -0.0053511648 
+Loop time of 104.485 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050925 | 20.337     | 80.427     | 734.5 | 19.46
+Neigh   | 0.0011595  | 0.014903   | 0.054773   |  18.1 |  0.01
+Comm    | 0.030679   | 4.0591     | 8.5349     | 200.3 |  3.88
+Output  | 2.2644     | 2.2782     | 2.2835     |   0.5 |  2.18
+Modify  | 0.0017689  | 2.7903     | 12.268     | 284.2 |  2.67
+Other   |            | 75.01      |            |       | 71.79
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.59 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9922.25 ave       38233 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317512
+Ave neighs/atom = 1.6680957
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  480000    178.49879            0            0 7.0363457e-16 -0.0053337871 
+  485000    177.05342            0            0 6.9793699e-16 0.00068119453 
+  490000    176.85885            0            0 6.9717002e-16 -0.003477739 
+Loop time of 102.199 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050485 | 20.34      | 80.413     | 734.5 | 19.90
+Neigh   | 0.0011266  | 0.014884   | 0.054438   |  18.0 |  0.01
+Comm    | 0.030918   | 4.0608     | 8.5422     | 200.3 |  3.97
+Output  | 0.00043881 | 0.014382   | 0.019639   |   6.5 |  0.01
+Modify  | 0.0017496  | 2.7785     | 12.211     | 283.7 |  2.72
+Other   |            | 74.99      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.56 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9922.03 ave       38231 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317505
+Ave neighs/atom = 1.6680589
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  490000    176.85885            0            0 6.9717002e-16 -0.0034628023 
+  495000    177.02402            0            0 6.9782109e-16 0.0039201524 
+  500000    177.53485            0            0 6.9983475e-16 0.0085377013 
+Loop time of 104.521 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050803 | 20.336     | 80.24      | 734.4 | 19.46
+Neigh   | 0.0013715  | 0.014996   | 0.053928   |  17.9 |  0.01
+Comm    | 0.030529   | 4.0595     | 8.5395     | 200.3 |  3.88
+Output  | 2.2416     | 2.2556     | 2.2609     |   0.5 |  2.16
+Modify  | 0.0017478  | 2.813      | 12.246     | 285.3 |  2.69
+Other   |            | 75.04      |            |       | 71.80
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.47 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9922.00 ave       38231 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317504
+Ave neighs/atom = 1.6680536
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  500000    177.53485            0            0 6.9983475e-16 0.0085320834 
+  505000    176.80088            0            0 6.9694149e-16 0.0071323611 
+  510000    176.33416            0            0 6.9510168e-16 0.0058796262 
+Loop time of 102.252 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.000517   | 20.338     | 80.277     | 734.5 | 19.89
+Neigh   | 0.0013551  | 0.014984   | 0.054526   |  18.0 |  0.01
+Comm    | 0.03058    | 4.0593     | 8.5414     | 200.3 |  3.97
+Output  | 0.00045226 | 0.014407   | 0.01967    |   6.5 |  0.01
+Modify  | 0.0017014  | 2.8041     | 12.228     | 284.9 |  2.74
+Other   |            | 75.02      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22699 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.41 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.78 ave       38231 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317497
+Ave neighs/atom = 1.6680169
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  510000    176.33416            0            0 6.9510168e-16 0.0058972983 
+  515000    175.99189            0            0 6.9375249e-16 0.0023441078 
+  520000     175.6033            0            0 6.9222066e-16 -0.00017771878 
+Loop time of 102.277 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051013 | 20.345     | 80.318     | 734.6 | 19.89
+Neigh   | 0.001091   | 0.014879   | 0.054462   |  18.1 |  0.01
+Comm    | 0.030897   | 4.0629     | 8.5464     | 200.4 |  3.97
+Output  | 0.00043584 | 0.01428    | 0.01956    |   6.6 |  0.01
+Modify  | 0.0017607  | 2.7941     | 12.213     | 284.4 |  2.73
+Other   |            | 75.05      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22699 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.44 ave        5128 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.59 ave       38229 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317491
+Ave neighs/atom = 1.6679853
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  520000     175.6033            0            0 6.9222066e-16 -0.00016333494 
+  525000    176.08477            0            0 6.941186e-16 -6.7603975e-05 
+  530000    175.48435            0            0 6.9175177e-16 0.0010948604 
+Loop time of 104.665 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051001 | 20.352     | 80.284     | 734.8 | 19.45
+Neigh   | 0.0011016  | 0.014856   | 0.054599   |  18.0 |  0.01
+Comm    | 0.030846   | 4.0649     | 8.5491     | 200.4 |  3.88
+Output  | 2.2394     | 2.2533     | 2.2587     |   0.5 |  2.15
+Modify  | 0.0017599  | 2.8061     | 12.249     | 285.0 |  2.68
+Other   |            | 75.17      |            |       | 71.82
+
+Nlocal:        5948.25 ave       22699 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.59 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.81 ave       38230 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317498
+Ave neighs/atom = 1.6680221
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  530000    175.48435            0            0 6.9175177e-16 0.0011107177 
+  535000    175.63748            0            0 6.9235542e-16 -0.0063758309 
+  540000    175.68237            0            0 6.9253234e-16 -0.0027667822 
+Loop time of 102.235 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050966 | 20.352     | 80.514     | 734.8 | 19.91
+Neigh   | 0.0013124  | 0.014972   | 0.05458    |  18.0 |  0.01
+Comm    | 0.03097    | 4.0509     | 8.5238     | 200.1 |  3.96
+Output  | 0.00045922 | 0.014368   | 0.019621   |   6.5 |  0.01
+Modify  | 0.0017233  | 2.7805     | 12.29      | 283.9 |  2.72
+Other   |            | 75.02      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.62 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.72 ave       38225 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317495
+Ave neighs/atom = 1.6680063
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  540000    175.68237            0            0 6.9253234e-16 -0.0027488587 
+  545000    175.85302            0            0 6.9320505e-16 0.0095549112 
+  550000    175.86456            0            0 6.9325054e-16 -0.0067684763 
+Loop time of 104.5 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050888 | 20.357     | 80.514     | 734.8 | 19.48
+Neigh   | 0.0011722  | 0.014887   | 0.054854   |  18.0 |  0.01
+Comm    | 0.031105   | 4.0524     | 8.5307     | 200.1 |  3.88
+Output  | 2.2385     | 2.2524     | 2.2577     |   0.5 |  2.16
+Modify  | 0.0017387  | 2.7762     | 12.239     | 283.5 |  2.66
+Other   |            | 75.05      |            |       | 71.82
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.50 ave        5128 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.69 ave       38224 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317494
+Ave neighs/atom = 1.6680011
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  550000    175.86456            0            0 6.9325054e-16 -0.0067415512 
+  555000    175.67328            0            0 6.9249652e-16 -0.003626478 
+  560000    176.23427            0            0 6.9470791e-16 0.0089662413 
+Loop time of 102.231 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050685 | 20.362     | 80.506     | 734.9 | 19.92
+Neigh   | 0.0011679  | 0.014899   | 0.054456   |  18.0 |  0.01
+Comm    | 0.030869   | 4.0541     | 8.5341     | 200.1 |  3.97
+Output  | 0.00044813 | 0.014297   | 0.019573   |   6.6 |  0.01
+Modify  | 0.0016835  | 2.7643     | 12.218     | 283.0 |  2.70
+Other   |            | 75.02      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.53 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.97 ave       38225 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317503
+Ave neighs/atom = 1.6680484
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  560000    176.23427            0            0 6.9470791e-16 0.0089381879 
+  565000    176.02033            0            0 6.9386459e-16  0.002417173 
+  570000    175.81591            0            0 6.9305877e-16 0.0060181253 
+Loop time of 102.3 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.0005098  | 20.368     | 80.481     | 735.1 | 19.91
+Neigh   | 0.0013196  | 0.014986   | 0.054333   |  17.9 |  0.01
+Comm    | 0.030897   | 4.0546     | 8.5284     | 200.2 |  3.96
+Output  | 0.00043276 | 0.014356   | 0.019673   |   6.6 |  0.01
+Modify  | 0.0017555  | 2.7752     | 12.226     | 283.5 |  2.71
+Other   |            | 75.07      |            |       | 73.39
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.47 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.75 ave       38221 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317496
+Ave neighs/atom = 1.6680116
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  570000    175.81591            0            0 6.9305877e-16 0.0060211585 
+  575000    176.35112            0            0 6.9516854e-16 -8.5118595e-05 
+  580000    176.15477            0            0 6.9439453e-16 0.00042265488 
+Loop time of 104.572 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051215 | 20.366     | 80.484     | 735.0 | 19.48
+Neigh   | 0.0013597  | 0.014993   | 0.05487    |  18.0 |  0.01
+Comm    | 0.030815   | 4.0574     | 8.5316     | 200.2 |  3.88
+Output  | 2.2405     | 2.2544     | 2.2597     |   0.5 |  2.16
+Modify  | 0.0017439  | 2.792      | 12.353     | 284.4 |  2.67
+Other   |            | 75.09      |            |       | 71.80
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.38 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.62 ave       38217 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317492
+Ave neighs/atom = 1.6679906
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  580000    176.15477            0            0 6.9439453e-16 0.00042949634 
+  585000    176.81686            0            0 6.9700448e-16 -0.014152653 
+  590000    175.10827            0            0 6.9026928e-16 0.0013713894 
+Loop time of 102.353 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050998 | 20.367     | 80.471     | 735.1 | 19.90
+Neigh   | 0.0011238  | 0.01488    | 0.054322   |  18.0 |  0.01
+Comm    | 0.030406   | 4.0548     | 8.5284     | 200.2 |  3.96
+Output  | 0.00046436 | 0.014389   | 0.019681   |   6.6 |  0.01
+Modify  | 0.001754   | 2.7989     | 12.346     | 284.6 |  2.73
+Other   |            | 75.1       |            |       | 73.38
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.31 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.56 ave       38218 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317490
+Ave neighs/atom = 1.6679801
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  590000    175.10827            0            0 6.9026928e-16  0.001386138 
+  595000     175.0268            0            0 6.8994812e-16 -0.0028711212 
+  600000    175.31129            0            0 6.910696e-16 0.0041504263 
+Loop time of 104.597 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050551 | 20.369     | 80.523     | 735.1 | 19.47
+Neigh   | 0.0011054  | 0.014851   | 0.054215   |  18.1 |  0.01
+Comm    | 0.031021   | 4.0544     | 8.5275     | 200.1 |  3.88
+Output  | 2.2382     | 2.2523     | 2.2576     |   0.5 |  2.15
+Modify  | 0.0017556  | 2.796      | 12.342     | 284.5 |  2.67
+Other   |            | 75.11      |            |       | 71.81
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.28 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.75 ave       38222 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317496
+Ave neighs/atom = 1.6680116
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  600000    175.31129            0            0 6.910696e-16 0.0041635161 
+  605000    174.95857            0            0 6.8967916e-16 0.0001235665 
+  610000    175.30436            0            0 6.9104228e-16 0.0078318211 
+Loop time of 102.364 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051719 | 20.369     | 80.507     | 735.1 | 19.90
+Neigh   | 0.0013235  | 0.014974   | 0.054614   |  17.9 |  0.01
+Comm    | 0.030541   | 4.0539     | 8.5288     | 200.2 |  3.96
+Output  | 0.00047446 | 0.014497   | 0.019795   |   6.5 |  0.01
+Modify  | 0.001745   | 2.7924     | 12.259     | 284.3 |  2.73
+Other   |            | 75.12      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.28 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.72 ave       38224 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317495
+Ave neighs/atom = 1.6680063
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  610000    175.30436            0            0 6.9104228e-16  0.007850708 
+  615000    174.89944            0            0 6.894461e-16 -0.002151177 
+  620000    175.81071            0            0 6.9303828e-16 -0.0034515158 
+Loop time of 102.386 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050903 | 20.366     | 80.45      | 735.0 | 19.89
+Neigh   | 0.0011878  | 0.014976   | 0.054481   |  17.9 |  0.01
+Comm    | 0.03096    | 4.0543     | 8.5315     | 200.1 |  3.96
+Output  | 0.00043421 | 0.014426   | 0.019726   |   6.5 |  0.01
+Modify  | 0.0017445  | 2.812      | 12.365     | 285.2 |  2.75
+Other   |            | 75.12      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22699 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.22 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.56 ave       38220 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317490
+Ave neighs/atom = 1.6679801
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  620000    175.81071            0            0 6.9303828e-16 -0.0034248592 
+  625000    174.95731            0            0 6.8967419e-16 -0.0030468391 
+  630000    174.84276            0            0 6.8922267e-16 0.0042143076 
+Loop time of 104.515 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051098 | 20.367     | 80.461     | 735.0 | 19.49
+Neigh   | 0.0011496  | 0.01491    | 0.054543   |  18.0 |  0.01
+Comm    | 0.030487   | 4.0517     | 8.5287     | 200.1 |  3.88
+Output  | 2.1954     | 2.2093     | 2.2146     |   0.5 |  2.11
+Modify  | 0.001722   | 2.7935     | 12.247     | 284.4 |  2.67
+Other   |            | 75.08      |            |       | 71.84
+
+Nlocal:        5948.25 ave       22699 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.19 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.66 ave       38221 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317493
+Ave neighs/atom = 1.6679958
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  630000    174.84276            0            0 6.8922267e-16 0.0042265806 
+  635000    174.89981            0            0 6.8944753e-16 -0.0065590796 
+  640000    174.68881            0            0 6.8861578e-16 -0.0015549673 
+Loop time of 102.288 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050905 | 20.365     | 80.536     | 735.0 | 19.91
+Neigh   | 0.0010459  | 0.014851   | 0.054232   |  18.0 |  0.01
+Comm    | 0.030536   | 4.0471     | 8.5334     | 200.0 |  3.96
+Output  | 0.00042029 | 0.014485   | 0.019785   |   6.5 |  0.01
+Modify  | 0.0016951  | 2.791      | 12.288     | 284.3 |  2.73
+Other   |            | 75.05      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22699 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.16 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.16 ave       38216 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317477
+Ave neighs/atom = 1.6679118
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  640000    174.68881            0            0 6.8861578e-16 -0.0015397676 
+  645000     175.6263            0            0 6.9231136e-16 0.0013446489 
+  650000    175.01092            0            0 6.8988553e-16 0.0014755285 
+Loop time of 104.576 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051066 | 20.369     | 80.525     | 735.1 | 19.48
+Neigh   | 0.0013372  | 0.014945   | 0.054516   |  17.9 |  0.01
+Comm    | 0.03047    | 4.05       | 8.5404     | 200.1 |  3.87
+Output  | 2.2454     | 2.2593     | 2.2646     |   0.5 |  2.16
+Modify  | 0.0017281  | 2.7981     | 12.238     | 284.5 |  2.68
+Other   |            | 75.08      |            |       | 71.80
+
+Nlocal:        5948.25 ave       22699 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.16 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.06 ave       38218 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317474
+Ave neighs/atom = 1.6678960
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  650000    175.01092            0            0 6.8988553e-16 0.0014905404 
+  655000    176.21733            0            0 6.9464116e-16 -0.0052057635 
+  660000     174.6604            0            0 6.8850381e-16 -0.0083469158 
+Loop time of 102.297 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050732 | 20.372     | 80.564     | 735.1 | 19.91
+Neigh   | 0.0011882  | 0.014884   | 0.054344   |  18.0 |  0.01
+Comm    | 0.030386   | 4.0464     | 8.5344     | 200.0 |  3.96
+Output  | 0.00041938 | 0.014267   | 0.019484   |   6.5 |  0.01
+Modify  | 0.0017412  | 2.7838     | 12.252     | 284.0 |  2.72
+Other   |            | 75.07      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22699 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.16 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.84 ave       38218 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317467
+Ave neighs/atom = 1.6678592
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  660000     174.6604            0            0 6.8850381e-16 -0.0083241163 
+  665000    175.00863            0            0 6.8987652e-16 0.0045728872 
+  670000    174.64403            0            0 6.8843929e-16 -0.0013730066 
+Loop time of 102.277 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050835 | 20.374     | 80.555     | 735.2 | 19.92
+Neigh   | 0.0011142  | 0.014865   | 0.054259   |  18.0 |  0.01
+Comm    | 0.030449   | 4.0463     | 8.5343     | 200.0 |  3.96
+Output  | 0.00040832 | 0.014343   | 0.01962    |   6.5 |  0.01
+Modify  | 0.0017573  | 2.774      | 12.207     | 283.4 |  2.71
+Other   |            | 75.05      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22699 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.12 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.00 ave       38220 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317472
+Ave neighs/atom = 1.6678855
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  670000    174.64403            0            0 6.8843929e-16 -0.0013541875 
+  675000    174.83621            0            0 6.8919683e-16 -0.0033673274 
+  680000    174.94742            0            0 6.8963521e-16 -0.0015186106 
+Loop time of 104.547 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050836 | 20.378     | 80.517     | 735.3 | 19.49
+Neigh   | 0.0013503  | 0.01499    | 0.054453   |  17.9 |  0.01
+Comm    | 0.030754   | 4.0483     | 8.5385     | 200.0 |  3.87
+Output  | 2.2206     | 2.2345     | 2.2398     |   0.5 |  2.14
+Modify  | 0.0017705  | 2.782      | 12.187     | 283.7 |  2.66
+Other   |            | 75.09      |            |       | 71.82
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.16 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.09 ave       38218 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317475
+Ave neighs/atom = 1.6679013
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  680000    174.94742            0            0 6.8963521e-16 -0.0015021268 
+  685000    174.45897            0            0 6.8770978e-16 0.00028373309 
+  690000    174.41463            0            0 6.8753499e-16 0.0049902142 
+Loop time of 102.335 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051196 | 20.374     | 80.469     | 735.2 | 19.91
+Neigh   | 0.0013096  | 0.014976   | 0.054531   |  17.9 |  0.01
+Comm    | 0.030528   | 4.0474     | 8.5349     | 200.0 |  3.96
+Output  | 0.00044379 | 0.014339   | 0.019583   |   6.5 |  0.01
+Modify  | 0.0017626  | 2.7979     | 12.222     | 284.5 |  2.73
+Other   |            | 75.09      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.12 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.06 ave       38217 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317474
+Ave neighs/atom = 1.6678960
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  690000    174.41463            0            0 6.8753499e-16 0.0050035086 
+  695000    175.54556            0            0 6.9199305e-16  0.002391682 
+  700000    174.76772            0            0 6.8892685e-16 -0.0063021459 
+Loop time of 104.531 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051286 | 20.378     | 80.464     | 735.2 | 19.50
+Neigh   | 0.0010843  | 0.014885   | 0.054454   |  18.0 |  0.01
+Comm    | 0.03082    | 4.0503     | 8.5358     | 200.0 |  3.87
+Output  | 2.238      | 2.252      | 2.2573     |   0.5 |  2.15
+Modify  | 0.0016987  | 2.7778     | 12.195     | 283.7 |  2.66
+Other   |            | 75.06      |            |       | 71.80
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.00 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.03 ave       38214 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317473
+Ave neighs/atom = 1.6678908
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  700000    174.76772            0            0 6.8892685e-16 -0.0062652881 
+  705000     174.9844            0            0  6.89781e-16 -0.00022832756 
+  710000    174.95102            0            0 6.8964943e-16 -0.0089877909 
+Loop time of 102.303 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050673 | 20.381     | 80.459     | 735.3 | 19.92
+Neigh   | 0.0011105  | 0.014867   | 0.054357   |  18.1 |  0.01
+Comm    | 0.030395   | 4.0494     | 8.5408     | 200.0 |  3.96
+Output  | 0.00042529 | 0.014303   | 0.019591   |   6.6 |  0.01
+Modify  | 0.0017042  | 2.7781     | 12.158     | 283.6 |  2.72
+Other   |            | 75.06      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.03 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.19 ave       38217 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317478
+Ave neighs/atom = 1.6679170
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  710000    174.95102            0            0 6.8964943e-16 -0.0089554402 
+  715000    174.79814            0            0 6.8904677e-16 -0.0012928566 
+  720000    174.37315            0            0 6.8737146e-16 0.00060957986 
+Loop time of 102.325 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051006 | 20.387     | 80.547     | 735.4 | 19.92
+Neigh   | 0.0013109  | 0.014937   | 0.054427   |  18.0 |  0.01
+Comm    | 0.030807   | 4.05       | 8.5457     | 200.0 |  3.96
+Output  | 0.00045832 | 0.014348   | 0.019628   |   6.5 |  0.01
+Modify  | 0.0017165  | 2.777      | 12.145     | 283.5 |  2.71
+Other   |            | 75.08      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.06 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.28 ave       38218 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317481
+Ave neighs/atom = 1.6679328
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  720000    174.37315            0            0 6.8737146e-16 0.00062387748 
+  725000    174.71881            0            0 6.8873405e-16 0.0011659545 
+  730000    174.42259            0            0 6.8756635e-16 -0.00023812758 
+Loop time of 104.604 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051124 | 20.385     | 80.579     | 735.4 | 19.49
+Neigh   | 0.0011594  | 0.014863   | 0.054239   |  18.0 |  0.01
+Comm    | 0.03085    | 4.0529     | 8.5483     | 200.1 |  3.87
+Output  | 2.2678     | 2.2818     | 2.2871     |   0.5 |  2.18
+Modify  | 0.0016675  | 2.773      | 12.203     | 283.4 |  2.65
+Other   |            | 75.1       |            |       | 71.79
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.06 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.44 ave       38219 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317486
+Ave neighs/atom = 1.6679591
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  730000    174.42259            0            0 6.8756635e-16 -0.00021045458 
+  735000    175.47934            0            0 6.9173202e-16  0.003858761 
+  740000    174.44215            0            0 6.8764348e-16 0.0015341788 
+Loop time of 102.344 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050646 | 20.386     | 80.643     | 735.3 | 19.92
+Neigh   | 0.0010364  | 0.014817   | 0.054456   |  18.1 |  0.01
+Comm    | 0.03016    | 4.0505     | 8.5404     | 200.1 |  3.96
+Output  | 0.00044066 | 0.01453    | 0.019788   |   6.5 |  0.01
+Modify  | 0.0017072  | 2.7791     | 12.273     | 283.9 |  2.72
+Other   |            | 75.1       |            |       | 73.38
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.03 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.03 ave       38217 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317473
+Ave neighs/atom = 1.6678908
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  740000    174.44215            0            0 6.8764348e-16 0.0015516849 
+  745000    174.63951            0            0 6.8842145e-16 -0.0066023613 
+  750000    175.38749            0            0 6.9136996e-16 -0.0063536014 
+Loop time of 104.577 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050812 | 20.396     | 80.62      | 735.6 | 19.50
+Neigh   | 0.0013115  | 0.014993   | 0.054781   |  18.0 |  0.01
+Comm    | 0.030703   | 4.0496     | 8.5427     | 200.0 |  3.87
+Output  | 2.2133     | 2.2272     | 2.2325     |   0.5 |  2.13
+Modify  | 0.0017496  | 2.7676     | 12.124     | 283.1 |  2.65
+Other   |            | 75.12      |            |       | 71.83
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.09 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.19 ave       38214 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317478
+Ave neighs/atom = 1.6679170
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  750000    175.38749            0            0 6.9136996e-16 -0.0063318201 
+  755000    175.16753            0            0 6.9050287e-16 -0.016986736 
+  760000    174.32682            0            0 6.8718886e-16 -0.002419531 
+Loop time of 102.338 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050921 | 20.4       | 80.607     | 735.6 | 19.93
+Neigh   | 0.0013336  | 0.015002   | 0.054949   |  18.0 |  0.01
+Comm    | 0.030797   | 4.0507     | 8.5446     | 200.1 |  3.96
+Output  | 0.00048631 | 0.014457   | 0.019762   |   6.5 |  0.01
+Modify  | 0.0016917  | 2.7595     | 12.083     | 282.6 |  2.70
+Other   |            | 75.1       |            |       | 73.38
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.09 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.31 ave       38214 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317482
+Ave neighs/atom = 1.6679380
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  760000    174.32682            0            0 6.8718886e-16 -0.002403561 
+  765000    174.50692            0            0 6.8789879e-16 -0.00089852813 
+  770000    174.44725            0            0 6.8766356e-16 0.0040439891 
+Loop time of 102.37 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051434 | 20.399     | 80.604     | 735.6 | 19.93
+Neigh   | 0.0011338  | 0.014874   | 0.054337   |  18.0 |  0.01
+Comm    | 0.030781   | 4.0479     | 8.541      | 200.0 |  3.95
+Output  | 0.00046285 | 0.014348   | 0.0196     |   6.5 |  0.01
+Modify  | 0.0017156  | 2.771      | 12.122     | 283.1 |  2.71
+Other   |            | 75.12      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.09 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.84 ave       38205 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317467
+Ave neighs/atom = 1.6678592
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  770000    174.44725            0            0 6.8766356e-16  0.004056445 
+  775000    174.75022            0            0 6.8885788e-16 -0.0029338605 
+  780000    174.15708            0            0 6.8651974e-16 -0.0021237998 
+Loop time of 104.62 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051439 | 20.402     | 80.622     | 735.6 | 19.50
+Neigh   | 0.0011206  | 0.014898   | 0.054286   |  18.1 |  0.01
+Comm    | 0.030918   | 4.0543     | 8.5509     | 200.1 |  3.88
+Output  | 2.2509     | 2.2648     | 2.2701     |   0.5 |  2.16
+Modify  | 0.0017097  | 2.768      | 12.132     | 283.2 |  2.65
+Other   |            | 75.12      |            |       | 71.80
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.09 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.72 ave       38201 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317463
+Ave neighs/atom = 1.6678382
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  780000    174.15708            0            0 6.8651974e-16 -0.0021067872 
+  785000    174.45998            0            0 6.8771377e-16 0.0060500457 
+  790000    174.85749            0            0 6.8928073e-16 -0.0046026866 
+Loop time of 102.457 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.0005137  | 20.401     | 80.607     | 735.6 | 19.91
+Neigh   | 0.001332   | 0.014987   | 0.054365   |  17.9 |  0.01
+Comm    | 0.031056   | 4.0569     | 8.5541     | 200.2 |  3.96
+Output  | 0.00044385 | 0.014431   | 0.019694   |   6.5 |  0.01
+Modify  | 0.0017591  | 2.8015     | 12.25      | 284.9 |  2.73
+Other   |            | 75.17      |            |       | 73.37
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.12 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.50 ave       38203 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317456
+Ave neighs/atom = 1.6678015
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  790000    174.85749            0            0 6.8928073e-16 -0.0045836578 
+  795000    174.41604            0            0 6.8754055e-16 -0.006852047 
+  800000    175.47652            0            0 6.917209e-16 0.0010085929 
+Loop time of 104.794 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051057 | 20.409     | 80.631     | 735.8 | 19.48
+Neigh   | 0.0011092  | 0.014832   | 0.054184   |  18.1 |  0.01
+Comm    | 0.030857   | 4.059      | 8.5445     | 200.3 |  3.87
+Output  | 2.253      | 2.267      | 2.2723     |   0.5 |  2.16
+Modify  | 0.0017135  | 2.8037     | 12.181     | 284.8 |  2.68
+Other   |            | 75.24      |            |       | 71.80
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.19 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.66 ave       38205 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317461
+Ave neighs/atom = 1.6678277
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  800000    175.47652            0            0 6.917209e-16 0.0010036823 
+  805000    174.73485            0            0 6.8879729e-16 -0.0065632014 
+  810000    174.75649            0            0 6.8888257e-16 -0.00058855285 
+Loop time of 102.484 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050649 | 20.413     | 80.736     | 735.9 | 19.92
+Neigh   | 0.0011332  | 0.014885   | 0.054477   |  18.0 |  0.01
+Comm    | 0.030085   | 4.0478     | 8.5384     | 200.0 |  3.95
+Output  | 0.00047812 | 0.01447    | 0.019758   |   6.5 |  0.01
+Modify  | 0.0017923  | 2.7843     | 12.189     | 283.9 |  2.72
+Other   |            | 75.21      |            |       | 73.39
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.16 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.03 ave       38205 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317473
+Ave neighs/atom = 1.6678908
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  810000    174.75649            0            0 6.8888257e-16 -0.00057932821 
+  815000    174.45911            0            0 6.8771032e-16 -0.001652874 
+  820000    174.90421            0            0 6.8946488e-16 -0.0062020106 
+Loop time of 102.537 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050964 | 20.417     | 80.715     | 735.9 | 19.91
+Neigh   | 0.0013002  | 0.015005   | 0.054525   |  17.9 |  0.01
+Comm    | 0.030401   | 4.0482     | 8.5434     | 200.0 |  3.95
+Output  | 0.00044943 | 0.014467   | 0.019759   |   6.5 |  0.01
+Modify  | 0.0017177  | 2.7934     | 12.181     | 284.3 |  2.72
+Other   |            | 75.25      |            |       | 73.39
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.16 ave        5128 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.16 ave       38206 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317477
+Ave neighs/atom = 1.6679118
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  820000    174.90421            0            0 6.8946488e-16 -0.0061805944 
+  825000    175.20822            0            0 6.9066328e-16 -0.0061222898 
+  830000    174.66196            0            0 6.8850997e-16 -0.00095587355 
+Loop time of 104.797 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051503 | 20.417     | 80.739     | 735.9 | 19.48
+Neigh   | 0.0012964  | 0.014943   | 0.054593   |  17.9 |  0.01
+Comm    | 0.030546   | 4.0497     | 8.5437     | 200.0 |  3.86
+Output  | 2.3004     | 2.3143     | 2.3197     |   0.5 |  2.21
+Modify  | 0.0017403  | 2.7834     | 12.19      | 283.8 |  2.66
+Other   |            | 75.22      |            |       | 71.77
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.16 ave        5128 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.97 ave       38208 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317471
+Ave neighs/atom = 1.6678803
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  830000    174.66196            0            0 6.8850997e-16 -0.00093614365 
+  835000    174.34789            0            0 6.8727192e-16 0.0023702738 
+  840000    174.25362            0            0 6.8690031e-16 0.0077885435 
+Loop time of 102.437 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051151 | 20.415     | 80.722     | 735.9 | 19.93
+Neigh   | 0.0011495  | 0.014914   | 0.054713   |  18.0 |  0.01
+Comm    | 0.030612   | 4.0485     | 8.5388     | 200.0 |  3.95
+Output  | 0.00044476 | 0.014423   | 0.019737   |   6.6 |  0.01
+Modify  | 0.0017249  | 2.7759     | 12.14      | 283.6 |  2.71
+Other   |            | 75.17      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.22 ave        5127 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.66 ave       38211 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317461
+Ave neighs/atom = 1.6678277
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  840000    174.25362            0            0 6.8690031e-16 0.0077988465 
+  845000    174.25051            0            0 6.8688804e-16 0.00078813808 
+  850000    174.08245            0            0 6.8622553e-16 0.0045962796 
+Loop time of 104.648 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051253 | 20.418     | 80.742     | 735.9 | 19.51
+Neigh   | 0.0011384  | 0.014905   | 0.054434   |  18.0 |  0.01
+Comm    | 0.030759   | 4.0491     | 8.5398     | 200.0 |  3.87
+Output  | 2.2382     | 2.2522     | 2.2575     |   0.5 |  2.15
+Modify  | 0.0017422  | 2.7605     | 12.065     | 282.7 |  2.64
+Other   |            | 75.15      |            |       | 71.82
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.19 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.84 ave       38212 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317467
+Ave neighs/atom = 1.6678592
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  850000    174.08245            0            0 6.8622553e-16 0.0046097366 
+  855000    174.00639            0            0 6.8592572e-16 0.0049826062 
+  860000    174.57343            0            0 6.8816097e-16 0.0069680121 
+Loop time of 102.459 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050679 | 20.425     | 80.767     | 736.1 | 19.93
+Neigh   | 0.00133    | 0.014954   | 0.054651   |  18.0 |  0.01
+Comm    | 0.030151   | 4.0508     | 8.5427     | 200.1 |  3.95
+Output  | 0.00046319 | 0.014397   | 0.019688   |   6.5 |  0.01
+Modify  | 0.001738   | 2.7631     | 12.083     | 282.9 |  2.70
+Other   |            | 75.19      |            |       | 73.39
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.22 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.09 ave       38209 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317475
+Ave neighs/atom = 1.6679013
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  860000    174.57343            0            0 6.8816097e-16 0.0069767854 
+  865000    173.98487            0            0 6.858409e-16 0.00089550446 
+  870000    174.52508            0            0 6.8797039e-16 -0.0047951664 
+Loop time of 102.448 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050731 | 20.429     | 80.808     | 736.2 | 19.94
+Neigh   | 0.0011709  | 0.014951   | 0.054454   |  17.9 |  0.01
+Comm    | 0.030224   | 4.0492     | 8.538      | 200.1 |  3.95
+Output  | 0.0004376  | 0.0144     | 0.01968    |   6.5 |  0.01
+Modify  | 0.0016718  | 2.7491     | 12.091     | 282.2 |  2.68
+Other   |            | 75.19      |            |       | 73.40
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.19 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.00 ave       38211 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317472
+Ave neighs/atom = 1.6678855
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  870000    174.52508            0            0 6.8797039e-16 -0.0047748868 
+  875000    174.98583            0            0 6.8978663e-16 -0.0025300949 
+  880000    174.07181            0            0 6.8618359e-16 0.0010603978 
+Loop time of 104.669 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050622 | 20.429     | 80.807     | 736.1 | 19.52
+Neigh   | 0.001188   | 0.014888   | 0.054537   |  18.0 |  0.01
+Comm    | 0.03074    | 4.0499     | 8.54       | 200.0 |  3.87
+Output  | 2.2181     | 2.2321     | 2.2374     |   0.5 |  2.13
+Modify  | 0.001686   | 2.7535     | 11.997     | 282.3 |  2.63
+Other   |            | 75.19      |            |       | 71.84
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.16 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9920.97 ave       38208 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317471
+Ave neighs/atom = 1.6678803
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  880000    174.07181            0            0 6.8618359e-16 0.0010784663 
+  885000    174.05326            0            0 6.8611049e-16 0.0091081842 
+  890000    174.65074            0            0 6.8846571e-16 -0.0068925754 
+Loop time of 102.478 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.0005092  | 20.43      | 80.744     | 736.2 | 19.94
+Neigh   | 0.0010963  | 0.014876   | 0.054742   |  18.1 |  0.01
+Comm    | 0.030692   | 4.0512     | 8.5439     | 200.1 |  3.95
+Output  | 0.00042682 | 0.01438    | 0.019659   |   6.5 |  0.01
+Modify  | 0.0016984  | 2.7683     | 12.001     | 283.0 |  2.70
+Other   |            | 75.2       |            |       | 73.38
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.06 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.12 ave       38209 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317476
+Ave neighs/atom = 1.6679065
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  890000    174.65074            0            0 6.8846571e-16 -0.0068840828 
+  895000    174.58404            0            0 6.8820278e-16  0.011847363 
+  900000    173.89639            0            0 6.8549209e-16 -0.0067013197 
+Loop time of 104.718 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051623 | 20.43      | 80.692     | 736.1 | 19.51
+Neigh   | 0.0013474  | 0.014945   | 0.054488   |  17.9 |  0.01
+Comm    | 0.03122    | 4.0488     | 8.5432     | 200.0 |  3.87
+Output  | 2.237      | 2.251      | 2.2562     |   0.5 |  2.15
+Modify  | 0.0017179  | 2.7742     | 12.06      | 283.3 |  2.65
+Other   |            | 75.2       |            |       | 71.81
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.06 ave        5126 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.19 ave       38211 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317478
+Ave neighs/atom = 1.6679170
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  900000    173.89639            0            0 6.8549209e-16 -0.006682018 
+  905000    174.35325            0            0 6.8729305e-16 -0.0052028567 
+  910000    173.89243            0            0 6.8547651e-16 -0.0014573346 
+Loop time of 102.461 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050887 | 20.434     | 80.633     | 736.2 | 19.94
+Neigh   | 0.0011219  | 0.01485    | 0.05436    |  18.1 |  0.01
+Comm    | 0.030606   | 4.0489     | 8.5413     | 200.0 |  3.95
+Output  | 0.00042379 | 0.014334   | 0.019596   |   6.5 |  0.01
+Modify  | 0.0017064  | 2.7589     | 11.996     | 282.5 |  2.69
+Other   |            | 75.19      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22697 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.06 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.47 ave       38210 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317487
+Ave neighs/atom = 1.6679643
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  910000    173.89243            0            0 6.8547651e-16 -0.0014321882 
+  915000    173.97541            0            0 6.8580361e-16  0.016532799 
+  920000    173.86374            0            0 6.8536342e-16 0.00019322029 
+Loop time of 102.439 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050612 | 20.444     | 80.809     | 736.4 | 19.96
+Neigh   | 0.0011456  | 0.014869   | 0.054105   |  18.0 |  0.01
+Comm    | 0.030082   | 4.0468     | 8.5425     | 200.0 |  3.95
+Output  | 0.0005243  | 0.014426   | 0.019697   |   6.5 |  0.01
+Modify  | 0.001712   | 2.7403     | 12.062     | 281.8 |  2.68
+Other   |            | 75.18      |            |       | 73.39
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.16 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.69 ave       38214 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317494
+Ave neighs/atom = 1.6680011
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  920000    173.86374            0            0 6.8536342e-16 0.00020864279 
+  925000    173.91487            0            0 6.8556495e-16 0.0041673627 
+  930000    174.62954            0            0 6.8838216e-16 -0.0051668049 
+Loop time of 104.745 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050835 | 20.443     | 80.795     | 736.4 | 19.52
+Neigh   | 0.0013611  | 0.014971   | 0.054848   |  17.9 |  0.01
+Comm    | 0.031455   | 4.0497     | 8.5433     | 200.0 |  3.87
+Output  | 2.2191     | 2.2331     | 2.2384     |   0.5 |  2.13
+Modify  | 0.0017074  | 2.7646     | 12.144     | 283.0 |  2.64
+Other   |            | 75.24      |            |       | 71.83
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.16 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.84 ave       38212 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317499
+Ave neighs/atom = 1.6680274
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  930000    174.62954            0            0 6.8838216e-16 -0.0051584765 
+  935000    174.14499            0            0 6.8647209e-16  -0.01100725 
+  940000    174.12666            0            0 6.8639983e-16 1.8443781e-05 
+Loop time of 102.564 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051355 | 20.445     | 80.817     | 736.4 | 19.93
+Neigh   | 0.0013673  | 0.014941   | 0.054396   |  17.9 |  0.01
+Comm    | 0.030921   | 4.0489     | 8.5439     | 200.0 |  3.95
+Output  | 0.00048871 | 0.014421   | 0.019713   |   6.5 |  0.01
+Modify  | 0.0017287  | 2.7802     | 12.184     | 283.7 |  2.71
+Other   |            | 75.26      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22696 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.16 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9922.00 ave       38212 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317504
+Ave neighs/atom = 1.6680536
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  940000    174.12666            0            0 6.8639983e-16 3.0897561e-05 
+  945000    174.68617            0            0 6.886054e-16 -0.0052385233 
+  950000    174.49314            0            0 6.8784448e-16 0.0022869468 
+Loop time of 104.819 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.0005151  | 20.447     | 80.828     | 736.5 | 19.51
+Neigh   | 0.0011336  | 0.014895   | 0.054289   |  18.0 |  0.01
+Comm    | 0.031224   | 4.0472     | 8.5429     | 200.0 |  3.86
+Output  | 2.2544     | 2.2684     | 2.2737     |   0.5 |  2.16
+Modify  | 0.0017162  | 2.7759     | 12.159     | 283.6 |  2.65
+Other   |            | 75.27      |            |       | 71.81
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.19 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.91 ave       38215 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317501
+Ave neighs/atom = 1.6680379
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  950000    174.49314            0            0 6.8784448e-16 0.0022957605 
+  955000    174.16313            0            0 6.8654359e-16   0.01055391 
+  960000    174.14162            0            0 6.8645879e-16 0.0056204674 
+Loop time of 102.569 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051257 | 20.448     | 80.757     | 736.5 | 19.94
+Neigh   | 0.0011578  | 0.014829   | 0.054191   |  18.0 |  0.01
+Comm    | 0.030625   | 4.0495     | 8.5444     | 200.0 |  3.95
+Output  | 0.00043655 | 0.014329   | 0.019594   |   6.5 |  0.01
+Modify  | 0.0017453  | 2.7769     | 12.12      | 283.6 |  2.71
+Other   |            | 75.26      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.22 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9922.03 ave       38213 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317505
+Ave neighs/atom = 1.6680589
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  960000    174.14162            0            0 6.8645879e-16 0.0056360661 
+  965000    173.96426            0            0 6.8575964e-16  0.011226569 
+  970000    173.99408            0            0 6.8587721e-16 -0.0025960689 
+Loop time of 102.562 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051065 | 20.453     | 80.76      | 736.6 | 19.94
+Neigh   | 0.0013191  | 0.014943   | 0.054665   |  18.0 |  0.01
+Comm    | 0.030865   | 4.0474     | 8.5402     | 200.0 |  3.95
+Output  | 0.00041816 | 0.014461   | 0.019772   |   6.6 |  0.01
+Modify  | 0.0017499  | 2.7715     | 12.114     | 283.3 |  2.70
+Other   |            | 75.26      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.16 ave        5124 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.59 ave       38212 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317491
+Ave neighs/atom = 1.6679853
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  970000    173.99408            0            0 6.8587721e-16 -0.0025810207 
+  975000    174.78445            0            0 6.8899282e-16 -0.0082632847 
+  980000    174.11597            0            0 6.8635767e-16 0.0073323536 
+Loop time of 104.806 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051487 | 20.455     | 80.777     | 736.6 | 19.52
+Neigh   | 0.001134   | 0.01487    | 0.054246   |  18.0 |  0.01
+Comm    | 0.030475   | 4.0507     | 8.543      | 200.1 |  3.86
+Output  | 2.2304     | 2.2444     | 2.2497     |   0.5 |  2.14
+Modify  | 0.0017402  | 2.7735     | 12.14      | 283.4 |  2.65
+Other   |            | 75.27      |            |       | 71.82
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.19 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.94 ave       38216 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317502
+Ave neighs/atom = 1.6680431
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  980000    174.11597            0            0 6.8635767e-16 0.0073461328 
+  985000    173.81852            0            0 6.8518514e-16 0.0010185955 
+  990000    173.97481            0            0 6.8580125e-16 0.0058125408 
+Loop time of 102.582 on 32 procs for 10000 steps with 190344 atoms
+
+99.1% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00050956 | 20.458     | 80.78      | 736.6 | 19.94
+Neigh   | 0.001174   | 0.014911   | 0.054506   |  18.0 |  0.01
+Comm    | 0.030871   | 4.0512     | 8.5435     | 200.1 |  3.95
+Output  | 0.00042364 | 0.014387   | 0.01971    |   6.6 |  0.01
+Modify  | 0.0017518  | 2.7671     | 12.118     | 283.1 |  2.70
+Other   |            | 75.28      |            |       | 73.38
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.22 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.53 ave       38216 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317489
+Ave neighs/atom = 1.6679748
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+	variable steps equal 10000
+	region wallzup  block -1 1 -1 1 2.5e-4 1
+	group bordesg region wallzup
+0 atoms in group bordesg
+	velocity bordesg set 0.0 0.0 0.0 units box
+
+	run ${steps}
+	run 10000
+Per MPI rank memory allocation (min/avg/max) = 22.26 | 23.91 | 28.55 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+  990000    173.97481            0            0 6.8580125e-16 0.0058279824 
+  995000    173.78107            0            0 6.8503753e-16 0.0039875136 
+ 1000000    174.10845            0            0 6.8632803e-16 0.0064503499 
+Loop time of 104.857 on 32 procs for 10000 steps with 190344 atoms
+
+99.0% CPU use with 32 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.00051547 | 20.458     | 80.8       | 736.7 | 19.51
+Neigh   | 0.0013338  | 0.014948   | 0.054551   |  17.9 |  0.01
+Comm    | 0.031002   | 4.0527     | 8.5472     | 200.1 |  3.87
+Output  | 2.2463     | 2.2603     | 2.2656     |   0.5 |  2.16
+Modify  | 0.0017324  | 2.7739     | 12.156     | 283.5 |  2.65
+Other   |            | 75.3       |            |       | 71.81
+
+Nlocal:        5948.25 ave       22698 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+Nghost:        1416.28 ave        5125 max           0 min
+Histogram: 16 8 0 0 0 0 0 0 0 8
+Neighs:        9921.47 ave       38216 max           0 min
+Histogram: 24 0 0 0 0 0 0 0 0 8
+
+Total # of neighbors = 317487
+Ave neighs/atom = 1.6679643
+Neighbor list builds = 5
+Dangerous builds = 0
+
+	region wallzup delete
+	next a
+jump SELF loop
+
+Total wall time: 2:52:06
