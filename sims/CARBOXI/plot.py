@@ -21,7 +21,6 @@ def plot_erosion(
     sim_id: str,
     timestamp: str,
     dir_imagenes: Path,
-    suffix: str = "",
 ) -> None:
     """Genera y guarda el gráfico de evolución de partículas eyectadas.
 
@@ -39,8 +38,6 @@ def plot_erosion(
         timestamp: Marca temporal de la simulación en formato
             ``"YYYY-MM-DD_HH-MM-SS"``. Se incluye en el nombre del archivo SVG.
         dir_imagenes: Directorio de destino para el archivo SVG.
-        suffix: Sufijo opcional para el nombre del archivo
-            (ej. ``"_filtrado_taylor"``).
 
     Returns:
         None
@@ -59,7 +56,7 @@ def plot_erosion(
 
     _draw_figure(df_plot, meta)
 
-    filename = f"plot_{sim_id}{suffix}_{timestamp}.svg"
+    filename = f"plot_{sim_id}_{timestamp}.svg"
     output_path = dir_imagenes / filename
     plt.savefig(output_path, format="svg")
     plt.close()
