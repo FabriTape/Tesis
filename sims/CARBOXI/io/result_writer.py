@@ -22,6 +22,7 @@ def save_erosion_results(
     timestamp: str,
     output_dir: Path,
     filter_thresholds: dict[str, float] | None = None,
+    suffix: str = "",
 ) -> Path:
     """Consolida y guarda los resultados de erosión en formato Parquet.
 
@@ -42,6 +43,7 @@ def save_erosion_results(
             utilizados (ej. ``{"umbral_vz_min": 0.0, "umbral_energia_min": 2e-4}``).
             Si se proporciona, se inyectan como columnas en el Parquet para
             trazabilidad del análisis.
+        suffix: Sufijo opcional para el nombre del archivo (ej. ``"_filtrado_taylor"``).
 
     Returns:
         Path al archivo Parquet creado.
@@ -58,7 +60,7 @@ def save_erosion_results(
     if filter_thresholds:
         df = df.with_columns(**{k: pl.lit(v) for k, v in filter_thresholds.items()})
 
-    path = output_dir / f"{sim_id}_TOTAL_{timestamp}.parquet"
+    path = output_dir / f"{sim_id}_TOTAL{suffix}_{timestamp}.parquet"
     df.write_parquet(path)
     return path
 

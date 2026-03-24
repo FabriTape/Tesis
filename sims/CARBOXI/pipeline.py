@@ -215,7 +215,9 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
     elif ff_value == "0.35":
         max_height = config.bed_height_ff_035
     else:
-        print(f"  Advertencia: ff={ff_value} no reconocido, usando ff_0.15 por defecto.")
+        print(
+            f"  Advertencia: ff={ff_value} no reconocido, usando ff_0.15 por defecto."
+        )
         max_height = config.bed_height_ff_015
 
     # Agregar radios al umbral de altura para el análisis de erosión
@@ -252,6 +254,9 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
 
     # --- 6. Fase 2: Análisis topológico con OVITO ---
     files_fase2 = dump_files[:cut_index]
+    method = "taylor"
+    suffix = "_filtrado_taylor"
+
     results = run_topology_analysis(
         dump_files=files_fase2,
         pipeline=pipeline,
@@ -259,6 +264,10 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         sim_id=sim_id,
         timestep_interval=timestep_interval,
         tolerancia_fz=config.filters.tolerancia_fz,
+        method=method,
+        radio_m=config.radio_m,
+        lonja_radios=config.filters.lonja_radios,
+        umbral_vz_min=config.filters.umbral_vz_min,
     )
 
     # --- 7. Exportación directa de resultados (sin verificar previos) ---
@@ -266,6 +275,7 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         "umbral_vz_min": config.filters.umbral_vz_min,
         "umbral_energia_min": config.filters.umbral_energia_min,
         "umbral_techo_radios": config.filters.umbral_techo_radios,
+        "lonja_radios": config.filters.lonja_radios,
     }
 
     if not results:
@@ -274,14 +284,19 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         return
 
     result_path = save_erosion_results(
-        results, sim_id, timestamp, config.dir_resultados, filter_thresholds
+        results,
+        sim_id,
+        timestamp,
+        config.dir_resultados,
+        filter_thresholds,
+        suffix=suffix,
     )
     print(f"\n  Resultados guardados en: {result_path}")
 
     # --- 7. Generación de gráfico ---
     try:
         df_total = pl.concat(results, how="vertical_relaxed")
-        plot_erosion(df_total, sim_id, timestamp, config.dir_imagenes)
+        plot_erosion(df_total, sim_id, timestamp, config.dir_imagenes, suffix=suffix)
     except Exception as exc:  # noqa: BLE001
         print(f"  Advertencia: no se pudo generar el gráfico: {exc}")
 
