@@ -210,7 +210,9 @@ def analyze_erosion_taylor(
 
     if ballistic_ids:
         df_eroded = df_slice.filter(
-            pl.col("cluster").is_in(ballistic_ids) & (pl.col("z") > max_height)
+            pl.col("cluster").is_in(ballistic_ids)
+            & (pl.col("z") > max_height)
+            & (pl.col("vz") > 0)
         )
     else:
         df_eroded = df_slice.filter(pl.lit(False))
