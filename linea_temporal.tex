@@ -27,10 +27,20 @@
 \toprule
 \textbf{Fecha} & \textbf{Commit} & \textbf{Descripción} \\
 \midrule
-2026-03-24 & a2b9265 & feat: lógica de clusters añadida a CARBOXI (método taylor) \\
-2026-03-24 & 9aef9ab & revert: cambios deshechos de CARBOXI de la mejora taylor (3 intentos fallidos) \\
-2026-03-24 & 05eb217 & \textbf{draft/taylor-erosion}: método taylor con filtro vz$>$0 individual \\
-2026-03-24 & 4b73a09 & revert: volver al método v1 original (taylor vz$>$0 no funcionó, 4 intentos fallidos) \\
+2026-03-24 & a2b9265 & feat: implementar método taylor en CARBOXI \\
+             &        & \quad--- \texttt{analyze\_erosion\_taylor()} en topology.py: lonja $z > z_{\text{max}} - 10R$, cluster analysis OVITO, filtro por CM \\
+             &        & \quad--- \texttt{\_filter\_ballistic\_clusters\_taylor()}: agrupa por cluster, filtra $v_{z,\text{cm}} > 0$, $z_{\text{cm}} > z_{\text{max}}$, $|\Sigma f_z| < \varepsilon$ \\
+             &        & \quad--- \texttt{FilterConfig.lonja\_radios: int} en config.py + \texttt{lonja\_radios = 10} en config.toml \\
+             &        & \quad--- \texttt{suffix} opcional en \texttt{save\_erosion\_results()} y \texttt{plot\_erosion()} \\
+             &        & \quad--- \texttt{run\_topology\_analysis()} recibe \texttt{method}, \texttt{radio\_m}, \texttt{lonja\_radios}, \texttt{umbral\_vz\_min} \\
+             &        & \quad--- \texttt{pipeline.py}: wiring con \texttt{method="taylor"}, \texttt{suffix="\_filtrado\_taylor"} \\
+             &        & \quad--- \textbf{Resultado:} 25 partículas (esperado: 20). Sin filtro individual por $z > z_{\text{max}}$ en partículas del cluster \\
+2026-03-24 & 9aef9ab & revert: deshacer cambios taylor en rama \texttt{desarrollo} (primer intento fallido, resultado 25 vs esperado 20) \\
+2026-03-24 & 05eb217 & \textbf{draft/taylor-erosion}: segundo intento con filtro $v_z > 0$ individual en partículas \\
+             &        & \quad--- Cambio en \texttt{analyze\_erosion\_taylor()} línea 213: agrega \texttt{\& (pl.col("vz") > 0)} \\
+             &        & \quad--- \textbf{Resultado:} sigue dando 25 (filtro $v_z$ individual no resolvió el sobreconteo) \\
+2026-03-24 & 4b73a09 & revert: volver a método v1 original sobre \texttt{draft/taylor-erosion} \\
+2026-03-24 & 7801258 & docs: actualizar línea temporal con detalle de intentos fallidos \\
 2026-03-23 & 74a8d2e & feat: recuperar simulaciones históricas y actualizar pipeline a CARBOXI \\
 2026-03-22 & 366cb55 & fix(cluster): corregir sintaxis booleana del if en loop trampa \\
 2026-03-22 & e3aa79d & fix(cluster): corregir uso de step y defaults proc en collision\_erosion\_bed \\
@@ -183,16 +193,49 @@ Reorganización completa del código y creación de la versión 3 del programa.
 \end{itemize}
 
 \subsection*{5. Método Taylor de Erosión -- Borrador (Mar 2026)}
-Método alternativo de detección de erosión basado en análisis de clusters por centro de masa:
+Método alternativo de detección de erosión propuesto para reemplazar el filtro $z > z_{\text{max}} \wedge v_z > 0$ del método v1.
+
+\subsubsection*{Descripción del método}
+\begin{enumerate}
+    \item \textbf{Selección de lonja}: partículas con $z > z_{\text{max}} - 10R$ (sin filtro previo de $v_z$ ni de tipo)
+    \item \textbf{Cluster analysis}: ejecutar OVITO sobre toda la lonja (coordinación + cluster)
+    \item \textbf{Filtro por centro de masa del cluster}:
+        \begin{itemize}
+            \item $v_{z,\text{cm}} > v_{z,\text{min}}$ (el CM se mueve hacia arriba)
+            \item $z_{\text{cm}} > z_{\text{max}}$ (el CM está por encima de la superficie)
+            \item $|\Sigma f_z| < \varepsilon$ (fuerza neta $\approx 0$, vuelo balístico)
+        \end{itemize}
+    \item \textbf{Filtro individual}: partículas con $z > z_{\text{max}}$ y $v_z > 0$
+    \item Incluir siempre proyectil (tipo 2)
+\end{enumerate}
+
+\subsubsection*{Archivos modificados}
 \begin{itemize}
-    \item Selección de lonja de la cama: partículas con $z > z_{\text{max}} - 10R$ (sin filtro previo de $v_z$)
-    \item Análisis de clusters con OVITO sobre toda la lonja
-    \item Filtro por centro de masa del cluster: $v_{z,\text{cm}} > 0$, $z_{\text{cm}} > z_{\text{max}}$, $|\Sigma f_z| < \varepsilon$
-    \item Filtro individual de partículas: $z > z_{\text{max}}$ y $v_z > 0$
-    \item Resultado esperado: 20 partículas (mismo que método v1)
-    \item \textbf{4 intentos fallidos} (lonja sin filtro, lonja+z, lonja+z+vz\_cm, lonja+z+vz\_individual)
-    \item Método v1 funciona correctamente --- no se modificó
-    \item Código original preservado en \texttt{desarrollo}, historial de intentos en \texttt{draft/taylor-erosion}
+    \item \texttt{analysis/topology.py}: \texttt{analyze\_erosion\_taylor()}, \texttt{\_filter\_ballistic\_clusters\_taylor()}, \texttt{run\_topology\_analysis()} con parámetro \texttt{method}
+    \item \texttt{config.py}: \texttt{FilterConfig.lonja\_radios: int} + parsing en \texttt{\_build\_config()}
+    \item \texttt{config.toml}: \texttt{lonja\_radios = 10} en sección \texttt{[filtros]}
+    \item \texttt{io/result_writer.py}: parámetro \texttt{suffix} opcional en \texttt{save\_erosion\_results()}
+    \item \texttt{plot.py}: parámetro \texttt{suffix} opcional en \texttt{plot\_erosion()}
+    \item \texttt{pipeline.py}: wiring con \texttt{method="taylor"}, \texttt{suffix="\_filtrado\_taylor"}, pasa \texttt{radio\_m}, \texttt{lonja\_radios}, \texttt{umbral\_vz\_min}
+\end{itemize}
+
+\subsubsection*{Intentos fallidos}
+\begin{enumerate}
+    \item \textbf{Intento 1} (commit \texttt{a2b9265}): lonja $z > z_{\text{max}} - 10R$, filtros CM del cluster, filtro individual $z > z_{\text{max}}$ \\
+        \textit{Resultado: 25 partículas (esperado: 20). Se devolvían partículas del cluster que estaban por debajo de $z_{\text{max}}$ antes de agregar el filtro individual.}
+    \item \textbf{Intento 2} (commit \texttt{9aef9ab} + reset): se agregó filtro $z > z_{\text{max}}$ individual \\
+        \textit{Resultado: 25 partículas (sin cambio).}
+    \item \textbf{Intento 3} (intentado localmente): se verificó que la lonja no era el problema (el filtro CM debería descartar clusters gigantes de la cama) \\
+        \textit{Hipótesis descartada: clusters de la cama pasan filtros CM.}
+    \item \textbf{Intento 4} (commit \texttt{05eb217}): se agregó $v_z > 0$ al filtro individual de partículas \\
+        \textit{Resultado: 25 partículas (sin cambio).}
+\end{enumerate}
+
+\subsubsection*{Estado}
+\begin{itemize}
+    \item Código original (método v1) preservado en rama \texttt{desarrollo} --- funciona correctamente (20 partículas)
+    \item Historial completo de intentos en rama \texttt{draft/taylor-erosion}
+    \item \textbf{Causa del sobreconteo no identificada}: posible diferencia en cómo se acumulan partículas a lo largo de los timesteps (v1 persiste flag \texttt{eroded}, taylor re-evalúa clusters cada frame)
 \end{itemize}
 
 \end{document}
