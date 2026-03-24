@@ -27,6 +27,9 @@
 \toprule
 \textbf{Fecha} & \textbf{Commit} & \textbf{Descripción} \\
 \midrule
+2026-03-24 & a2b9265 & feat: lógica de clusters añadida a CARBOXI (método taylor) \\
+2026-03-24 & 9aef9ab & revert: cambios deshechos de CARBOXI de la mejora taylor (3 intentos fallidos) \\
+2026-03-24 & 05eb217 & \textbf{draft/taylor-erosion}: método taylor con filtro vz$>$0 individual \\
 2026-03-23 & 74a8d2e & feat: recuperar simulaciones históricas y actualizar pipeline a CARBOXI \\
 2026-03-22 & 366cb55 & fix(cluster): corregir sintaxis booleana del if en loop trampa \\
 2026-03-22 & e3aa79d & fix(cluster): corregir uso de step y defaults proc en collision\_erosion\_bed \\
@@ -176,6 +179,18 @@ Reorganización completa del código y creación de la versión 3 del programa.
     \item Pipeline completo de detección de ondas
     \item Soporte para nuevo formato LAMMPS
     \item Convertidor de formatos legacy
+\end{itemize}
+
+\subsection*{5. Método Taylor de Erosión -- Borrador (Mar 2026)}
+Método alternativo de detección de erosión basado en análisis de clusters por centro de masa:
+\begin{itemize}
+    \item Selección de lonja de la cama: partículas con $z > z_{\text{max}} - 10R$ (sin filtro previo de $v_z$)
+    \item Análisis de clusters con OVITO sobre toda la lonja
+    \item Filtro por centro de masa del cluster: $v_{z,\text{cm}} > 0$, $z_{\text{cm}} > z_{\text{max}}$, $|\Sigma f_z| < \varepsilon$
+    \item Filtro individual de partículas: $z > z_{\text{max}}$ y $v_z > 0$
+    \item Resultado esperado: 20 partículas (mismo que método v1)
+    \item 3 intentos fallidos en rama \texttt{desarrollo}, revertidos
+    \item Borrador activo en rama \texttt{draft/taylor-erosion} con fix $v_z > 0$ individual
 \end{itemize}
 
 \end{document}
