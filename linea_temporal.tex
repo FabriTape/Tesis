@@ -1,15 +1,18 @@
-\documentclass[12pt,a4paper]{article}
+\documentclass[]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[spanish]{babel}
 \usepackage{booktabs}
 \usepackage{xcolor}
 \usepackage{geometry}
 \usepackage{parskip}
-
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{float}
+\newcommand{\textbffeat}{\textbf{feat}}
 \geometry{margin=2.5cm}
 
 \title{Línea Temporal del Repositorio Tesis}
-\author{Fabián}
+\author{Fabrizio}
 \date{\today}
 
 \begin{document}
@@ -42,12 +45,24 @@
 2026-03-24 & 4b73a09 & revert: volver a método v1 original sobre \texttt{draft/taylor-erosion} \\
 2026-03-24 & 7801258 & docs: actualizar línea temporal con detalle de intentos fallidos \\
 2026-03-23 & 74a8d2e & feat: recuperar simulaciones históricas y actualizar pipeline a CARBOXI \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}[H]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}llp{10cm}@{}}
+\toprule
+\textbf{Fecha} & \textbf{Commit} & \textbf{Descripción} \\
+\midrule
 2026-03-22 & 366cb55 & fix(cluster): corregir sintaxis booleana del if en loop trampa \\
-2026-03-22 & e3aa79d & fix(cluster): corregir uso de step y defaults proc en collision\_erosion\_bed \\
-2026-03-22 & 0bf5145 & fix: detectar halt por comparación de pasos \\
-2026-03-22 & 5439e8c & fix: halt solo para simulaciones críticas (vel=-50 y move≠0) \\
-2026-03-22 & 7afdaef & fix: crear check\_wave antes del loop para evitar uncompute \\
-2026-03-22 & 56dffee & Edición en la lógica de collision\_erosion\_box.input \\
+2026-03-22 & e3aa79d & fix(cluster): corregir uso de step y defaults proc en \texttt{collision\_erosion\_bed} \\
+2026-03-22 & 0bf5145 & fix: detectar halt por comparación de pasos (\texttt{step\_before} vs \texttt{step\_after}) \\
+2026-03-22 & 5439e8c & fix: halt solo para simulaciones críticas (vel=-50 y move$\neq$0) \\
+2026-03-22 & 7afdaef & fix: crear \texttt{check\_wave} antes del loop para evitar uncompute en primera iteración \\
+2026-03-22 & 56dffee & Edición en la lógica de \texttt{collision\_erosion\_box.input} \\
 2026-03-22 & 1a528c6 & Ediciones de Gemini \\
 2026-03-21 & 9d756ea & Ediciones de Python y compatibilidades con miniconda \\
 2026-03-21 & 23fbeca & fix: restaurar doble for para desplazamiento X e Y en moves \\
@@ -63,7 +78,7 @@
 }
 \end{table}
 
-\section*{2026 -- Refactorización Mayor (Marzo)}
+\section*{2026 -- Refactorización y Mejoras (Marzo 6--16)}
 
 \begin{table}[H]
 \centering
@@ -75,33 +90,29 @@
 2026-03-16 & de66ffa & Merge branch 'desarrollo' \\
 2026-03-16 & f493b8b & fix: agregar radios al umbral de altura para erosión \\
 2026-03-15 & f50785a & \textbf{refactor: reemplazar código legado por CARBOXI refactorizado} \\
-2026-03-15 & 3c472b5 & refactor: eliminar get\_max\_bed\_height() y usar valores de config \\
+2026-03-15 & 3c472b5 & refactor: eliminar \texttt{get\_max\_bed\_height()} y usar valores de config \\
 2026-03-15 & 66707cf & feat: incluir id y type en datos de onda \\
-2026-03-12 & cd086f1 & \textbffeat: refactor completo con máquina de estados y configuración externalizada \\
+2026-03-12 & cd086f1 & \textbf{feat: refactor completo con máquina de estados y configuración externalizada} \\
+             &        & \quad--- Módulos: \texttt{pipeline.py}, \texttt{analysis/wave.py}, \texttt{analysis/topology.py}, \texttt{io/}, \texttt{plot.py} \\
+             &        & \quad--- Configuración en \texttt{config.toml} leída con \texttt{tomllib} (stdlib) \\
+             &        & \quad--- Pipeline de OVITO reutilizado (\texttt{build\_ovito\_pipeline}) \\
 2026-03-12 & 3b4a68c & refactor: análisis de onda automático y umbrales desde YAML \\
 2026-03-12 & 9a05b10 & feat: procesar automáticamente todas las subcarpetas \\
-2026-03-09 & 864b432 & Refactorizar extracción de metadatos con Regex + caché OVITO \\
-2026-03-09 & f3cf7d2 & Refactorizar orquestador, optimizar pipeline OVITO/Polars \\
-2026-03-08 & 3762691 & Análisis de Ovito: primero detectar onda, luego análisis \\
-\bottomrule
-\end{tabular}
-}
-\end{table}
-
-\section*{2026 -- Correcciones y Mejoras (Marzo)}
-
-\begin{table}[H]
-\centering
-\resizebox{\textwidth}{!}{
-\begin{tabular}{@{}llp{10cm}@{}}
-\toprule
-\textbf{Fecha} & \textbf{Commit} & \textbf{Descripción} \\
-\midrule
-2026-03-08 & 3967bc2 & Corrección de detector\_ondas() - proyectil no parte de onda \\
-2026-03-07 & a9b3ecc & Detección de bordes desde output.gz \\
-2026-03-07 & 8acd421 & Quitar dependencias no usadas en data\_extractor.py \\
-2026-03-06 & 1a61de7 & Cambio en guardado de resultados y gestión de datos faltantes \\
-2026-03-06 & c176632 & Edición en lógica de escritura de resultados \\
+2026-03-09 & 864b432 & refactor: extracción de metadatos con Regex + caché OVITO \\
+2026-03-09 & f3cf7d2 & \textbf{refactor: orquestador en dos fases (Fail Fast)} \\
+             &        & \quad--- Fase 1: escaneo rápido de onda con Polars \\
+             &        & \quad--- Fase 2: análisis topológico OVITO solo en timesteps útiles \\
+             &        & \quad--- Eliminado anti-patrón \texttt{pl.concat} iterativo \\
+             &        & \quad--- Constantes globales reemplazan números mágicos \\
+             &        & \quad--- Docstrings Google Style + \texttt{pathlib} para rutas \\
+2026-03-08 & 3762691 & refactor: reordenar flujo --- primero detectar onda, luego análisis OVITO \\
+2026-03-08 & 59ebe48 & docs: cambios en docstrings generados por Gemini \\
+2026-03-07 & 3967bc2 & fix: restaurar \texttt{buscar\_carpeta()} borrada por error + \texttt{detector\_ondas()} no toma proyectil en aire \\
+             &        & \quad--- Pruebas con ff\_0.15\_np\_1\_vel\_-10\_angle\_0\_MOVE\_0\_0\_0: OK \\
+2026-03-07 & a9b3ecc & feat: detección de bordes de cama directo desde \texttt{output.gz} + edición de docstrings \\
+2026-03-07 & 8acd421 & fix: quitar dependencias no usadas en \texttt{data\_extractor.py} \\
+2026-03-06 & 1a61de7 & fix: cambio en guardado de resultados y gestión de datos faltantes \\
+2026-03-06 & c176632 & fix: ediciones en lógica de escritura de resultados + descarga de nuevas simulaciones \\
 \bottomrule
 \end{tabular}
 }
@@ -117,12 +128,25 @@
 \textbf{Fecha} & \textbf{Commit} & \textbf{Descripción} \\
 \midrule
 2025-12-23 & 0670506 & Merge PR \#8 from desarrollo \\
-2025-12-23 & e59ac08 & data\_extractor unificado con Lector.py + Polars \\
-2025-12-23 & e9fbc1e & Mejoras en rendimiento de data\_extractor.py \\
+2025-12-23 & e9fbc1e & Mejoras en rendimiento y lectura de \texttt{data\_extractor.py} (+258/$-$198 líneas) \\
+2025-12-23 & e0ce6b8 & Update shebang a \texttt{python3} \\
+2025-12-23 & cfb2e8e & Agregar \texttt{\_\_pycache\_\_} y carpetas de simulación al .gitignore \\
+2025-12-23 & e59ac08 & \textbf{data\_extractor unificado con Lector.py} \\
+             &        & \quad--- Se borran perfiles sin origen claro \\
+             &        & \quad--- Eliminado \texttt{run\_erosion\_bed\_sims\_lammps\_move.sh} legacy \\
 2025-12-23 & 8e0f4b0 & \textbf{Módulo Lector con Polars} para leer .gz sin .parquet \\
-2025-12-16 & 6098baa & Añadir gráficos y edición del código \\
-2025-12-10 & 747cae7 & Versión final de data\_extractor\_2.py \\
-2025-12-10 & d282329 & data\_extractor\_2.py hecho por DeepSeek \\
+             &        & \quad--- \texttt{pl.scan\_csv()} para LazyFrames \\
+             &        & \quad--- data\_extractor migrando a Polars para v3.1 \\
+             &        & \quad--- Integración de OVITO para cálculos de coordinación \\
+2025-12-23 & 24471e5 & Limpieza: quitar archivos que no debieron subirse \\
+2025-12-16 & 6098baa & Añadir gráficos y edición del código (\texttt{analisis\_Tesis.ipynb}) \\
+             &        & \quad--- Animaciones: \texttt{animacion\_tesis.gif}, \texttt{histograma\_anim.gif} \\
+2025-12-10 & 747cae7 & Versión final de \texttt{data\_extractor\_2.py} (+535/$-$62 líneas) \\
+2025-12-10 & d282329 & \textbf{data\_extractor\_2.py} (hecho por DeepSeek) --- paralelización \\
+             &        & \quad--- Perfilado con \texttt{cProfile}: \texttt{perfil.prof}, \texttt{perfil\_final.svg} \\
+2025-12-10 & bd63843 & Solución de problemas de escritura/lectura, semi-automatización \\
+             &        & \quad--- 21 archivos cambiados (+12995/$-$359 líneas) \\
+             &        & \quad--- Tests de perfilado: \texttt{perfilparquet.prof}, \texttt{reultados\_espacioalocado\_ne\_Keyectados.prof} \\
 \bottomrule
 \end{tabular}
 }
@@ -214,7 +238,7 @@ Método alternativo de detección de erosión propuesto para reemplazar el filtr
     \item \texttt{analysis/topology.py}: \texttt{analyze\_erosion\_taylor()}, \texttt{\_filter\_ballistic\_clusters\_taylor()}, \texttt{run\_topology\_analysis()} con parámetro \texttt{method}
     \item \texttt{config.py}: \texttt{FilterConfig.lonja\_radios: int} + parsing en \texttt{\_build\_config()}
     \item \texttt{config.toml}: \texttt{lonja\_radios = 10} en sección \texttt{[filtros]}
-    \item \texttt{io/result_writer.py}: parámetro \texttt{suffix} opcional en \texttt{save\_erosion\_results()}
+    \item \texttt{io/result\_writer.py}: parámetro \texttt{suffix} opcional en \texttt{save\_erosion\_results()}
     \item \texttt{plot.py}: parámetro \texttt{suffix} opcional en \texttt{plot\_erosion()}
     \item \texttt{pipeline.py}: wiring con \texttt{method="taylor"}, \texttt{suffix="\_filtrado\_taylor"}, pasa \texttt{radio\_m}, \texttt{lonja\_radios}, \texttt{umbral\_vz\_min}
 \end{itemize}
