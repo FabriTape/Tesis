@@ -1,0 +1,174 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{parskip}
+
+\geometry{margin=2.5cm}
+
+\title{Línea Temporal de Errores -- Repositorio Tesis}
+\author{Fabián}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section*{Errores en collision\_erosion\_bed.input (LAMMPS)}
+
+\subsection*{2026-03-22 -- Problemas con halt y wave detection}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llp{9cm}@{}}
+\toprule
+\textbf{Hora} & \textbf{Commit} & \textbf{Error y Solución} \\
+\midrule
+13:47 & e3aa79d & \textbf{Error en step y defaults proc:} Uso incorrecto de variables en collision\_erosion\_bed. Corrección de defaults de proc y manejo de step. \\
+13:55 & 366cb55 & \textbf{Sintaxis booleana incorrecta:} El if en el loop de trampa usaba lógica booleana incorrecta. Se corrigió la sintaxis. \\
+04:30 & 1be9177 & \textbf{Sin loop de trampa:} El halt de onda cortaba la simulación pero no había forma limpia de salir. Se agregó loop de trampa + salida limpia. \\
+04:39 & 7afdaef & \textbf{Could not find compute ID:} El primer uncompute fallaba porque check\_wave no existía aún. Se crea dummy antes del label trampa. \\
+04:49 & 7f73005 & \textbf{Could not find compute ID + Compute not current:} El approach de uncompute/recompute fallaba entre runs. Solución KISS: usar file\_exists flag. \\
+05:06 & 7caef10 & \textbf{Misma solución KISS:} Se refina el approach de flag por archivo para salir del loop tras halt. \\
+05:09 & 7caef10 & \textbf{Permisos en /tmp:} El cluster no permite escribir en /tmp. Se cambia a /dev/shm para el flag. \\
+05:22 & 5439e8c & \textbf{Halt en todas las simulaciones:} El halt se activaba para todas, incluyendo las no críticas. Solo debe afectar vel=-50 y move≠0. \\
+05:38 & 0bf5145 & \textbf{Compute not current between runs:} El approach con v\_stop\_cond fallaba. Nueva estrategia: comparar step\_before vs step\_after para detectar halt. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section*{Errores en CARBOXI (Python/Polars)}
+
+\subsection*{2026-03-15 -- Errores de tipos en Parquet}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llp{9cm}@{}}
+\toprule
+\textbf{Hora} & \textbf{Commit} & \textbf{Error y Solución} \\
+\midrule
+16:32 & 4967def & \textbf{Error Object en Parquet:} Los tipos no se forzaban correctamente. Se agregó forzado de tipos en result\_writer. \\
+16:55 & df6bb21 & \textbf{Tipos Object en concat:} Schema no se aplicaba en concat. Se usa schema explícito en concat. \\
+17:12 & e202d6e & \textbf{Tipos Object tras concat:} Conversión de tipos insuficiente. Se convierten tipos antes de concat. \\
+17:31 & 0b9bdd7 & \textbf{Errores de tipo en cast:} strict=True fallaba. Se usa strict=False en cast. \\
+17:34 & 2201d73 & \textbf{Columnas Object:} Polars convertía tipos a Object. Se reemplazan con null del tipo correcto. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{2026-03-15 -- OVITO y plot}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llp{9cm}@{}}
+\toprule
+\textbf{Hora} & \textbf{Commit} & \textbf{Error y Solución} \\
+\midrule
+15:42 & 603b37d & \textbf{Nombres de propiedades OVITO incorrectos:} 'Cluster ID' no existía. Se cambió a 'Cluster Identifier'. Orden de análisis incorrecto. \\
+17:39 & 7e18039 & \textbf{plot.py sin proyectil\_erosion:} El nuevo algoritmo de erosión eliminó proyectil\_erosion pero plot.py lo seguía usando. Se actualizó. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section*{Errores en Pipeline y Lógica}
+
+\subsection*{2026-03-22 -- Config y scripting}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llp{9cm}@{}}
+\toprule
+\textbf{Hora} & \textbf{Commit} & \textbf{Error y Solución} \\
+\midrule
+18:33 & 23fbeca & \textbf{Doble for perdido:} La refactorización a config.toml perdió el producto cartesiano original de moves. Solo quedaba ymove=0. Se restauró el doble for. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{2026-03-20 -- Convert}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llp{9cm}@{}}
+\toprule
+\textbf{Hora} & \textbf{Commit} & \textbf{Error y Solución} \\
+\midrule
+21:48 & 593caa9 & \textbf{Polars no soporta lista de Paths:} pl.read\_csv(list[Path]) no funciona. Se leyó cada archivo individualmente. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{2026-03-16 -- Detección de erosión}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llp{9cm}@{}}
+\toprule
+\textbf{Hora} & \textbf{Commit} & \textbf{Error y Solución} \\
+\midrule
+02:01 & f493b8b & \textbf{Umlaut de altura sin radios:} La detección de erosión usaba altura sin considerar radios. Se agregaron radios al umbral. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{2026-03-12 -- Criticidad}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llp{9cm}@{}}
+\toprule
+\textbf{Hora} & \textbf{Commit} & \textbf{Error y Solución} \\
+\midrule
+19:39 & 64e63c8 & \textbf{Criticidad evaluada mal:} Se evaluaba solo la primera carpeta. Todas las simulaciones usaban esos parámetros. Se evaluó por simulación individual. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section*{Errores Históricos}
+
+\subsection*{2026-03-07 -- data\_extractor y detector\_ondas}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llp{9cm}@{}}
+\toprule
+\textbf{Hora} & \textbf{Commit} & \textbf{Error y Solución} \\
+\midrule
+20:12 & 3967bc2 & \textbf{Borré parte de buscar\_carpeta():} Error al refactorizar, el código dejó de funcionar. Además, detector\_ondas() tomaba al proyectil como parte de la onda. Se filtró cuando está en el aire. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section*{Resumen de Errores por Categoría}
+
+\subsection*{LAMMPS Input (collision\_erosion\_bed.input)}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Halt/Wave Detection:} 9 fixes relacionados con halt, compute IDs, permisos, y lógica booleana
+    \item \textbf{Main Issues:} Compute not current, Could not find compute ID, permisos en /tmp
+\end{itemize}
+
+\subsection*{Python/Polars (CARBOXI)}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Tipos Parquet:} 5 fixes para columnas Object y errores de cast
+    \item \textbf{OVITO:} Nombres de propiedades y orden de análisis
+    \item \textbf{Plot:} Variables eliminadas en refactor
+\end{itemize}
+
+\subsection*{Pipeline}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Configuración:} Doble for de moves perdido en refactor
+    \item \textbf{Convert:} Polars no soporta lista de Paths
+    \item \textbf{Criticidad:} Evaluada solo en primera carpeta
+    \item \textbf{Detección:} Umlaut sin considerar radios
+\end{itemize}
+
+\subsection*{Data Extractor}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Funciones borradas:} buscar\_carpeta() parcialmente eliminada
+    \item \textbf{Lógica de onda:} Proyectil incluido incorrectamente en detección
+\end{itemize}
+
+\end{document}

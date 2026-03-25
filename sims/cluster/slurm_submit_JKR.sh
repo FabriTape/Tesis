@@ -7,7 +7,7 @@
 #SBATCH --ntasks-per-node=64
 #SBATCH -o ./logs/job_exec_%j.out
 ##SBATCH --gres=gpu:1
-#SBATCH --nodelist=toko07
+#SBATCH --nodelist=toko04
 #SBATCH --partition=XL
 
 ## Espacio añadido para ejecutar en gpu2

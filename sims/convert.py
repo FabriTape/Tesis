@@ -71,7 +71,9 @@ def convert_step(
 
     Lee cada archivo individualmente (filtrando vacíos por tamaño),
     extrae las 8 columnas originales y escribe un archivo gzip con
-    header LAMMPS estándar.
+    header LAMMPS estándar. Escribir a archivo temporal y renombrar
+    garantiza atomicidad: si el proceso se interrumpe, el .gz final
+    no queda corrupto.
 
     Args:
         file_paths: Archivos mixtos del mismo timestep.
@@ -79,8 +81,11 @@ def convert_step(
         output_path: Ruta de salida ``output.<step>.gz``.
 
     Returns:
-        Número de átomos escritos.
+        Número de átomos escritos, o -1 si el archivo ya existe.
     """
+    if output_path.exists():
+        return -1
+
     dfs: list[pl.DataFrame] = []
 
     for fpath in file_paths:
@@ -105,7 +110,9 @@ def convert_step(
     df = pl.concat(dfs, how="vertical_relaxed")
     n_atoms = df.height
 
-    with gzip.open(output_path, "wt") as f:
+    tmp_path = output_path.with_suffix(".gz.tmp")
+
+    with gzip.open(tmp_path, "wt") as f:
         f.write("ITEM: TIMESTEP\n")
         f.write(f"{step}\n")
         f.write("ITEM: NUMBER OF ATOMS\n")
@@ -115,6 +122,7 @@ def convert_step(
         f.write("ITEM: ATOMS id type x y z vx vy vz\n")
         df.write_csv(f, separator=" ", include_header=False)
 
+    tmp_path.rename(output_path)
     return n_atoms
 
 
@@ -123,7 +131,10 @@ def convert_simulation(sim_dir: Path) -> None:
 
     Descubre archivos ``output.<step>.<core>.txt``, los agrupa por
     paso temporal, genera ``output.<step>.gz`` por cada paso y
-    elimina los originales.
+    elimina los originales inmediatamente después de cada paso.
+
+    Es idempotente: si se interrumpe y se re-ejecuta, salta los
+    pasos ya convertidos (``.gz`` existe) y reanuda donde quedó.
 
     Args:
         sim_dir: Directorio de la simulación.
@@ -137,30 +148,30 @@ def convert_simulation(sim_dir: Path) -> None:
     total_files = sum(len(v) for v in mixed.values())
     print(f"  {len(mixed)} pasos encontrados ({total_files} archivos)")
 
-    converted: list[Path] = []
+    converted = 0
+    skipped = 0
 
     for step, file_paths in mixed.items():
         output_path = sim_dir / f"output.{step}.gz"
         n_atoms = convert_step(file_paths, step, output_path)
 
-        if output_path.stat().st_size > 0:
-            converted.append(output_path)
-        else:
-            print(f"  Advertencia: output.{step}.gz vacío ({n_atoms} átomos)")
+        if n_atoms == -1:
+            skipped += 1
+            continue
 
-    if not converted:
-        print("  No se generaron archivos. Abortando eliminación.")
-        return
+        if n_atoms == 0 or output_path.stat().st_size == 0:
+            print(f"  Advertencia: step {step} vacío ({n_atoms} átomos)")
+            continue
 
-    deleted = 0
-    for file_list in mixed.values():
-        for fpath in file_list:
+        for fpath in file_paths:
             fpath.unlink()
-            deleted += 1
 
-    names = ", ".join(p.name for p in converted)
-    print(f"  Convertidos: {names}")
-    print(f"  Eliminados: {deleted} archivos originales")
+        converted += 1
+
+    summary = f"  Convertidos: {converted}"
+    if skipped:
+        summary += f" | Saltados (ya existían): {skipped}"
+    print(summary)
 
 
 def main() -> None:

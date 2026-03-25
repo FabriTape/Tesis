@@ -1,0 +1,135 @@
+ # Init
+
+variable data index 1
+
+
+variable xrotate index 1
+variable yrotate index 1
+variable zrotate index 1
+variable angle index 1
+
+
+variable xmove index 1
+variable ymove index 1
+variable zmove index 1
+
+
+variable velocity index 1
+variable nsteps index 1
+variable ndumps index 1
+variable nthermo index 1
+
+variable proc_x index 1
+variable proc_y index 1
+variable proc_z index 1
+
+variable timestep index 1
+
+variable young_modulus index 1
+variable poisson index 1
+variable surface_energy index 1
+variable density_proj index 1
+
+
+newton off
+
+
+units       si
+dimension   3
+boundary    p p f
+atom_style  sphere
+neighbor  100e-9 bin
+comm_modify mode single vel yes cutoff 5e-6
+processors ${proc_x} ${proc_y} ${proc_z}
+
+
+
+
+# Atom definition
+read_data ${data}
+#read_data ./box_fill_0.35_SI.data
+
+#TODO: EDITAR TAMAÑO DE CAJA EN DATA y NUMERO DE GRANOS a 2
+
+change_box all z final -1e-5 0.000410
+#TODO: GRANOS EN POSICION original con centro de la caja en 0 0 0
+
+#1 1 1.52e-6 2000 0.76e-6 0 0
+#2 1 1.52e-6 2000 -0.76e-6 0 0
+#3 1 1.52e-6 2000 0 1.32e-6 0
+
+##### crea granos del proyectil
+
+#create_atoms 2 single 73.26e-6 72.5e-6 152e-6
+#create_atoms 2 single 71.74e-6 72.5e-6 152e-6
+#create_atoms 2 single 72.5e-6 73.82e-6 152e-6
+
+
+#NP1
+#create_atoms 2 single 50e-5 50e-5 105e-5
+#create_atoms 2 single 5e-5 5e-5 10.3e-5
+#create_atoms 2 single 72.5e-6 72.5e-6 152e-6
+
+
+#NP3
+#create_atoms 2 single 73.26e-6 72.5e-6 152e-6
+#create_atoms 2 single 71.74e-6 72.5e-6 152e-6
+#create_atoms 2 single 72.5e-6 73.816e-6 152e-6
+#Esto lo pongo para que las 3 particulas queden en el centro
+create_atoms 2 single 50.76e-6 50e-6 152e-6
+create_atoms 2 single 49.24e-6 50e-6 152e-6
+create_atoms 2 single 50e-6 51.316e-6 152e-6
+
+set type 2 diameter 1.52e-6
+set type 2 density ${density_proj}
+
+# Groups
+group bloque type 1
+group sphere type 2
+
+#TODO: CUIDADO CON EL CENTRO DE LA ROTACION, SI CAMBIA EL TAMAÑO DE LA CAJA HAY Q CAMBIAR EL CENTRO
+#displace_atoms sphere rotate 72.5e-6 72.5e-6 152e-6 ${xrotate} ${yrotate} ${zrotate} ${angle}
+displace_atoms sphere rotate 50e-6 50e-6 152e-6 ${xrotate} ${yrotate} ${zrotate} ${angle}
+displace_atoms sphere move ${xmove} ${ymove} ${zmove}
+
+
+write_data pre-run_with_projectile.data
+
+
+#Settings
+#pair_style gran/easy 2.7e10 0.17 0.5e-9 0.025 0.1e-9 0.736e-5  #you have to modify the values for your implementation
+pair_style granular
+pair_coeff * * jkr ${young_modulus} 1.0e16 ${poisson} ${surface_energy} tangential mindlin NULL 1 0.5 rolling sds 5e09 9.895e-09 0.1 twisting marshall
+
+timestep ${timestep}
+
+# fixes & compute
+fix 1 bloque nve/sphere
+fix 2 sphere nve/sphere
+
+compute 1 all ke/atom
+
+velocity bloque create 10.0 83921
+velocity sphere set 0.0 0.0 ${velocity} units box
+
+
+thermo ${nthermo}
+thermo_modify lost warn
+
+dump 1 all custom ${ndumps} output.*.gz id type x y z vx vy vz fz
+
+# ==========================================================
+# TRAMPA: congela partículas que escapan de la cama
+# ==========================================================
+
+region r_trampa block INF INF INF INF 2.5e-4 INF
+group gr_trampa dynamic all region r_trampa every 10000
+
+# ==========================================================
+# EJECUCIÓN
+# ==========================================================
+
+run ${nsteps} every 10000 "velocity gr_trampa set 0.0 0.0 0.0"
+
+# Guardado final de seguridad
+write_data post-run_final.data
