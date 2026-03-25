@@ -69,15 +69,15 @@ def analyze_erosion(
     lf: pl.LazyFrame,
     pipeline: Pipeline,
     max_height: float,
-    tolerancia_fz: float,
+    prev_dump: pl.DataFrame | None,
+    tolerancia_v_cm: float,
 ) -> pl.DataFrame:
     """Calcula coordinación y clusters para las partículas erosionadas de un timestep.
 
     Aplica el criterio de erosión (``z > max_height`` AND ``vz > 0``), ejecuta
-    cluster analysis con OVITO y luego filtra por vuelo balístico: solo se
-    conservan los clusters cuya fuerza Z neta es cercana a cero
-    (``|Σfz| < tolerancia_fz``), indicando que no están en contacto activo
-    con la cama.
+    cluster analysis con OVITO y luego filtra por comparación inter-timestep:
+    solo se conservan clusters cuyo centro de masa cambió de velocidad respecto
+    al dump anterior (``|Δv_cm| > tolerancia_v_cm``).
 
     El proyectil (tipo 2) siempre se incluye en el resultado.
 
@@ -87,8 +87,9 @@ def analyze_erosion(
         pipeline: Pipeline de OVITO ya inicializado con ``build_ovito_pipeline``.
         max_height: Umbral vertical de la cama [m]. Las partículas con
             ``z > max_height`` y ``vz > 0`` se consideran eyectadas.
-        tolerancia_fz: Tolerancia de fuerza Z neta por cluster [N]. Un cluster
-            se considera en vuelo balístico si ``|Σfz| < tolerancia_fz``.
+        prev_dump: Dump anterior completo con columnas ``["id", "vx", "vy", "vz"]``.
+            None si es el primer dump.
+        tolerancia_v_cm: Tolerancia de |Δv_cm| entre dumps [m/s].
 
     Returns:
         DataFrame con las partículas erosionadas balísticas + proyectil,
@@ -103,7 +104,7 @@ def analyze_erosion(
     Example:
         >>> pipeline = build_ovito_pipeline(cutoff=1.14e-6)
         >>> df = analyze_erosion(lf_timestep, pipeline, max_height=5.2e-5,
-        ...                      tolerancia_fz=1e-6)
+        ...                      prev_dump=None, tolerancia_v_cm=0.0)
     """
     lf = lf.with_columns(
         ((pl.col("z") > max_height) & (pl.col("vz") > 0)).alias("eroded")
@@ -127,7 +128,9 @@ def analyze_erosion(
         )
     )
 
-    ballistic_ids = _filter_ballistic_clusters(df_eroded, tolerancia_fz)
+    ballistic_ids = _filter_ballistic_clusters(
+        df_eroded, tolerancia_v_cm, prev_dump
+    )
 
     if ballistic_ids:
         df_eroded = df_eroded.filter(
@@ -157,14 +160,14 @@ def run_topology_analysis(
     max_height: float,
     sim_id: str,
     timestep_interval: int,
-    tolerancia_fz: float,
+    tolerancia_v_cm: float,
 ) -> list[pl.DataFrame]:
     """Ejecuta el análisis topológico completo sobre una lista de archivos dump.
 
     Procesa secuencialmente cada archivo de volcado LAMMPS, aplica el criterio
-    de erosión con filtro balístico por fuerza Z neta y calcula coordinación
-    y clusters con OVITO. Inyecta los metadatos de la simulación en cada
-    DataFrame resultado para garantizar trazabilidad en el archivo Parquet final.
+    de erosión con filtro por comparación inter-timestep (CM velocity) y calcula
+    coordinación y clusters con OVITO. Inyecta los metadatos de la simulación
+    en cada DataFrame resultado para garantizar trazabilidad.
 
     Args:
         dump_files: Lista de rutas a los archivos ``output.*.gz`` a procesar,
@@ -175,8 +178,7 @@ def run_topology_analysis(
             ``erosion_bed_SI_``). Se usa para extraer metadatos con regex.
         timestep_interval: Intervalo de volcado entre archivos consecutivos
             (frecuencia de dump en timesteps LAMMPS).
-        tolerancia_fz: Tolerancia de fuerza Z neta por cluster [N] para el
-            filtro balístico.
+        tolerancia_v_cm: Tolerancia de |Δv_cm| entre dumps [m/s].
 
     Returns:
         Lista de DataFrames, uno por cada archivo procesado. Cada DataFrame
@@ -189,13 +191,18 @@ def run_topology_analysis(
 
     metadata = extraer_metadatos(sim_id)
     results: list[pl.DataFrame] = []
+    prev_dump: pl.DataFrame | None = None
     total = len(dump_files)
 
     for i, file_path in enumerate(dump_files):
         print_progress(i, total, label="erosión")
 
         lf = read_dump(file_path, _ANALYSIS_COLUMNS)
-        df = analyze_erosion(lf, pipeline, max_height, tolerancia_fz)
+        df_raw = lf.collect()
+
+        df = analyze_erosion(lf, pipeline, max_height, prev_dump, tolerancia_v_cm)
+
+        prev_dump = df_raw.select(["id", "vx", "vy", "vz"])
 
         df = df.with_columns(
             **{k: pl.lit(v) for k, v in metadata.items()},
@@ -215,30 +222,67 @@ def run_topology_analysis(
 # ---------------------------------------------------------------------------
 
 
-def _filter_ballistic_clusters(df: pl.DataFrame, tolerancia_fz: float) -> list[int]:
-    """Identifica clusters en vuelo balístico por fuerza Z neta cercana a cero.
+def _filter_ballistic_clusters(
+    df: pl.DataFrame,
+    tolerancia_v_cm: float,
+    prev_dump: pl.DataFrame | None = None,
+) -> list[int]:
+    """Identifica clusters cuyo CM no cambió de velocidad entre dumps.
 
-    Agrupa por ``cluster`` y calcula la suma de ``fz`` para cada cluster.
-    Un cluster se considera balístico (libre de contacto con la cama) si
-    la fuerza Z neta es menor que la tolerancia.
+    Para cada cluster en el dump actual, encuentra partículas que existían
+    en el dump anterior (por ID). Si el |Δv_cm| entre dumps es menor que
+    la tolerancia, el cluster se considera estático y se filtra.
+
+    Si ``prev_dump`` es None (primer dump), no se filtra y se devuelven
+    todos los clusters.
 
     Args:
-        df: DataFrame con columnas ``"cluster"`` y ``"fz"``.
-        tolerancia_fz: Umbral absoluto de fuerza Z neta [N].
+        df: DataFrame con columnas ``"id"``, ``"cluster"``, ``"vx"``,
+            ``"vy"``, ``"vz"``.
+        tolerancia_v_cm: Tolerancia de |Δv_cm| [m/s]. 0 = estricto.
+        prev_dump: DataFrame del dump anterior con columnas ``"id"``,
+            ``"vx"``, ``"vy"``, ``"vz"``. None si es el primer dump.
 
     Returns:
-        Lista de IDs de clusters que pasan el filtro balístico.
+        Lista de IDs de clusters que pasan el filtro (CM en movimiento).
     """
     if df.is_empty() or "cluster" not in df.columns:
         return []
 
-    cluster_fz = (
-        df.group_by("cluster")
-        .agg(pl.col("fz").sum().alias("fz_sum"))
-        .filter(pl.col("fz_sum").abs() < tolerancia_fz)
+    if prev_dump is None:
+        return df["cluster"].unique().cast(pl.Int64).to_list()
+
+    id_prev = set(prev_dump["id"])
+
+    if not id_prev:
+        return df["cluster"].unique().cast(pl.Int64).to_list()
+
+    cluster_stats = (
+        df.with_columns(pl.col("id").is_in(id_prev).alias("in_prev"))
+        .group_by("cluster")
+        .agg(
+            pl.col("vx").filter(pl.col("in_prev")).mean().alias("vx_prev"),
+            pl.col("vy").filter(pl.col("in_prev")).mean().alias("vy_prev"),
+            pl.col("vz").filter(pl.col("in_prev")).mean().alias("vz_prev"),
+            pl.col("vx").mean().alias("vx_curr"),
+            pl.col("vy").mean().alias("vy_curr"),
+            pl.col("vz").mean().alias("vz_curr"),
+            pl.col("in_prev").sum().alias("n_prev"),
+        )
+        .filter(pl.col("n_prev") > 0)
+        .with_columns(
+            (
+                (pl.col("vx_curr") - pl.col("vx_prev")) ** 2
+                + (pl.col("vy_curr") - pl.col("vy_prev")) ** 2
+                + (pl.col("vz_curr") - pl.col("vz_prev")) ** 2
+            )
+            .sqrt()
+            .alias("delta_v_cm")
+        )
+        .filter(pl.col("delta_v_cm") > tolerancia_v_cm)
     )
 
-    return cluster_fz["cluster"].cast(pl.Int64).to_list()
+    return cluster_stats["cluster"].cast(pl.Int64).to_list()
 
 
 def _run_ovito(df: pl.DataFrame, pipeline: Pipeline) -> pl.DataFrame:

@@ -56,15 +56,15 @@ class FilterConfig:
         umbral_vz_min: Velocidad vertical mínima para considerar eyección [m/s].
         umbral_energia_min: Energía cinética mínima de erosión [m²/s²].
         umbral_techo_radios: Margen de seguridad vertical en número de radios.
-        tolerancia_fz: Tolerancia de fuerza Z neta por cluster para vuelo
-            balístico libre. Un cluster se considera eyectado si
-            |Σfz_cluster| < tolerancia_fz [N].
+        tolerancia_v_cm: Tolerancia de |Δv_cm| entre dumps consecutivos [m/s].
+            Un cluster se considera estático si su CM no cambió de velocidad
+            entre el dump anterior y el actual. 0 = comparación estricta.
     """
 
     umbral_vz_min: float
     umbral_energia_min: float
     umbral_techo_radios: float
-    tolerancia_fz: float
+    tolerancia_v_cm: float
 
 
 @dataclass(frozen=True)
@@ -190,7 +190,7 @@ def _build_config(raw: dict) -> Config:
         umbral_vz_min=float(filtros_raw["umbral_vz_min"]),
         umbral_energia_min=float(filtros_raw["umbral_energia_min"]),
         umbral_techo_radios=float(filtros_raw["umbral_techo_radios"]),
-        tolerancia_fz=float(filtros_raw["tolerancia_fz"]),
+        tolerancia_v_cm=float(filtros_raw.get("tolerancia_v_cm", 0.0)),
     )
 
     rutas = raw["rutas"]

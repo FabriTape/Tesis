@@ -261,7 +261,7 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         max_height=max_height,
         sim_id=sim_id,
         timestep_interval=timestep_interval,
-        tolerancia_fz=config.filters.tolerancia_fz,
+        tolerancia_v_cm=config.filters.tolerancia_v_cm,
     )
 
     # --- 7. Exportación directa de resultados (sin verificar previos) ---
@@ -269,6 +269,7 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         "umbral_vz_min": config.filters.umbral_vz_min,
         "umbral_energia_min": config.filters.umbral_energia_min,
         "umbral_techo_radios": config.filters.umbral_techo_radios,
+        "tolerancia_v_cm": config.filters.tolerancia_v_cm,
     }
 
     if not results:

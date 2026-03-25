@@ -35,7 +35,7 @@ tolerancia_move  = 1      # Tolerancia para considerar move != 0
 umbral_vz_min       = 0.0     # Velocidad vertical mínima [m/s]
 umbral_energia_min  = 0.00002 # Energía cinética mínima [m²/s²]
 umbral_techo_radios = 5       # Margen de seguridad en número de radios (Z)
-tolerancia_fz       = 1e-12    # Tolerancia |Σfz| ≈ 0 por cluster [N]
+tolerancia_v_cm     = 0.0     # Tolerancia |Δv_cm| entre dumps [m/s]. 0 = estricto
 
 # -----------------------------------------------------------------------------
 # PARÁMETROS FÍSICOS DEL MATERIAL (SÍLICE)
