@@ -119,6 +119,19 @@
 \end{tabular}
 \end{table}
 
+\subsection*{2026-03-25 -- Simplificación CARBOXI}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llp{9cm}@{}}
+\toprule
+\textbf{Fecha} & \textbf{Commit} & \textbf{Error y Solución} \\
+\midrule
+2026-03-25 & adcab92 & \textbf{Código muerto acumulado (242 líneas):} Método taylor nunca usado, routing de método innecesario, código comentado en pipeline.py y lammps\_reader.py, campos de config sin uso (method, lonja\_radios). Solución: eliminación masiva siguiendo YAGNI. Solo queda el método v1 (z+vz + filtro balístico fz). \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection*{2026-03-20 -- Convert}
 
 \begin{table}[H]
@@ -204,7 +217,7 @@
     \item \textbf{Convert:} Polars no soporta lista de Paths
     \item \textbf{Criticidad:} Evaluada solo en primera carpeta
     \item \textbf{Detección:} Umbral sin considerar radios
-    \item \textbf{Método:} Hardcodeado a taylor → configurable via config.toml
+    \item \textbf{Simplificación:} 242 líneas de código muerto eliminadas (método taylor, routing, código comentado)
 \end{itemize}
 
 \subsection*{Data Extractor}
