@@ -15,17 +15,17 @@ resultados      = "./resultados"
 np              = 3          # Número de partículas del proyectil
 ndumps          = 25000      # Frecuencia de dump [timesteps]
 nthermo         = 5000       # Frecuencia de thermo [timesteps]
-cores           = 16         # Núcleos MPI
-processors      = [4, 4, 1]  # [Px, Py, Pz], producto debe ser = cores
+cores           = 32         # Núcleos MPI
+processors      = [4, 4, 2]  # [Px, Py, Pz], producto debe ser = cores
 exe             = "lmp_g++_openmpi-4.0.2_stableSep2021"
 timestep        = 5e-11      # Paso temporal [s]
 
 [sweep]
-fills           = [0.35]
-vels            = [-50]
-angles          = [0, 90, 180]
-moves           = [0]
-total_steps     = [50000]   # Un valor por cada combinación fill×vel×angle
+fills           = [0.35, 0.15]
+vels            = [-10]
+angles          = [0]
+moves           = [-2, 0, 2]
+total_steps     = [1300000]   # Un valor por cada combinación fill×vel×angle
 grain_radius_um = 0.76        # Radio del grano [μm] (para cálculo de desplazamiento)
 xrotate         = 1
 yrotate         = 0

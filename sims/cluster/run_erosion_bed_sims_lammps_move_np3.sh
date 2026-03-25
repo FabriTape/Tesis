@@ -33,7 +33,7 @@ done
 
 # Configuración MPI
 MPIRUN="mpirun --allow-run-as-root -np $CORES ${BASE_DIR}/$EXE"
-OUTDIR="./Buffer/sims_SI_erosion_bed_100um_ff_${FILLS// /_}_vel_${VELS// /_}_move_${MOVES// /_}_NP_${NP}_cores_${CORES}"
+OUTDIR="${BASE_DIR}/Buffer/sims_SI_erosion_bed_100um_ff_${FILLS// /_}_vel_${VELS// /_}_move_${MOVES// /_}_NP_${NP}_cores_${CORES}"
 COUNTER=0
 
 mkdir -p "$OUTDIR"
@@ -106,5 +106,5 @@ echo "========================================"
 echo "  Simulaciones completadas."
 echo "  Ejecutando análisis..."
 echo "========================================"
-cd "${BASE_DIR}/sims"
+cd "${BASE_DIR}/Buffer"
 $PY311 -m CARBOXI "$OUTDIR"
