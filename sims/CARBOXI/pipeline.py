@@ -254,8 +254,8 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
 
     # --- 6. Fase 2: Análisis topológico con OVITO ---
     files_fase2 = dump_files[:cut_index]
-    method = "taylor"
-    suffix = "_filtrado_taylor"
+    method = config.filters.method
+    suffix = f"_filtrado_{method}"
 
     results = run_topology_analysis(
         dump_files=files_fase2,

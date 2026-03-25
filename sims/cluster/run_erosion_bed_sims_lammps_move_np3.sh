@@ -8,7 +8,7 @@
 
 INPUT="collision_erosion_bed.input"
 BASE_DIR=$(pwd)
-#PY311="/home/fbazzoni/.venv/bin/python"
+ORIGINAL_LDLIB="$LD_LIBRARY_PATH"
 source ~/miniconda/bin/activate tesis_env
 PY311="python"
 # Cargar configuración centralizada
@@ -108,12 +108,18 @@ echo "  Ejecutando análisis..."
 echo "========================================"
 
 # Display virtual para ovito (headless)
+# Limpieza de lock files previos y restauración de LD_LIBRARY_PATH
+# (conda corrompe glibc, Xvfb necesita el del sistema)
+killall Xvfb 2>/dev/null
+rm -f /tmp/.X99-lock /tmp/.X11-unix/X99
+export LD_LIBRARY_PATH="$ORIGINAL_LDLIB"
 export DISPLAY=:99
 Xvfb :99 -screen 0 1024x768x24 &
 XVFB_PID=$!
 sleep 2
 
-cd "${BASE_DIR}"
+# CARBOXI editable install funciona desde el home
+cd ~
 $PY311 -m CARBOXI "$OUTDIR"
 
 # Limpieza del display virtual
