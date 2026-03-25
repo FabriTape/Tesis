@@ -8,10 +8,12 @@
 
 INPUT="collision_erosion_bed.input"
 BASE_DIR=$(pwd)
-
+#PY311="/home/fbazzoni/.venv/bin/python"
+source ~/miniconda/bin/activate tesis_env
+PY311="python"
 # Cargar configuración centralizada
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-python3.11 ${SCRIPT_DIR}/read_config.py ${SCRIPT_DIR}/config.toml
+$PY311 ${SCRIPT_DIR}/read_config.py ${SCRIPT_DIR}/config.toml
 source config_vars.sh
 
 # Variables derivadas
@@ -22,16 +24,16 @@ R=$GRAIN_RADIUS_UM
 XMOVE=()
 YMOVE=()
 
-for mv in "${MOVES[@]}"; do
-	xmove=$(echo "$mv * $R" | bc)
-	ymove=0
-	XMOVE+=( "$xmove" )
-	YMOVE+=( "$ymove" )
+for mx in "${MOVES[@]}"; do
+	for my in "${MOVES[@]}"; do
+		XMOVE+=( "$(echo "$mx * $R" | bc)" )
+		YMOVE+=( "$(echo "$my * $R" | bc)" )
+	done
 done
 
 # Configuración MPI
 MPIRUN="mpirun --allow-run-as-root -np $CORES ${BASE_DIR}/$EXE"
-OUTDIR="./Transitoria/sims_SI_erosion_bed_100um_ff_${FILLS// /_}_vel_${VELS// /_}_move_${MOVES// /_}_NP_${NP}_cores_${CORES}"
+OUTDIR="${BASE_DIR}/Buffer/sims_SI_erosion_bed_100um_ff_${FILLS// /_}_vel_${VELS// /_}_move_${MOVES// /_}_NP_${NP}_cores_${CORES}"
 COUNTER=0
 
 mkdir -p "$OUTDIR"
@@ -81,11 +83,6 @@ do
 							   -v ndumps "$NDUMPS" \
 							   -v nthermo "$NTHERMO" \
 							   -v timestep "$TIMESTEP" \
-							   -v z_filtro "$Z_FILTRO" \
-							   -v v2_min "$V2_MIN" \
-							   -v v2_max "$V2_MAX" \
-							   -v n_max "$N_MAX" \
-							   -v umbral_xy "$UMBRAL_XY" \
 							   -v young_modulus "$YOUNG_MODULUS" \
 							   -v poisson "$POISSON" \
 							   -v surface_energy "$SURFACE_ENERGY" \
@@ -109,4 +106,5 @@ echo "========================================"
 echo "  Simulaciones completadas."
 echo "  Ejecutando análisis..."
 echo "========================================"
-python3.11 ~/analyze.py "$OUTDIR"
+cd "${BASE_DIR}"
+$PY311 -m CARBOXI "$OUTDIR"
