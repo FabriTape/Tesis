@@ -11,7 +11,6 @@ partículas en cada timestep. Las primeras 9 líneas son encabezado; la línea
 las partículas de la cama; el tipo 2 es el proyectil.
 """
 
-# import gzip
 import re
 from pathlib import Path
 
@@ -19,10 +18,6 @@ import polars as pl
 
 # Nombres de columna estándar en los archivos dump de esta simulación.
 _ALL_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]
-
-# Líneas del encabezado donde se encuentran los límites de la caja.
-# Índice base-0: línea 5 = eje X, línea 6 = eje Y.
-_BOX_LINES: dict[str, int] = {"x": 5, "y": 6}
 
 
 def read_dump(path: Path, columns: list[str] | None = None) -> pl.LazyFrame:
@@ -58,39 +53,6 @@ def read_dump(path: Path, columns: list[str] | None = None) -> pl.LazyFrame:
         schema_overrides={"type": pl.UInt8},
     )
     return lf.select(columns or _ALL_COLUMNS)
-
-
-# def read_box_limits(path: Path) -> dict[str, list[float]]:
-#     """Extrae los límites espaciales de la caja de simulación desde un dump.
-#
-#     Lee las líneas de encabezado del archivo comprimido sin cargarlo completo
-#     en memoria. Devuelve los límites mínimo y máximo para los ejes X e Y.
-#
-#     Args:
-#         path: Ruta al archivo dump comprimido (``output.*.gz``).
-#
-#     Returns:
-#         Diccionario con claves ``"x"`` e ``"y"``, cada una con una lista
-#         ``[min, max]`` expresada en metros [m].
-#
-#     Example:
-#         >>> limits = read_box_limits(Path("sim/output.0.gz"))
-#         >>> limits["x"]
-#         [0.0, 0.002]
-#     """
-#     limits: dict[str, list[float]] = {"x": [], "y": []}
-#     line_to_axis = {v: k for k, v in _BOX_LINES.items()}
-#     max_line = max(_BOX_LINES.values())
-#
-#     with gzip.open(path, "rt") as f:
-#         for i, line in enumerate(f):
-#             if i in line_to_axis:
-#                 axis = line_to_axis[i]
-#                 limits[axis] = [float(v) for v in line.strip().split()]
-#             if i >= max_line:
-#                 break
-#
-#     return limits
 
 
 def list_dump_files(directory: Path) -> list[Path]:

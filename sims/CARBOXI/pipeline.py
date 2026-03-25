@@ -254,8 +254,6 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
 
     # --- 6. Fase 2: Análisis topológico con OVITO ---
     files_fase2 = dump_files[:cut_index]
-    method = config.filters.method
-    suffix = f"_filtrado_{method}"
 
     results = run_topology_analysis(
         dump_files=files_fase2,
@@ -264,10 +262,6 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         sim_id=sim_id,
         timestep_interval=timestep_interval,
         tolerancia_fz=config.filters.tolerancia_fz,
-        method=method,
-        radio_m=config.radio_m,
-        lonja_radios=config.filters.lonja_radios,
-        umbral_vz_min=config.filters.umbral_vz_min,
     )
 
     # --- 7. Exportación directa de resultados (sin verificar previos) ---
@@ -275,7 +269,6 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         "umbral_vz_min": config.filters.umbral_vz_min,
         "umbral_energia_min": config.filters.umbral_energia_min,
         "umbral_techo_radios": config.filters.umbral_techo_radios,
-        "lonja_radios": config.filters.lonja_radios,
     }
 
     if not results:
@@ -289,14 +282,13 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         timestamp,
         config.dir_resultados,
         filter_thresholds,
-        suffix=suffix,
     )
     print(f"\n  Resultados guardados en: {result_path}")
 
     # --- 7. Generación de gráfico ---
     try:
         df_total = pl.concat(results, how="vertical_relaxed")
-        plot_erosion(df_total, sim_id, timestamp, config.dir_imagenes, suffix=suffix)
+        plot_erosion(df_total, sim_id, timestamp, config.dir_imagenes)
     except Exception as exc:  # noqa: BLE001
         print(f"  Advertencia: no se pudo generar el gráfico: {exc}")
 
@@ -418,39 +410,3 @@ def _clear() -> None:
     import os
 
     os.system("cls" if os.name == "nt" else "clear")
-
-
-# ---------------------------------------------------------------------------
-# Helper privado del pipeline (comentado - referencia futura)
-# ---------------------------------------------------------------------------
-
-
-# def _resolve_use_static_box(
-#     limits_initial: dict[str, list[float]],
-#     limits_final: dict[str, list[float]],
-#     config: Config,
-# ) -> bool:
-#     """Determina si usar los límites estáticos de la caja de simulación.
-#
-#     Si los límites no cambiaron entre el frame inicial y el final, usa la
-#     caja fija. Si cambiaron, aplica el valor de ``config.usar_caja`` y
-#     emite una advertencia informativa sin interacción con el usuario.
-#
-#     Args:
-#         limits_initial: Límites espaciales del primer frame de la simulación.
-#         limits_final: Límites espaciales del último frame de la simulación.
-#         config: Configuración del programa con el valor por defecto de
-#             ``usar_caja``.
-#
-#     Returns:
-#         ``True`` si se deben usar los límites fijos de la caja; ``False`` para
-#         bordes dinámicos basados en la posición de las partículas.
-#     """
-#     if limits_initial == limits_final:
-#         return True
-#
-#     print(
-#         f"  ⚠  Los límites de la caja cambiaron entre frame inicial y final.\n"
-#         f"     Usando configuración: usar_caja={config.usar_caja}"
-#     )
-#     return config.usar_caja

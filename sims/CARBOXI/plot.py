@@ -39,8 +39,7 @@ def plot_erosion(
         timestamp: Marca temporal de la simulación en formato
             ``"YYYY-MM-DD_HH-MM-SS"``. Se incluye en el nombre del archivo SVG.
         dir_imagenes: Directorio de destino para el archivo SVG.
-        suffix: Sufijo opcional para el nombre del archivo
-            (ej. ``"_filtrado_taylor"``).
+        suffix: Sufijo opcional para el nombre del archivo.
 
     Returns:
         None

@@ -43,7 +43,7 @@ def save_erosion_results(
             utilizados (ej. ``{"umbral_vz_min": 0.0, "umbral_energia_min": 2e-4}``).
             Si se proporciona, se inyectan como columnas en el Parquet para
             trazabilidad del análisis.
-        suffix: Sufijo opcional para el nombre del archivo (ej. ``"_filtrado_taylor"``).
+        suffix: Sufijo opcional para el nombre del archivo.
 
     Returns:
         Path al archivo Parquet creado.

@@ -59,18 +59,12 @@ class FilterConfig:
         tolerancia_fz: Tolerancia de fuerza Z neta por cluster para vuelo
             balístico libre. Un cluster se considera eyectado si
             |Σfz_cluster| < tolerancia_fz [N].
-        lonja_radios: Espesor de la lonja de análisis por debajo de
-            max_height en número de radios (método taylor).
-        method: Método de detección de erosión. "v1" usa filtro z+vz,
-            "taylor" usa lonja con análisis de clusters por CM.
     """
 
     umbral_vz_min: float
     umbral_energia_min: float
     umbral_techo_radios: float
     tolerancia_fz: float
-    lonja_radios: int
-    method: str
 
 
 @dataclass(frozen=True)
@@ -197,8 +191,6 @@ def _build_config(raw: dict) -> Config:
         umbral_energia_min=float(filtros_raw["umbral_energia_min"]),
         umbral_techo_radios=float(filtros_raw["umbral_techo_radios"]),
         tolerancia_fz=float(filtros_raw["tolerancia_fz"]),
-        lonja_radios=int(filtros_raw.get("lonja_radios", 10)),
-        method=str(filtros_raw.get("method", "v1")),
     )
 
     rutas = raw["rutas"]

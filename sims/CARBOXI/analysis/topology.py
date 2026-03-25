@@ -151,87 +151,6 @@ def analyze_erosion(
     ).drop("eroded")
 
 
-def analyze_erosion_taylor(
-    lf: pl.LazyFrame,
-    pipeline: Pipeline,
-    max_height: float,
-    tolerancia_fz: float,
-    umbral_vz_min: float,
-    radio_m: float,
-    lonja_radios: int,
-) -> pl.DataFrame:
-    """Detecta erosión por análisis de clusters en una lonja de la cama.
-
-    Selecciona todas las partículas por debajo de ``max_height`` hasta
-    ``max_height - lonja_radios * radio_m`` (sin filtro previo de velocidad),
-    ejecuta cluster analysis con OVITO y filtra clusters por su centro de masa:
-    un cluster se considera eyectado si su CM tiene ``vz > umbral_vz_min``,
-    ``z > max_height`` y ``|Σfz| < tolerancia_fz``.
-
-    Luego filtra las partículas individuales del cluster para conservar solo
-    las que están por encima de ``max_height`` (realmente eyectadas).
-
-    El proyectil (tipo 2) siempre se incluye en el resultado.
-
-    Args:
-        lf: LazyFrame con columnas del dump LAMMPS incluyendo ``fz``:
-            ``["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]``.
-        pipeline: Pipeline de OVITO inicializado con ``build_ovito_pipeline``.
-        max_height: Umbral de altura de la cama [m] (con ``umbral_techo_radios``
-            ya aplicado).
-        tolerancia_fz: Tolerancia de fuerza Z neta por cluster [N].
-        umbral_vz_min: Velocidad vertical mínima del CM del cluster [m/s].
-        radio_m: Radio de partícula en metros [m].
-        lonja_radios: Espesor de la lonja en número de radios.
-
-    Returns:
-        DataFrame con partículas de clusters eyectados + proyectil,
-        incluyendo columnas ``"coordinacion"``, ``"cluster"`` y
-        ``"proyectil_erosion"``.
-    """
-    z_min_slice = max_height - lonja_radios * radio_m
-
-    lf = lf.with_columns(pl.lit(False).alias("eroded"))
-    df = lf.filter((pl.col("z") > z_min_slice) | (pl.col("type") == 2)).collect()
-
-    if df.is_empty():
-        return _empty_result(df)
-
-    df_slice = df.filter(pl.col("z") > z_min_slice)
-    df_proj = df.filter(pl.col("type") == 2)
-
-    if df_slice.is_empty():
-        return _empty_result(df)
-
-    df_slice = _run_ovito(df_slice, pipeline)
-    ballistic_ids = _filter_ballistic_clusters_taylor(
-        df_slice, tolerancia_fz, umbral_vz_min, max_height
-    )
-
-    if ballistic_ids:
-        df_eroded = df_slice.filter(
-            pl.col("cluster").is_in(ballistic_ids) & (pl.col("z") > max_height)
-        )
-    else:
-        df_eroded = df_slice.filter(pl.lit(False))
-
-    if not df_proj.is_empty():
-        df_proj = df_proj.with_columns(
-            pl.lit(None).cast(pl.Float64).alias("coordinacion"),
-            pl.lit(None).cast(pl.UInt32).alias("cluster"),
-        )
-        df_final = pl.concat([df_eroded, df_proj], how="vertical_relaxed")
-    else:
-        df_final = df_eroded
-
-    return df_final.with_columns(
-        pl.when(pl.col("type") == 2)
-        .then(pl.lit(True))
-        .otherwise(pl.lit(None))
-        .alias("proyectil_erosion")
-    ).drop("eroded")
-
-
 def run_topology_analysis(
     dump_files: list[Path],
     pipeline: Pipeline,
@@ -239,10 +158,6 @@ def run_topology_analysis(
     sim_id: str,
     timestep_interval: int,
     tolerancia_fz: float,
-    method: str = "v1",
-    radio_m: float = 0.0,
-    lonja_radios: int = 10,
-    umbral_vz_min: float = 0.0,
 ) -> list[pl.DataFrame]:
     """Ejecuta el análisis topológico completo sobre una lista de archivos dump.
 
@@ -262,11 +177,6 @@ def run_topology_analysis(
             (frecuencia de dump en timesteps LAMMPS).
         tolerancia_fz: Tolerancia de fuerza Z neta por cluster [N] para el
             filtro balístico.
-        method: Método de detección de erosión. ``"v1"`` usa filtro z+vz,
-            ``"taylor"`` usa lonja con análisis de clusters por CM.
-        radio_m: Radio de partícula en metros [m]. Solo se usa con method="taylor".
-        lonja_radios: Espesor de la lonja en radios. Solo se usa con method="taylor".
-        umbral_vz_min: Velocidad mínima del CM del cluster [m/s]. Solo con "taylor".
 
     Returns:
         Lista de DataFrames, uno por cada archivo procesado. Cada DataFrame
@@ -285,19 +195,7 @@ def run_topology_analysis(
         print_progress(i, total, label="erosión")
 
         lf = read_dump(file_path, _ANALYSIS_COLUMNS)
-
-        if method == "taylor":
-            df = analyze_erosion_taylor(
-                lf,
-                pipeline,
-                max_height,
-                tolerancia_fz,
-                umbral_vz_min,
-                radio_m,
-                lonja_radios,
-            )
-        else:
-            df = analyze_erosion(lf, pipeline, max_height, tolerancia_fz)
+        df = analyze_erosion(lf, pipeline, max_height, tolerancia_fz)
 
         df = df.with_columns(
             **{k: pl.lit(v) for k, v in metadata.items()},
@@ -341,49 +239,6 @@ def _filter_ballistic_clusters(df: pl.DataFrame, tolerancia_fz: float) -> list[i
     )
 
     return cluster_fz["cluster"].cast(pl.Int64).to_list()
-
-
-def _filter_ballistic_clusters_taylor(
-    df: pl.DataFrame,
-    tolerancia_fz: float,
-    umbral_vz_min: float,
-    max_height: float,
-) -> list[int]:
-    """Identifica clusters eyectados por propiedades del centro de masa.
-
-    Agrupa por ``cluster`` y calcula el CM (z, vz) y la suma de fz.
-    Un cluster pasa el filtro si TODAS las condiciones se cumplen:
-    - ``vz_cm > umbral_vz_min`` (el CM se mueve hacia arriba)
-    - ``z_cm > max_height`` (el CM está por encima de la superficie)
-    - ``|Σfz| < tolerancia_fz`` (fuerza neta ≈ 0, vuelo balístico)
-
-    Args:
-        df: DataFrame con columnas ``"cluster"``, ``"z"``, ``"vz"``, ``"fz"``.
-        tolerancia_fz: Umbral absoluto de fuerza Z neta [N].
-        umbral_vz_min: Velocidad vertical mínima del CM [m/s].
-        max_height: Altura mínima del CM para considerar eyección [m].
-
-    Returns:
-        Lista de IDs de clusters que pasan los tres filtros.
-    """
-    if df.is_empty() or "cluster" not in df.columns:
-        return []
-
-    cluster_stats = (
-        df.group_by("cluster")
-        .agg(
-            pl.col("z").mean().alias("z_cm"),
-            pl.col("vz").mean().alias("vz_cm"),
-            pl.col("fz").sum().alias("fz_sum"),
-        )
-        .filter(
-            (pl.col("vz_cm") > umbral_vz_min)
-            & (pl.col("z_cm") > max_height)
-            & (pl.col("fz_sum").abs() < tolerancia_fz)
-        )
-    )
-
-    return cluster_stats["cluster"].cast(pl.Int64).to_list()
 
 
 def _run_ovito(df: pl.DataFrame, pipeline: Pipeline) -> pl.DataFrame:
