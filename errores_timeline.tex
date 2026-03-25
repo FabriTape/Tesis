@@ -42,6 +42,37 @@
 
 \section*{Errores en CARBOXI (Python/Polars)}
 
+\subsection*{2026-03-25 -- Empaquetamiento y cluster headless}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llp{9cm}@{}}
+\toprule
+\textbf{Fecha} & \textbf{Commit} & \textbf{Error y Solución} \\
+\midrule
+2026-03-25 & 272950f & \textbf{hatchling crea .pth vacío en editable install:} PEP 660 editable install con hatchling creaba un archivo \_carboxi.pth vacío en site-packages. Python no encontraba el módulo. Solución: cambiar build backend a setuptools que maneja editable installs correctamente. \\
+2026-03-25 & 9ede3bc & \textbf{ovito segfault en cluster headless:} ovito intenta conectarse a un display gráfico al importarse. En cluster sin monitor → segfault. Solución: arrancar Xvfb (display virtual) antes de importar ovito. \\
+2026-03-25 & ac6d996 & \textbf{GLIBC conflict con Xvfb:} conda modifica LD\_LIBRARY\_PATH con su propio glibc. Xvfb y tools del sistema fallan con \texttt{undefined symbol: \_\_libc\_pthread\_init}. Solución: guardar LD\_LIBRARY\_PATH antes de activar conda, restaurarlo antes de Xvfb. \\
+2026-03-25 & ac6d996 & \textbf{Stale Xvfb lock files:} Si Xvfb muere, deja /tmp/.X99-lock que impide arrancar uno nuevo. Solución: \texttt{rm -f /tmp/.X99-lock /tmp/.X11-unix/X99} antes de arrancar. \\
+2026-03-25 & ac6d996 & \textbf{Editable install falla desde Buffer/:} python -m CARBOXI fallaba con "No module named CARBOXI" desde directorios de simulación. Funcionaba desde /tmp y \~. Solución: ejecutar CARBOXI desde \~{} en el script. \\
+2026-03-25 & --- & \textbf{pip vs Python distintos:} pip apuntaba a Python 3.13 del sistema, python era 3.11 del conda env. pip install instalaba en el lugar equivocado. Solución: usar \texttt{python -m pip install} en vez de \texttt{pip install}. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{2026-03-25 -- Método de análisis hardcodeado}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llp{9cm}@{}}
+\toprule
+\textbf{Fecha} & \textbf{Commit} & \textbf{Error y Solución} \\
+\midrule
+2026-03-25 & ac6d996 & \textbf{Método hardcodeado a taylor:} El método de análisis de erosión estaba hardcodeado a ``taylor'' en pipeline.py. Los archivos de salida siempre tenían ``\_filtrado\_taylor'' aunque se quería usar ``v1''. Solución: agregar campo \texttt{method} a config.toml [filtros] y usar \texttt{config.filters.method} en pipeline.py. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection*{2026-03-15 -- Errores de tipos en Parquet}
 
 \begin{table}[H]
@@ -157,12 +188,23 @@
     \item \textbf{Plot:} Variables eliminadas en refactor
 \end{itemize}
 
+\subsection*{Empaquetamiento y Cluster}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Build backend:} hatchling crea .pth vacío → setuptools
+    \item \textbf{Headless:} ovito segfault sin display → Xvfb
+    \item \textbf{GLIBC:} conda corrompe LD\_LIBRARY\_PATH → restaurar antes de Xvfb
+    \item \textbf{Lock files:} Xvfb deja locks stale → cleanup manual
+    \item \textbf{Editable install:} no funciona desde ciertos directorios → ejecutar desde \~{}
+    \item \textbf{pip mismatch:} pip vs python de distintas versiones → usar \texttt{python -m pip}
+\end{itemize}
+
 \subsection*{Pipeline}
 \begin{itemize}[leftmargin=*]
     \item \textbf{Configuración:} Doble for de moves perdido en refactor
     \item \textbf{Convert:} Polars no soporta lista de Paths
     \item \textbf{Criticidad:} Evaluada solo en primera carpeta
-    \item \textbf{Detección:} Umlaut sin considerar radios
+    \item \textbf{Detección:} Umbral sin considerar radios
+    \item \textbf{Método:} Hardcodeado a taylor → configurable via config.toml
 \end{itemize}
 
 \subsection*{Data Extractor}

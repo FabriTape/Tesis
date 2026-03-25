@@ -27,6 +27,12 @@
 \toprule
 \textbf{Fecha} & \textbf{Commit} & \textbf{Descripción} \\
 \midrule
+2026-03-25 & ac6d996 & feat: método de erosión configurable + fix Xvfb/LD\_LIBRARY\_PATH \\
+2026-03-25 & 9ede3bc & feat: agregar Xvfb para soporte headless de ovito en CARBOXI \\
+2026-03-25 & 272950f & fix: cambiar build backend de hatchling a setuptools (.pth vacío) \\
+2026-03-25 & a85a49d & Merge PR \#9: CARBOXI como paquete instalable \\
+2026-03-25 & 1a7f352 & feat: crear \_\_init\_\_.py y pyproject.toml para CARBOXI \\
+2026-03-25 & d3a1b37 & ediciones para lanzar nuevas sims en cluster \\
 2026-03-23 & 74a8d2e & feat: recuperar simulaciones históricas y actualizar pipeline a CARBOXI \\
 2026-03-22 & 366cb55 & fix(cluster): corregir sintaxis booleana del if en loop trampa \\
 2026-03-22 & e3aa79d & fix(cluster): corregir uso de step y defaults proc en collision\_erosion\_bed \\
@@ -176,6 +182,14 @@ Reorganización completa del código y creación de la versión 3 del programa.
     \item Pipeline completo de detección de ondas
     \item Soporte para nuevo formato LAMMPS
     \item Convertidor de formatos legacy
+\end{itemize}
+
+\subsection*{5. Empaquetamiento y Cluster (Mar 2026)}
+\begin{itemize}
+    \item CARBOXI como paquete instalable (pyproject.toml + setuptools)
+    \item Soporte headless con Xvfb para ovito
+    \item Fix GLIBC conflict (conda vs sistema)
+    \item Método de erosión configurable (v1 / taylor)
 \end{itemize}
 
 \end{document}
