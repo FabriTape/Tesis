@@ -27,6 +27,7 @@
 \toprule
 \textbf{Fecha} & \textbf{Commit} & \textbf{Descripción} \\
 \midrule
+2026-03-25 & adcab92 & refactor: eliminar método taylor y código muerto (-242 líneas) \\
 2026-03-25 & ac6d996 & feat: método de erosión configurable + fix Xvfb/LD\_LIBRARY\_PATH \\
 2026-03-25 & 9ede3bc & feat: agregar Xvfb para soporte headless de ovito en CARBOXI \\
 2026-03-25 & 272950f & fix: cambiar build backend de hatchling a setuptools (.pth vacío) \\
@@ -189,7 +190,7 @@ Reorganización completa del código y creación de la versión 3 del programa.
     \item CARBOXI como paquete instalable (pyproject.toml + setuptools)
     \item Soporte headless con Xvfb para ovito
     \item Fix GLIBC conflict (conda vs sistema)
-    \item Método de erosión configurable (v1 / taylor)
+    \item Simplificación: eliminar método taylor y código muerto (-242 líneas)
 \end{itemize}
 
 \end{document}
