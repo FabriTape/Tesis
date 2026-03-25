@@ -106,5 +106,15 @@ echo "========================================"
 echo "  Simulaciones completadas."
 echo "  Ejecutando análisis..."
 echo "========================================"
+
+# Display virtual para ovito (headless)
+export DISPLAY=:99
+Xvfb :99 -screen 0 1024x768x24 &
+XVFB_PID=$!
+sleep 2
+
 cd "${BASE_DIR}"
 $PY311 -m CARBOXI "$OUTDIR"
+
+# Limpieza del display virtual
+kill $XVFB_PID 2>/dev/null
