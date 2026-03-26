@@ -6,6 +6,11 @@
 \usepackage{geometry}
 \usepackage{enumitem}
 \usepackage{parskip}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{longtable}
+\newcommand{\textbffeat}{\textbf{feat}}
 
 \geometry{margin=2.5cm}
 
@@ -34,7 +39,7 @@
 		04:49         & 7f73005         & \textbf{Could not find compute ID + Compute not current:} El approach de uncompute/recompute fallaba entre runs. Solución KISS: usar file\_exists flag.      \\
 		05:06         & 7caef10         & \textbf{Misma solución KISS:} Se refina el approach de flag por archivo para salir del loop tras halt.                                                       \\
 		05:09         & 7caef10         & \textbf{Permisos en /tmp:} El cluster no permite escribir en /tmp. Se cambia a /dev/shm para el flag.                                                        \\
-		05:22         & 5439e8c         & \textbf{Halt en todas las simulaciones:} El halt se activaba para todas, incluyendo las no críticas. Solo debe afectar vel=-50 y move≠0.                     \\
+		05:22         & 5439e8c         & \textbf{Halt en todas las simulaciones:} El halt se activaba para todas, incluyendo las no críticas. Solo debe afectar vel=-50 y move$\neq$0.                \\
 		05:38         & 0bf5145         & \textbf{Compute not current between runs:} El approach con v\_stop\_cond fallaba. Nueva estrategia: comparar step\_before vs step\_after para detectar halt. \\
 		\bottomrule
 	\end{tabular}
