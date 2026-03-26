@@ -85,16 +85,16 @@ def _run_ovito(df: pl.DataFrame, pipeline: Pipeline) -> pl.DataFrame:
 def filter_F1I(
     lf: pl.LazyFrame,
     bed_height: float,
-    _prev_dump: pl.DataFrame | None = None,
-    _tol: float = 0.0,
+    prev_dump: pl.DataFrame | None = None,
+    tol: float = 0.0,
 ) -> pl.DataFrame:
     """F1I: Filtrado por z > bed_height (individual).
 
     Args:
         lf: LazyFrame del dump.
         bed_height: Altura de la cama [m].
-        _prev_dump: No usado (compatibilidad de firma).
-        _tol: No usado (compatibilidad de firma).
+        prev_dump: No usado (compatibilidad de firma).
+        tol: No usado (compatibilidad de firma).
 
     Returns:
         DataFrame con partículas sobre la cama + proyectil.
@@ -106,16 +106,16 @@ def filter_F1I(
 def filter_F2I(
     lf: pl.LazyFrame,
     bed_height: float,
-    _prev_dump: pl.DataFrame | None = None,
-    _tol: float = 0.0,
+    prev_dump: pl.DataFrame | None = None,
+    tol: float = 0.0,
 ) -> pl.DataFrame:
     """F2I: Filtrado por z > bed_height AND vz > 0 (individual).
 
     Args:
         lf: LazyFrame del dump.
         bed_height: Altura de la cama [m].
-        _prev_dump: No usado.
-        _tol: No usado.
+        prev_dump: No usado.
+        tol: No usado.
 
     Returns:
         DataFrame con partículas eyectadas + proyectil.
@@ -190,8 +190,8 @@ def filter_F3I(
 def filter_F1C(
     lf: pl.LazyFrame,
     bed_height: float,
-    _prev_dump: pl.DataFrame | None = None,
-    _tol: float = 0.0,
+    prev_dump: pl.DataFrame | None = None,
+    tol: float = 0.0,
     pipeline: Pipeline | None = None,
 ) -> pl.DataFrame:
     """F1C: Filtrado por z_cm > bed_height (cluster).
@@ -199,8 +199,8 @@ def filter_F1C(
     Args:
         lf: LazyFrame del dump.
         bed_height: Altura de la cama [m].
-        _prev_dump: No usado.
-        _tol: No usado.
+        prev_dump: No usado.
+        tol: No usado.
         pipeline: Pipeline de Ovito.
 
     Returns:
@@ -217,8 +217,8 @@ def filter_F1C(
 def filter_F2C(
     lf: pl.LazyFrame,
     bed_height: float,
-    _prev_dump: pl.DataFrame | None = None,
-    _tol: float = 0.0,
+    prev_dump: pl.DataFrame | None = None,
+    tol: float = 0.0,
     pipeline: Pipeline | None = None,
 ) -> pl.DataFrame:
     """F2C: Filtrado por z_cm > bed_height AND vz_cm > 0 (cluster).
@@ -226,8 +226,8 @@ def filter_F2C(
     Args:
         lf: LazyFrame del dump.
         bed_height: Altura de la cama [m].
-        _prev_dump: No usado.
-        _tol: No usado.
+        prev_dump: No usado.
+        tol: No usado.
         pipeline: Pipeline de Ovito.
 
     Returns:
