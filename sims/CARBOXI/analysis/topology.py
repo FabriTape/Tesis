@@ -68,16 +68,23 @@ def build_ovito_pipeline(cutoff: float) -> Pipeline:
 def analyze_erosion(
     lf: pl.LazyFrame,
     pipeline: Pipeline,
+    bed_height: float,
     max_height: float,
     prev_dump: pl.DataFrame | None,
     tolerancia_v_cm: float,
 ) -> pl.DataFrame:
     """Calcula coordinación y clusters para las partículas erosionadas de un timestep.
 
-    Aplica el criterio de erosión (``z > max_height`` AND ``vz > 0``), ejecuta
-    cluster analysis con OVITO y luego filtra por comparación inter-timestep:
-    solo se conservan clusters cuyo centro de masa cambió de velocidad respecto
-    al dump anterior (``|Δv_cm| > tolerancia_v_cm``).
+    Filtrado en dos etapas:
+
+    1. **Candidatas**: partículas con ``z > bed_height`` y ``vz > 0``. Captura
+       todas las partículas sobre la superficie de la cama, incluso las que
+       oscilan cerca del umbral.
+    2. **Clusters por CM**: tras ejecutar cluster analysis con OVITO, se
+       conservan solo clusters cuyo centro de masa cumple
+       ``z_cm > max_height`` (donde ``max_height = bed_height + margen``).
+       Esto elimina la sensibilidad a oscilaciones térmicas de partículas
+       individuales.
 
     El proyectil (tipo 2) siempre se incluye en el resultado.
 
@@ -85,8 +92,8 @@ def analyze_erosion(
         lf: LazyFrame con las columnas del dump LAMMPS incluyendo ``fz``:
             ``["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]``.
         pipeline: Pipeline de OVITO ya inicializado con ``build_ovito_pipeline``.
-        max_height: Umbral vertical de la cama [m]. Las partículas con
-            ``z > max_height`` y ``vz > 0`` se consideran eyectadas.
+        bed_height: Altura cruda de la cama [m]. Filtro inicial de candidatas.
+        max_height: Umbral de CM del cluster [m]. ``bed_height + margen``.
         prev_dump: Dump anterior completo con columnas ``["id", "vx", "vy", "vz"]``.
             None si es el primer dump.
         tolerancia_v_cm: Tolerancia de |Δv_cm| entre dumps [m/s].
@@ -103,11 +110,12 @@ def analyze_erosion(
 
     Example:
         >>> pipeline = build_ovito_pipeline(cutoff=1.14e-6)
-        >>> df = analyze_erosion(lf_timestep, pipeline, max_height=5.2e-5,
-        ...                      prev_dump=None, tolerancia_v_cm=0.0)
+        >>> df = analyze_erosion(lf_timestep, pipeline, bed_height=5.0e-5,
+        ...                      max_height=5.4e-5, prev_dump=None,
+        ...                      tolerancia_v_cm=0.0)
     """
     lf = lf.with_columns(
-        ((pl.col("z") > max_height) & (pl.col("vz") > 0)).alias("eroded")
+        ((pl.col("z") > bed_height) & (pl.col("vz") > 0)).alias("eroded")
     )
     df = lf.filter((pl.col("eroded")) | (pl.col("type") == 2)).collect()
 
@@ -117,25 +125,38 @@ def analyze_erosion(
     df_eroded = df.filter(pl.col("eroded"))
     df_not_eroded = df.filter(~pl.col("eroded"))
 
-    df_eroded = (
-        _run_ovito(df_eroded, pipeline)
-        if not df_eroded.is_empty()
-        else (
-            df_eroded.with_columns(
-                pl.lit(None).cast(pl.Float64).alias("coordinacion"),
-                pl.lit(None).cast(pl.UInt32).alias("cluster"),
+    if not df_eroded.is_empty():
+        df_eroded = _run_ovito(df_eroded, pipeline)
+
+        # Filtrar clusters por CM z > max_height
+        cluster_cm = (
+            df_eroded.group_by("cluster")
+            .agg(pl.col("z").mean().alias("z_cm"))
+        )
+        valid_clusters = cluster_cm.filter(
+            pl.col("z_cm") > max_height
+        )["cluster"].to_list()
+
+        df_eroded = df_eroded.filter(pl.col("cluster").is_in(valid_clusters))
+
+        if not df_eroded.is_empty():
+            ballistic_ids = _filter_ballistic_clusters(
+                df_eroded, tolerancia_v_cm, prev_dump
             )
-        )
-    )
-
-    ballistic_ids = _filter_ballistic_clusters(df_eroded, tolerancia_v_cm, prev_dump)
-
-    if ballistic_ids:
-        df_eroded = df_eroded.filter(
-            pl.col("cluster").is_in(ballistic_ids) | (pl.col("type") == 2)
-        )
+            if ballistic_ids:
+                df_eroded = df_eroded.filter(
+                    pl.col("cluster").is_in(ballistic_ids)
+                    | (pl.col("type") == 2)
+                )
+            else:
+                df_eroded = df_eroded.filter(pl.col("type") == 2)
+        else:
+            df_eroded = df_eroded.filter(pl.col("type") == 2)
     else:
-        df_eroded = df_eroded.filter(pl.col("type") == 2)
+        df_eroded = df_eroded.with_columns(
+            pl.lit(None).cast(pl.Float64).alias("coordinacion"),
+            pl.lit(None).cast(pl.UInt32).alias("cluster"),
+        )
 
     df_not_eroded = df_not_eroded.with_columns(
         pl.lit(None).cast(pl.Float64).alias("coordinacion"),
@@ -155,6 +176,7 @@ def analyze_erosion(
 def run_topology_analysis(
     dump_files: list[Path],
     pipeline: Pipeline,
+    bed_height: float,
     max_height: float,
     sim_id: str,
     timestep_interval: int,
@@ -163,15 +185,16 @@ def run_topology_analysis(
     """Ejecuta el análisis topológico completo sobre una lista de archivos dump.
 
     Procesa secuencialmente cada archivo de volcado LAMMPS, aplica el criterio
-    de erosión con filtro por comparación inter-timestep (CM velocity) y calcula
-    coordinación y clusters con OVITO. Inyecta los metadatos de la simulación
-    en cada DataFrame resultado para garantizar trazabilidad.
+    de erosión con filtro por CM del cluster y comparación inter-timestep.
+    Inyecta los metadatos de la simulación en cada DataFrame resultado para
+    garantizar trazabilidad.
 
     Args:
         dump_files: Lista de rutas a los archivos ``output.*.gz`` a procesar,
             ordenados cronológicamente.
         pipeline: Pipeline de OVITO inicializado con ``build_ovito_pipeline``.
-        max_height: Umbral de altura de la cama [m] para el criterio de erosión.
+        bed_height: Altura cruda de la cama [m] para filtro inicial de candidatas.
+        max_height: Umbral de CM del cluster [m] (bed_height + margen).
         sim_id: Identificador de la simulación (nombre de carpeta sin prefijo
             ``erosion_bed_SI_``). Se usa para extraer metadatos con regex.
         timestep_interval: Intervalo de volcado entre archivos consecutivos
@@ -198,7 +221,9 @@ def run_topology_analysis(
         lf = read_dump(file_path, _ANALYSIS_COLUMNS)
         df_raw = lf.collect()
 
-        df = analyze_erosion(lf, pipeline, max_height, prev_dump, tolerancia_v_cm)
+        df = analyze_erosion(
+            lf, pipeline, bed_height, max_height, prev_dump, tolerancia_v_cm
+        )
 
         prev_dump = df_raw.select(["id", "vx", "vy", "vz"])
 

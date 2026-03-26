@@ -254,11 +254,14 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
 
     # --- 6. Fase 2: Análisis topológico con OVITO ---
     files_fase2 = dump_files[:cut_index]
+    bed_height = max_height
+    max_height_cm = max_height + config.filters.umbral_techo_radios * config.radio_m
 
     results = run_topology_analysis(
         dump_files=files_fase2,
         pipeline=pipeline,
-        max_height=max_height,
+        bed_height=bed_height,
+        max_height=max_height_cm,
         sim_id=sim_id,
         timestep_interval=timestep_interval,
         tolerancia_v_cm=config.filters.tolerancia_v_cm,
