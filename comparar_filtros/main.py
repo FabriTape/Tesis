@@ -133,7 +133,7 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
             else:
                 df = filter_func(lf, bed_height)
 
-            df = df.with_columns(i=pl.lit(i))
+            df = df.with_columns(i=pl.lit(i, dtype=pl.Int64))
             metrics_list.append(compute_metrics(df, i))
             results_list.append(df)
 
@@ -142,7 +142,7 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
             prev_dump = df_raw.select(["id", "vx", "vy", "vz"])
 
         # Concatenar resultados
-        df_total = pl.concat(results_list, how="diagonal") if results_list else pl.DataFrame()
+        df_total = pl.concat(results_list, how="diagonal_relaxed") if results_list else pl.DataFrame()
         gaps = compute_gaps(df_total) if not df_total.is_empty() else 0
         fluct = sum(
             1
@@ -166,7 +166,7 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
     summaries = {}
     for config_name in CONFIG_NAMES:
         metrics = all_metrics[config_name]
-        df_total = pl.concat(all_results[config_name], how="diagonal")
+        df_total = pl.concat(all_results[config_name], how="diagonal_relaxed")
         summaries[config_name] = {
             "n_ids": metrics[-1]["n_unique_ids"],
             "gaps": compute_gaps(df_total),
