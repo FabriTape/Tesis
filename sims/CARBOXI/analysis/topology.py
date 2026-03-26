@@ -128,9 +128,7 @@ def analyze_erosion(
         )
     )
 
-    ballistic_ids = _filter_ballistic_clusters(
-        df_eroded, tolerancia_v_cm, prev_dump
-    )
+    ballistic_ids = _filter_ballistic_clusters(df_eroded, tolerancia_v_cm, prev_dump)
 
     if ballistic_ids:
         df_eroded = df_eroded.filter(
@@ -279,7 +277,7 @@ def _filter_ballistic_clusters(
             .sqrt()
             .alias("delta_v_cm")
         )
-        .filter(pl.col("delta_v_cm") > tolerancia_v_cm)
+        .filter(pl.col("delta_v_cm") < tolerancia_v_cm)
     )
 
     return cluster_stats["cluster"].cast(pl.Int64).to_list()
