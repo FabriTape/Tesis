@@ -27,6 +27,12 @@
 \toprule
 \textbf{Fecha} & \textbf{Commit} & \textbf{Descripción} \\
 \midrule
+2026-03-26 & 62590cf & feat: filtro erosión por CM z del cluster (en vez de z individual) \\
+2026-03-26 & 8406f0e & error en la lógica de filtrado \\
+2026-03-26 & 28546c0 & feat: unificar config.toml como fuente única (cluster + CARBOXI) \\
+2026-03-25 & 85d4c48 & feat: filtro erosión por comparación CM inter-timestep (reemplaza fz) \\
+2026-03-25 & ae631fc & cambio de parámetros a 7 radios de filtro y umbral de velocidad \\
+2026-03-25 & fd77e27 & cambio de parámetros a 1e-12 en umbral de fz \\
 2026-03-25 & adcab92 & refactor: eliminar método taylor y código muerto (-242 líneas) \\
 2026-03-25 & ac6d996 & feat: método de erosión configurable + fix Xvfb/LD\_LIBRARY\_PATH \\
 2026-03-25 & 9ede3bc & feat: agregar Xvfb para soporte headless de ovito en CARBOXI \\
@@ -191,6 +197,9 @@ Reorganización completa del código y creación de la versión 3 del programa.
     \item Soporte headless con Xvfb para ovito
     \item Fix GLIBC conflict (conda vs sistema)
     \item Simplificación: eliminar método taylor y código muerto (-242 líneas)
+    \item Config unificado: un solo config.toml en cluster/ (fuente única)
+    \item Filtro erosión: comparación CM inter-timestep + filtro por CM z del cluster
+    \item Bug pendiente: partículas con gaps (z oscila alrededor de max\_height)
 \end{itemize}
 
 \end{document}

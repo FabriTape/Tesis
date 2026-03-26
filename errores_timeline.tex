@@ -73,6 +73,23 @@
 \end{tabular}
 \end{table}
 
+\subsection*{2026-03-25/26 -- Filtro de erosión inter-timestep}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}llp{9cm}@{}}
+\toprule
+\textbf{Fecha} & \textbf{Commit} & \textbf{Error y Solución} \\
+\midrule
+2026-03-25 & 85d4c48 & \textbf{Filtro fz caótico:} El filtro por $\sum fz \approx 0$ no funcionaba bien (valores erráticos). Solución: reemplazar por comparación de $|v_{cm}|$ entre dumps consecutivos (por ID de partícula en común). \\
+2026-03-25 & 85d4c48 & \textbf{Clusters de tamaño 1 filtran partículas correctamente eyectadas:} Cuando una partícula está sola en un cluster, $|\Delta v_{cm}| \approx 0$ (se compara consigo misma). El filtro inter-timestep la elimina como ``estacionaria''. Bug pendiente. \\
+2026-03-26 & 62590cf & \textbf{Partículas oscilan alrededor de max\_height:} Partículas a 2--6 radios sobre el umbral pasan brevemente por debajo de $z > max\_height$, generando gaps en el resultado. Solución: filtro por CM z del cluster en vez de z individual. No resolvió el problema porque los clusters de tamaño 1 tienen CM z = z individual. \\
+2026-03-26 & 62590cf & \textbf{ID 61991 SÍ está en el dump de LAMMPS:} Verificado con \texttt{zgrep} en el cluster. ID 61991 está en output.900000.gz con z=107.8 µm y vz=0.1495 m/s. El gap es causado por CARBOXI que filtra la partícula, no por LAMMPS. \\
+2026-03-26 & 28546c0 & \textbf{Config duplicado:} Dos config.toml (cluster/ y CARBOXI/) con overlap y valores distintos (material, tolerancia). Solución: unificar en un solo config.toml en cluster/ con \texttt{--config} argumento para CARBOXI. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection*{2026-03-15 -- Errores de tipos en Parquet}
 
 \begin{table}[H]
@@ -218,6 +235,10 @@
     \item \textbf{Criticidad:} Evaluada solo en primera carpeta
     \item \textbf{Detección:} Umbral sin considerar radios
     \item \textbf{Simplificación:} 242 líneas de código muerto eliminadas (método taylor, routing, código comentado)
+    \item \textbf{Filtro fz:} Caótico → reemplazado por comparación CM inter-timestep
+    \item \textbf{Clusters size 1:} $\Delta v_{cm} \approx 0$ (se compara consigo misma) → filtra partículas correctamente eyectadas
+    \item \textbf{CM z:} Filtro por CM z del cluster no resuelve gaps (clusters size 1 tienen CM z = z individual)
+    \item \textbf{Config unificado:} Dos config.toml con overlap → merge en cluster/config.toml
 \end{itemize}
 
 \subsection*{Data Extractor}
