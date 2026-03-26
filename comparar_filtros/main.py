@@ -59,18 +59,22 @@ CLUSTER_CONFIGS = {"F1C", "F2C", "F3C"}
 def _detect_bed_height(sim_dir: Path) -> float:
     """Detecta la altura de la cama según el nombre de la carpeta.
 
+    Aplica margen de 5 radios sobre la altura cruda.
+
     Args:
         sim_dir: Directorio de la simulación.
 
     Returns:
-        Altura de la cama [m].
+        Altura de la cama con margen [m].
     """
     name = sim_dir.name
     if "ff_0.15" in name:
-        return BED_HEIGHT_FF_015
+        base = BED_HEIGHT_FF_015
     elif "ff_0.35" in name:
-        return BED_HEIGHT_FF_035
-    return BED_HEIGHT_FF_015
+        base = BED_HEIGHT_FF_035
+    else:
+        base = BED_HEIGHT_FF_015
+    return base + 5 * RADIO_M
 
 
 def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
