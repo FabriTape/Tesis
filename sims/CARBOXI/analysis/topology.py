@@ -213,6 +213,7 @@ def run_topology_analysis(
     metadata = extraer_metadatos(sim_id)
     results: list[pl.DataFrame] = []
     prev_dump: pl.DataFrame | None = None
+    eroded_ids: set[int] = set()
     total = len(dump_files)
 
     for i, file_path in enumerate(dump_files):
@@ -226,6 +227,29 @@ def run_topology_analysis(
         )
 
         prev_dump = df_raw.select(["id", "vx", "vy", "vz"])
+
+        # Tracking acumulativo: agregar IDs detectadas como erosionadas
+        current_eroded = set(
+            df.filter(pl.col("type") != 2)["id"].to_list()
+        )
+        eroded_ids.update(current_eroded)
+
+        # Incluir partículas que fueron erosionadas antes pero no pasaron
+        # el filtro en este step (oscilan alrededor de max_height)
+        current_ids = set(df["id"].to_list())
+        raw_ids = set(df_raw["id"].to_list())
+        missing = (eroded_ids & raw_ids) - current_ids
+
+        if missing:
+            additional = (
+                df_raw.filter(pl.col("id").is_in(missing))
+                .with_columns(
+                    pl.lit(None).cast(pl.Float64).alias("coordinacion"),
+                    pl.lit(None).cast(pl.UInt32).alias("cluster"),
+                    pl.lit(None).cast(pl.Boolean).alias("proyectil_erosion"),
+                )
+            )
+            df = pl.concat([df, additional], how="diagonal")
 
         df = df.with_columns(
             **{k: pl.lit(v) for k, v in metadata.items()},
