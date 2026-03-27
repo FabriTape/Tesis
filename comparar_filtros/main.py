@@ -146,18 +146,19 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
                 df = filter_func(lf, bed_height)
 
             # Tracking acumulativo: mantener IDs detectadas antes
-            current_eroded = set(
-                df.filter(pl.col("type") != 2)["id"].to_list()
-            )
-            eroded_ids.update(current_eroded)
+            if not df.is_empty() and "type" in df.columns:
+                current_eroded = set(
+                    df.filter(pl.col("type") != 2)["id"].to_list()
+                )
+                eroded_ids.update(current_eroded)
 
-            current_ids = set(df["id"].to_list())
-            raw_ids = set(df_raw["id"].to_list())
-            missing = (eroded_ids & raw_ids) - current_ids
+                current_ids = set(df["id"].to_list())
+                raw_ids = set(df_raw["id"].to_list())
+                missing = (eroded_ids & raw_ids) - current_ids
 
-            if missing:
-                additional = df_raw.filter(pl.col("id").is_in(missing))
-                df = pl.concat([df, additional], how="diagonal_relaxed")
+                if missing:
+                    additional = df_raw.filter(pl.col("id").is_in(missing))
+                    df = pl.concat([df, additional], how="diagonal_relaxed")
 
             df = df.with_columns(i=pl.lit(i, dtype=pl.Int64))
             metrics_list.append(compute_metrics(df, i, pipeline=pipeline_metrics))
