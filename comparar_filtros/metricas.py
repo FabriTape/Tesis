@@ -21,8 +21,7 @@ def compute_metrics(df: pl.DataFrame, step_index: int) -> dict:
         "n_bed": bed.shape[0],
         "n_proj": proj.shape[0],
         "n_total": df.shape[0],
-        "z_cm": bed["z"].mean() if not bed.is_empty() else 0.0,
-        "vz_cm": bed["vz"].mean() if not bed.is_empty() else 0.0,
+        "n_clusters": bed["cluster"].n_unique() if "cluster" in bed.columns else 0,
         "z_max": bed["z"].max() if not bed.is_empty() else 0.0,
         "n_unique_ids": bed["id"].n_unique(),
     }

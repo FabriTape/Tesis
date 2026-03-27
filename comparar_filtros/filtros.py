@@ -8,7 +8,6 @@ Filtros de cluster (F1C, F2C, F3C):
   y aplican criterios al CM del cluster.
 """
 
-
 import polars as pl
 from numpy import empty as np_empty
 from ovito.data import DataCollection, SimulationCell  # type: ignore[import-untyped]
@@ -17,7 +16,6 @@ from ovito.modifiers import (  # type: ignore[import-untyped]
     CoordinationAnalysisModifier,
 )
 from ovito.pipeline import Pipeline, StaticSource  # type: ignore[import-untyped]
-
 
 _COLUMNS = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]
 
@@ -121,8 +119,7 @@ def filter_F2I(
         DataFrame con partículas eyectadas + proyectil.
     """
     df = lf.filter(
-        ((pl.col("z") > bed_height) & (pl.col("vz") > 0))
-        | (pl.col("type") == 2)
+        ((pl.col("z") > bed_height) & (pl.col("vz") > 0)) | (pl.col("type") == 2)
     ).collect()
     return df
 
@@ -145,8 +142,7 @@ def filter_F3I(
         DataFrame con partículas eyectadas balísticas + proyectil.
     """
     df = lf.filter(
-        ((pl.col("z") > bed_height) & (pl.col("vz") > 0))
-        | (pl.col("type") == 2)
+        ((pl.col("z") > bed_height) & (pl.col("vz") > 0)) | (pl.col("type") == 2)
     ).collect()
 
     if prev_dump is None or df.is_empty():
@@ -234,8 +230,7 @@ def filter_F2C(
         DataFrame con clusters eyectados + proyectil.
     """
     df = lf.filter(
-        ((pl.col("z") > bed_height) & (pl.col("vz") > 0))
-        | (pl.col("type") == 2)
+        ((pl.col("z") > bed_height) & (pl.col("vz") > 0)) | (pl.col("type") == 2)
     ).collect()
 
     if pipeline is None or df.is_empty():
@@ -264,8 +259,7 @@ def filter_F3C(
         DataFrame con clusters balísticos + proyectil.
     """
     df = lf.filter(
-        ((pl.col("z") > bed_height) & (pl.col("vz") > 0))
-        | (pl.col("type") == 2)
+        ((pl.col("z") > bed_height) & (pl.col("vz") > 0)) | (pl.col("type") == 2)
     ).collect()
 
     if pipeline is None or df.is_empty():
@@ -301,7 +295,9 @@ def filter_F3C(
                 (pl.col("vx_curr") - pl.col("vx_prev")) ** 2
                 + (pl.col("vy_curr") - pl.col("vy_prev")) ** 2
                 + (pl.col("vz_curr") - pl.col("vz_prev")) ** 2
-            ).sqrt().alias("delta_v_cm")
+            )
+            .sqrt()
+            .alias("delta_v_cm")
         )
         .filter(pl.col("delta_v_cm") < tol)
     )
@@ -349,12 +345,9 @@ def _apply_cluster_filter(
 
     df_eroded = _run_ovito(df_eroded, pipeline)
 
-    cluster_cm = (
-        df_eroded.group_by("cluster")
-        .agg(
-            pl.col("z").mean().alias("z_cm"),
-            pl.col("vz").mean().alias("vz_cm"),
-        )
+    cluster_cm = df_eroded.group_by("cluster").agg(
+        pl.col("z").mean().alias("z_cm"),
+        pl.col("vz").mean().alias("vz_cm"),
     )
 
     mask = pl.col("z_cm") > bed_height
@@ -364,4 +357,8 @@ def _apply_cluster_filter(
     valid = cluster_cm.filter(mask)["cluster"].to_list()
     df_eroded = df_eroded.filter(pl.col("cluster").is_in(valid))
 
-    return pl.concat([df_eroded, proj], how="diagonal") if not proj.is_empty() else df_eroded
+    return (
+        pl.concat([df_eroded, proj], how="diagonal")
+        if not proj.is_empty()
+        else df_eroded
+    )

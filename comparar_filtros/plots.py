@@ -50,41 +50,41 @@ def plot_comparison(
     ax.legend(fontsize=8, ncol=2)
     ax.grid(alpha=0.3)
 
-    # Plot 2: z_cm vs step
+    # Plot 2: n_clusters vs step
     ax = axes[0, 1]
     for config, metrics in all_metrics.items():
         steps = [m["step"] for m in metrics]
-        z_cm = [m["z_cm"] * 1e6 for m in metrics]
+        n_clusters = [m["n_clusters"] for m in metrics]
         ax.plot(
             steps,
-            z_cm,
+            n_clusters,
             label=config,
             color=colors.get(config, "gray"),
             linestyle=linestyles.get(config, "-"),
             linewidth=1.5,
         )
     ax.set_xlabel("Step")
-    ax.set_ylabel("z_CM [µm]")
-    ax.set_title("Altura promedio del CM")
+    ax.set_ylabel("N clusters")
+    ax.set_title("Número de clusters por step")
     ax.legend(fontsize=8, ncol=2)
     ax.grid(alpha=0.3)
 
-    # Plot 3: vz_cm vs step
+    # Plot 3: z_max vs step
     ax = axes[1, 0]
     for config, metrics in all_metrics.items():
         steps = [m["step"] for m in metrics]
-        vz_cm = [m["vz_cm"] for m in metrics]
+        z_max = [m["z_max"] * 1e6 for m in metrics]
         ax.plot(
             steps,
-            vz_cm,
+            z_max,
             label=config,
             color=colors.get(config, "gray"),
             linestyle=linestyles.get(config, "-"),
             linewidth=1.5,
         )
     ax.set_xlabel("Step")
-    ax.set_ylabel("vz_CM [m/s]")
-    ax.set_title("Velocidad promedio del CM")
+    ax.set_ylabel("z_max [µm]")
+    ax.set_title("Altura máxima del ejecta")
     ax.legend(fontsize=8, ncol=2)
     ax.grid(alpha=0.3)
 
@@ -133,8 +133,7 @@ def plot_summary_table(
             str(s.get("n_ids", 0)),
             str(s.get("gaps", 0)),
             str(s.get("fluct", 0)),
-            f"{s.get('z_cm_final', 0) * 1e6:.1f}",
-            f"{s.get('vz_cm_final', 0):.4f}",
+            str(s.get("n_clusters_final", 0)),
         ])
 
     fig, ax = plt.subplots(figsize=(10, 4))
@@ -142,7 +141,7 @@ def plot_summary_table(
 
     table = ax.table(
         cellText=data,
-        colLabels=["Config", "IDs", "Gaps", "Fluct", "z_CM final [µm]", "vz_CM final [m/s]"],
+        colLabels=["Config", "IDs", "Gaps", "Fluct", "Clusters"],
         loc="center",
         cellLoc="center",
     )

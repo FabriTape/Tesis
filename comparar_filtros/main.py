@@ -175,8 +175,7 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
                 for j in range(1, len(metrics))
                 if metrics[j]["n_bed"] < metrics[j - 1]["n_bed"]
             ),
-            "z_cm_final": metrics[-1]["z_cm"],
-            "vz_cm_final": metrics[-1]["vz_cm"],
+            "n_clusters_final": metrics[-1]["n_clusters"],
         }
 
     plot_summary_table(summaries, image_dir)
