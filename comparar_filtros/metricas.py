@@ -76,13 +76,24 @@ def compute_metrics(
     Returns:
         Diccionario con métricas por step.
     """
+    if df.is_empty() or "type" not in df.columns:
+        return {
+            "step": step_index,
+            "n_bed": 0,
+            "n_proj": 0,
+            "n_total": 0,
+            "n_clusters": 0,
+            "z_max": 0.0,
+            "n_unique_ids": 0,
+        }
+
     bed = df.filter(pl.col("type") != 2)
     proj = df.filter(pl.col("type") == 2)
 
     n_clusters = 0
-    if pipeline is not None and not bed.is_empty() and bed.shape[0] > 0:
-        bed = _run_ovito(bed, pipeline)
-        n_clusters = bed["cluster"].n_unique()
+    if pipeline is not None and not bed.is_empty():
+        bed_with_cluster = _run_ovito(bed, pipeline)
+        n_clusters = bed_with_cluster["cluster"].n_unique()
 
     return {
         "step": step_index,
