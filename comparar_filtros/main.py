@@ -17,7 +17,6 @@ import sys
 from pathlib import Path
 
 import polars as pl
-
 from filtros import (
     CONFIG_NAMES,
     build_ovito_pipeline,
@@ -29,13 +28,18 @@ from filtros import (
     filter_F3I,
 )
 from lammps_reader import list_dump_files, read_dump
-from metricas import build_cluster_pipeline, compute_gaps, compute_gaps_per_step, compute_metrics
+from metricas import (
+    build_cluster_pipeline,
+    compute_gaps,
+    compute_gaps_per_step,
+    compute_metrics,
+)
 from plots import plot_comparison, plot_summary_table
 
 # Parámetros físicos (extraer de la simulación)
 BED_HEIGHT_FF_015 = 9.99989e-5
 BED_HEIGHT_FF_035 = 9.99999e-5
-RADIO_UM = 0.76
+RADIO_UM = 0.7601551  ## Mas un 0.02% para que me tome las vibraciones
 RADIO_M = RADIO_UM * 1e-6
 CUTOFF = RADIO_M * 2
 TOLERANCIA_V_CM = 1e-6
@@ -74,7 +78,7 @@ def _detect_bed_height(sim_dir: Path) -> float:
         base = BED_HEIGHT_FF_035
     else:
         base = BED_HEIGHT_FF_015
-    return base + 5 * RADIO_M
+    return base + 2 * RADIO_M
 
 
 def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
@@ -98,8 +102,12 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
         return
 
     # Pipelines de Ovito
-    pipeline_filter = build_ovito_pipeline(cutoff=CUTOFF)  # para filtros cluster (con coordinación)
-    pipeline_metrics = build_cluster_pipeline(cutoff=CUTOFF)  # para métricas (solo clusters)
+    pipeline_filter = build_ovito_pipeline(
+        cutoff=CUTOFF
+    )  # para filtros cluster (con coordinación)
+    pipeline_metrics = build_cluster_pipeline(
+        cutoff=CUTOFF
+    )  # para métricas (solo clusters)
 
     # Resultados por config
     all_metrics: dict[str, list[dict]] = {}
@@ -144,7 +152,11 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
             prev_dump = df_raw.select(["id", "vx", "vy", "vz"])
 
         # Concatenar resultados
-        df_total = pl.concat(results_list, how="diagonal_relaxed") if results_list else pl.DataFrame()
+        df_total = (
+            pl.concat(results_list, how="diagonal_relaxed")
+            if results_list
+            else pl.DataFrame()
+        )
         gaps = compute_gaps(df_total) if not df_total.is_empty() else 0
         fluct = sum(
             1
@@ -154,13 +166,17 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
 
         all_metrics[config_name] = metrics_list
         all_results[config_name] = results_list
-        all_gaps[config_name] = compute_gaps_per_step(df_total) if not df_total.is_empty() else []
+        all_gaps[config_name] = (
+            compute_gaps_per_step(df_total) if not df_total.is_empty() else []
+        )
 
         # Guardar CSV
         csv_path = output_dir / f"{sim_name}_{config_name}.csv"
         if not df_total.is_empty():
             df_total.write_csv(csv_path)
-        print(f"    → IDs: {metrics_list[-1]['n_unique_ids']}, gaps: {gaps}, fluct: {fluct}")
+        print(
+            f"    → IDs: {metrics_list[-1]['n_unique_ids']}, gaps: {gaps}, fluct: {fluct}"
+        )
 
     # Generar plots
     plot_comparison(all_metrics, all_gaps, sim_name, image_dir)
