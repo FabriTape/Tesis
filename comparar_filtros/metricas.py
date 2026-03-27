@@ -1,14 +1,77 @@
 """Métricas por step para comparación de filtros de erosión."""
 
 import polars as pl
+from numpy import empty as np_empty
+from ovito.data import DataCollection, SimulationCell  # type: ignore[import-untyped]
+from ovito.modifiers import ClusterAnalysisModifier  # type: ignore[import-untyped]
+from ovito.pipeline import Pipeline, StaticSource  # type: ignore[import-untyped]
 
 
-def compute_metrics(df: pl.DataFrame, step_index: int) -> dict:
+def _run_ovito(df: pl.DataFrame, pipeline: Pipeline) -> pl.DataFrame:
+    """Ejecuta Ovito sobre un DataFrame y agrega columna de cluster.
+
+    Args:
+        df: DataFrame con columnas ["x", "y", "z"].
+        pipeline: Pipeline de Ovito configurado.
+
+    Returns:
+        DataFrame original con columna "cluster" agregada.
+    """
+    positions = df.select(["x", "y", "z"]).to_numpy()
+
+    new_data = DataCollection()
+    particles = new_data.create_particles(count=positions.shape[0])
+    particles.create_property("Position", data=positions)
+
+    cell = SimulationCell()
+    cell[:, :] = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]
+    new_data.objects.append(cell)
+
+    pipeline.source = StaticSource(data=new_data)
+    computed = pipeline.compute()
+
+    return df.with_columns(
+        pl.Series("cluster", computed.particles["Cluster"][:], dtype=pl.UInt32)
+    )
+
+
+def build_cluster_pipeline(cutoff: float) -> Pipeline:
+    """Inicializa pipeline de Ovito solo para cluster analysis.
+
+    Args:
+        cutoff: Distancia de corte [m].
+
+    Returns:
+        Pipeline configurado.
+    """
+    data = DataCollection()
+    particles = data.create_particles()
+    particles.create_property("Position", data=np_empty((0, 3)))
+
+    cell = SimulationCell()
+    cell[:, :] = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]
+    data.objects.append(cell)
+
+    pipeline = Pipeline(source=StaticSource(data=data))
+    pipeline.modifiers.append(ClusterAnalysisModifier(cutoff=cutoff))
+
+    return pipeline
+
+
+def compute_metrics(
+    df: pl.DataFrame,
+    step_index: int,
+    pipeline: Pipeline | None = None,
+) -> dict:
     """Calcula métricas de un DataFrame de partículas filtradas.
+
+    Ejecuta Ovito sobre las partículas de cama para obtener n_clusters.
 
     Args:
         df: DataFrame con partículas filtradas (incluye proyectil).
         step_index: Índice del step/dump.
+        pipeline: Pipeline de Ovito para cluster analysis. Si es None,
+            n_clusters será 0.
 
     Returns:
         Diccionario con métricas por step.
@@ -16,12 +79,17 @@ def compute_metrics(df: pl.DataFrame, step_index: int) -> dict:
     bed = df.filter(pl.col("type") != 2)
     proj = df.filter(pl.col("type") == 2)
 
+    n_clusters = 0
+    if pipeline is not None and not bed.is_empty() and bed.shape[0] > 0:
+        bed = _run_ovito(bed, pipeline)
+        n_clusters = bed["cluster"].n_unique()
+
     return {
         "step": step_index,
         "n_bed": bed.shape[0],
         "n_proj": proj.shape[0],
         "n_total": df.shape[0],
-        "n_clusters": bed["cluster"].n_unique() if "cluster" in bed.columns else 0,
+        "n_clusters": n_clusters,
         "z_max": bed["z"].max() if not bed.is_empty() else 0.0,
         "n_unique_ids": bed["id"].n_unique(),
     }

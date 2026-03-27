@@ -29,7 +29,7 @@ from filtros import (
     filter_F3I,
 )
 from lammps_reader import list_dump_files, read_dump
-from metricas import compute_gaps, compute_metrics
+from metricas import build_cluster_pipeline, compute_gaps, compute_metrics
 from plots import plot_comparison, plot_summary_table
 
 # Parámetros físicos (extraer de la simulación)
@@ -97,8 +97,9 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
         print("  Sin dumps. Saltando...")
         return
 
-    # Pipeline de Ovito (solo para configs cluster)
-    pipeline = build_ovito_pipeline(cutoff=CUTOFF)
+    # Pipelines de Ovito
+    pipeline_filter = build_ovito_pipeline(cutoff=CUTOFF)  # para filtros cluster (con coordinación)
+    pipeline_metrics = build_cluster_pipeline(cutoff=CUTOFF)  # para métricas (solo clusters)
 
     # Resultados por config
     all_metrics: dict[str, list[dict]] = {}
@@ -126,7 +127,7 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
                     bed_height,
                     prev_dump=prev_dump,
                     tol=TOLERANCIA_V_CM,
-                    pipeline=pipeline,
+                    pipeline=pipeline_filter,
                 )
             elif use_dv:
                 df = filter_func(lf, bed_height, prev_dump, TOLERANCIA_V_CM)
@@ -134,7 +135,7 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
                 df = filter_func(lf, bed_height)
 
             df = df.with_columns(i=pl.lit(i, dtype=pl.Int64))
-            metrics_list.append(compute_metrics(df, i))
+            metrics_list.append(compute_metrics(df, i, pipeline=pipeline_metrics))
             results_list.append(df)
 
             # Guardar dump actual para filtros con Δv
