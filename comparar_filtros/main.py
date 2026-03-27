@@ -123,12 +123,14 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
         metrics_list: list[dict] = []
         results_list: list[pl.DataFrame] = []
         prev_dump: pl.DataFrame | None = None
+        eroded_ids: set[int] = set()
 
         for i, dump_file in enumerate(dump_files):
             if i % 10 == 0:
                 print(f"    step {i}/{len(dump_files)}")
 
             lf = read_dump(dump_file, _COLUMNS)
+            df_raw = lf.collect()
 
             if use_cluster:
                 df = filter_func(
@@ -143,12 +145,25 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
             else:
                 df = filter_func(lf, bed_height)
 
+            # Tracking acumulativo: mantener IDs detectadas antes
+            current_eroded = set(
+                df.filter(pl.col("type") != 2)["id"].to_list()
+            )
+            eroded_ids.update(current_eroded)
+
+            current_ids = set(df["id"].to_list())
+            raw_ids = set(df_raw["id"].to_list())
+            missing = (eroded_ids & raw_ids) - current_ids
+
+            if missing:
+                additional = df_raw.filter(pl.col("id").is_in(missing))
+                df = pl.concat([df, additional], how="diagonal_relaxed")
+
             df = df.with_columns(i=pl.lit(i, dtype=pl.Int64))
             metrics_list.append(compute_metrics(df, i, pipeline=pipeline_metrics))
             results_list.append(df)
 
             # Guardar dump actual para filtros con Δv
-            df_raw = lf.collect()
             prev_dump = df_raw.select(["id", "vx", "vy", "vz"])
 
         # Concatenar resultados
