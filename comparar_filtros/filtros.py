@@ -132,6 +132,9 @@ def filter_F3I(
 ) -> pl.DataFrame:
     """F3I: Filtrado por z > bed_height AND vz > 0 AND |Δv| < tol (individual).
 
+    Solo se conservan partículas cuya velocidad no cambió entre dumps
+    (vuelo balístico).
+
     Args:
         lf: LazyFrame del dump.
         bed_height: Altura de la cama [m].
@@ -139,10 +142,10 @@ def filter_F3I(
         tol: Tolerancia de |Δv| [m/s].
 
     Returns:
-        DataFrame con partículas eyectadas balísticas + proyectil.
+        DataFrame con partículas eyectadas balísticas.
     """
     df = lf.filter(
-        ((pl.col("z") > bed_height) & (pl.col("vz") > 0)) | (pl.col("type") == 2)
+        (pl.col("z") > bed_height) & (pl.col("vz") > 0)
     ).collect()
 
     if prev_dump is None or df.is_empty():
@@ -152,28 +155,18 @@ def filter_F3I(
     prev = prev_dump.select(["id", "vx", "vy", "vz"]).rename(
         {"vx": "vx_prev", "vy": "vy_prev", "vz": "vz_prev"}
     )
-    merged = df.join(prev, on="id", how="left")
+    merged = df.join(prev, on="id", how="inner")
 
-    # Calcular |Δv| solo para partículas que estaban en prev
+    # Calcular |Δv|
     merged = merged.with_columns(
-        pl.when(pl.col("vx_prev").is_not_null())
-        .then(
-            (
-                (pl.col("vx") - pl.col("vx_prev")) ** 2
-                + (pl.col("vy") - pl.col("vy_prev")) ** 2
-                + (pl.col("vz") - pl.col("vz_prev")) ** 2
-            ).sqrt()
-        )
-        .otherwise(pl.lit(-1.0))
-        .alias("delta_v")
+        (
+            (pl.col("vx") - pl.col("vx_prev")) ** 2
+            + (pl.col("vy") - pl.col("vy_prev")) ** 2
+            + (pl.col("vz") - pl.col("vz_prev")) ** 2
+        ).sqrt().alias("delta_v")
     )
 
-    # Mantener: proyectil, partículas nuevas, o partículas con |Δv| < tol
-    filtered = merged.filter(
-        (pl.col("type") == 2)
-        | (pl.col("vx_prev").is_null())
-        | (pl.col("delta_v") < tol)
-    )
+    filtered = merged.filter(pl.col("delta_v") < tol)
 
     return filtered.drop(["vx_prev", "vy_prev", "vz_prev", "delta_v"])
 
@@ -256,10 +249,10 @@ def filter_F3C(
         pipeline: Pipeline de Ovito.
 
     Returns:
-        DataFrame con clusters balísticos + proyectil.
+        DataFrame con clusters balísticos.
     """
     df = lf.filter(
-        ((pl.col("z") > bed_height) & (pl.col("vz") > 0)) | (pl.col("type") == 2)
+        (pl.col("z") > bed_height) & (pl.col("vz") > 0)
     ).collect()
 
     if pipeline is None or df.is_empty():
@@ -275,7 +268,7 @@ def filter_F3C(
     bed = df.filter(pl.col("type") != 2)
 
     if bed.is_empty():
-        return df
+        return pl.DataFrame()
 
     cluster_delta_v = (
         bed.with_columns(pl.col("id").is_in(prev_ids).alias("in_prev"))
@@ -303,16 +296,11 @@ def filter_F3C(
     )
 
     valid_clusters = cluster_delta_v["cluster"].to_list()
-    proj = df.filter(pl.col("type") == 2)
 
     if valid_clusters:
-        filtered = df.filter(
-            pl.col("cluster").is_in(valid_clusters) | (pl.col("type") == 2)
-        )
-    else:
-        filtered = proj
+        return df.filter(pl.col("cluster").is_in(valid_clusters))
 
-    return filtered
+    return pl.DataFrame()
 
 
 # ---------------------------------------------------------------------------
