@@ -42,7 +42,7 @@ BED_HEIGHT_FF_035 = 9.99999e-5
 RADIO_UM = 0.7601551  ## Mas un 0.02% para que me tome las vibraciones
 RADIO_M = RADIO_UM * 1e-6
 CUTOFF = RADIO_M * 2
-TOLERANCIA_V_CM = 1e-6
+TOLERANCIA_V_CM = 1e-10
 
 _COLUMNS = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]
 
@@ -78,7 +78,7 @@ def _detect_bed_height(sim_dir: Path) -> float:
         base = BED_HEIGHT_FF_035
     else:
         base = BED_HEIGHT_FF_015
-    return base + 2 * RADIO_M
+    return base + 5 * RADIO_M
 
 
 def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
@@ -147,9 +147,7 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
 
             # Tracking acumulativo: mantener IDs detectadas antes
             if not df.is_empty() and "type" in df.columns:
-                current_eroded = set(
-                    df.filter(pl.col("type") != 2)["id"].to_list()
-                )
+                current_eroded = set(df.filter(pl.col("type") != 2)["id"].to_list())
                 eroded_ids.update(current_eroded)
 
                 current_ids = set(df["id"].to_list())
