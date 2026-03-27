@@ -96,6 +96,21 @@
 	\end{tabular}
 \end{table}
 
+\subsection*{2026-03-26 -- Comparar filtros}
+
+\begin{table}[H]
+	\centering
+	\begin{tabular}{@{}llp{9cm}@{}}
+		\toprule
+		\textbf{Fecha} & \textbf{Commit} & \textbf{Error y Solución}                                                                                                                                                                                                                          \\
+		\midrule
+		2026-03-26     & 5826f4f         & \textbf{Keyword args incompatibles:} Las funciones de filtro tenían parámetros con prefijo \_ (\_prev\_dump, \_tol). main.py los llamaba sin prefijo. Solución: quitar prefijos de los parámetros.                                                 \\
+		2026-03-26     & 5f3abed         & \textbf{Schema mismatch en concat:} \texttt{pl.concat(..., how="diagonal")} fallaba porque \texttt{pl.lit(i)} creaba Int32 inconsistente. Solución: \texttt{pl.lit(i, dtype=pl.Int64)} y \texttt{how="diagonal\_relaxed"}.                         \\
+		2026-03-26     & 7fbc8cd         & \textbf{DataFrame vacío de F3C:} Cuando F3C no tiene clusters balísticos, devuelve \texttt{pl.DataFrame()} vacío sin columnas. \texttt{df.filter(pl.col("type"))} falla. Solución: check de \texttt{df.is\_empty()} al inicio de compute\_metrics. \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
 \subsection*{2026-03-15 -- Errores de tipos en Parquet}
 
 \begin{table}[H]

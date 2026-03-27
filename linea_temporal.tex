@@ -28,6 +28,14 @@
 	\toprule
 	\textbf{Fecha} & \textbf{Commit} & \textbf{Descripción}                                                          \\
 	\midrule
+	2026-03-26     & 7fbc8cd         & fix: handle empty DataFrame en compute\_metrics (F3C vacío)                   \\
+	2026-03-26     & 8f6c678         & refactor: simplificar F3I/F3C (quitar proyectil y partículas nuevas)          \\
+	2026-03-26     & 82cc1d5         & feat: ejecutar Ovito en TODOS los filtros para métricas n\_clusters           \\
+	2026-03-26     & cad8c1d         & refactor: reemplazar z\_cm/vz\_cm por n\_clusters y z\_max                    \\
+	2026-03-26     & 5f3abed         & fix: diagonal\_relaxed + Int64 cast para schema mismatch                      \\
+	2026-03-26     & 1992457         & fix: agregar margen de 5 radios al filtro z                                   \\
+	2026-03-26     & 5826f4f         & fix: quitar prefijo \_ de parámetros en filtros.py                            \\
+	2026-03-26     & 1f6d150         & feat: proyecto comparar\_filtros - 6 configuraciones de filtro                \\
 	2026-03-26     & 1c44b0b         & feat: tracking acumulativo de IDs erosionadas (fix gaps definitivo)           \\
 	2026-03-26     & 62590cf         & feat: filtro erosión por CM z del cluster (en vez de z individual)            \\
 	2026-03-26     & 8406f0e         & error en la lógica de filtrado                                                \\
@@ -175,6 +183,15 @@ Reorganización completa del código y creación de la versión 3 del programa.
 	\item Config unificado: un solo config.toml en cluster/ (fuente única)
 	\item Filtro erosión: comparación CM inter-timestep + filtro por CM z del cluster
 	\item Fix gaps: tracking acumulativo de IDs erosionadas (18/18 simulaciones con 0 gaps)
+\end{itemize}
+
+\subsection*{6. Comparación de Filtros (Mar 2026)}
+\begin{itemize}
+	\item Proyecto independiente en \texttt{Tesis/comparar\_filtros/}
+	\item 6 configuraciones de filtro: F1 (z), F2 (z+vz), F3 (z+vz+$\Delta$v)
+	\item Variaciones: individual (I) vs cluster (C) con Ovito
+	\item Métricas: n\_bed, n\_clusters, z\_max, gaps, fluctuaciones
+	\item Ovito ejecutado sobre TODOS los filtros para métricas comparables
 \end{itemize}
 
 \end{document}
