@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 def plot_comparison(
     all_metrics: dict[str, list[dict]],
+    all_gaps: dict[str, list[dict]],
     sim_name: str,
     output_dir: Path,
 ) -> None:
@@ -15,6 +16,8 @@ def plot_comparison(
     Args:
         all_metrics: Dict con clave = nombre config (F1I, F1C, ...)
             y valor = lista de métricas por step.
+        all_gaps: Dict con clave = nombre config y valor = lista de gaps
+            acumulados por step.
         sim_name: Nombre de la simulación (para título).
         output_dir: Directorio de salida para los SVG.
     """
@@ -69,43 +72,29 @@ def plot_comparison(
     ax.legend(fontsize=8, ncol=2)
     ax.grid(alpha=0.3)
 
-    # Plot 3: z_max vs step
+    # Plot 3: gaps acumulados vs step
     ax = axes[1, 0]
-    for config, metrics in all_metrics.items():
-        steps = [m["step"] for m in metrics]
-        z_max = [m["z_max"] * 1e6 for m in metrics]
+    for config, gaps_data in all_gaps.items():
+        if not gaps_data:
+            continue
+        steps = [g["step"] for g in gaps_data]
+        gaps = [g["gaps_acumulados"] for g in gaps_data]
         ax.plot(
             steps,
-            z_max,
+            gaps,
             label=config,
             color=colors.get(config, "gray"),
             linestyle=linestyles.get(config, "-"),
             linewidth=1.5,
         )
     ax.set_xlabel("Step")
-    ax.set_ylabel("z_max [µm]")
-    ax.set_title("Altura máxima del ejecta")
+    ax.set_ylabel("Gaps acumulados")
+    ax.set_title("IDs que desaparecen entre steps")
     ax.legend(fontsize=8, ncol=2)
     ax.grid(alpha=0.3)
 
-    # Plot 4: IDs únicos acumulados vs step
-    ax = axes[1, 1]
-    for config, metrics in all_metrics.items():
-        steps = [m["step"] for m in metrics]
-        ids = [m["n_unique_ids"] for m in metrics]
-        ax.plot(
-            steps,
-            ids,
-            label=config,
-            color=colors.get(config, "gray"),
-            linestyle=linestyles.get(config, "-"),
-            linewidth=1.5,
-        )
-    ax.set_xlabel("Step")
-    ax.set_ylabel("IDs únicos")
-    ax.set_title("Partículas únicas acumuladas")
-    ax.legend(fontsize=8, ncol=2)
-    ax.grid(alpha=0.3)
+    # Plot 4: vacío (placeholder)
+    axes[1, 1].axis("off")
 
     plt.tight_layout()
     output_path = output_dir / f"comparacion_{sim_name}.svg"
@@ -116,12 +105,14 @@ def plot_comparison(
 
 def plot_summary_table(
     summaries: dict[str, dict],
+    sim_name: str,
     output_dir: Path,
 ) -> None:
     """Genera una tabla resumen en formato SVG.
 
     Args:
         summaries: Dict con clave = config, valor = {gaps, fluct, n_ids, ...}.
+        sim_name: Nombre de la simulación (para nombre de archivo).
         output_dir: Directorio de salida.
     """
     configs = list(summaries.keys())
@@ -149,10 +140,10 @@ def plot_summary_table(
     table.set_fontsize(10)
     table.scale(1.2, 1.5)
 
-    ax.set_title("Resumen de configuraciones", fontsize=14, pad=20)
+    ax.set_title(f"Resumen — {sim_name}", fontsize=14, pad=20)
 
     plt.tight_layout()
-    output_path = output_dir / "tabla_resumen.svg"
+    output_path = output_dir / f"tabla_resumen_{sim_name}.svg"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  Tabla guardada: {output_path}")

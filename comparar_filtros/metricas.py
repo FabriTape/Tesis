@@ -106,6 +106,35 @@ def compute_metrics(
     }
 
 
+def compute_gaps_per_step(df: pl.DataFrame) -> list[dict]:
+    """Calcula gaps acumulados por step.
+
+    Para cada step, cuenta cuántos IDs detectados en pasos anteriores
+    no están presentes en el step actual.
+
+    Args:
+        df: DataFrame concatenado de todos los steps con columna "i".
+
+    Returns:
+        Lista de dicts con "step" y "gaps_acumulados".
+    """
+    bed = df.filter(pl.col("type") != 2)
+    if bed.is_empty():
+        return []
+
+    max_step = bed["i"].max()
+    seen_ids: set[int] = set()
+    result = []
+
+    for step in range(max_step + 1):
+        step_ids = set(bed.filter(pl.col("i") == step)["id"].to_list())
+        gaps = len(seen_ids - step_ids)
+        result.append({"step": step, "gaps_acumulados": gaps})
+        seen_ids.update(step_ids)
+
+    return result
+
+
 def compute_gaps(df: pl.DataFrame) -> int:
     """Cuenta partículas con gaps (entran y salen entre steps).
 

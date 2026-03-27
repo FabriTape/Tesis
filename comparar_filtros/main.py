@@ -29,7 +29,7 @@ from filtros import (
     filter_F3I,
 )
 from lammps_reader import list_dump_files, read_dump
-from metricas import build_cluster_pipeline, compute_gaps, compute_metrics
+from metricas import build_cluster_pipeline, compute_gaps, compute_gaps_per_step, compute_metrics
 from plots import plot_comparison, plot_summary_table
 
 # Parámetros físicos (extraer de la simulación)
@@ -103,6 +103,7 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
 
     # Resultados por config
     all_metrics: dict[str, list[dict]] = {}
+    all_gaps: dict[str, list[dict]] = {}
     all_results: dict[str, list[pl.DataFrame]] = {}
 
     for config_name in CONFIG_NAMES:
@@ -153,6 +154,7 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
 
         all_metrics[config_name] = metrics_list
         all_results[config_name] = results_list
+        all_gaps[config_name] = compute_gaps_per_step(df_total) if not df_total.is_empty() else []
 
         # Guardar CSV
         csv_path = output_dir / f"{sim_name}_{config_name}.csv"
@@ -161,7 +163,7 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
         print(f"    → IDs: {metrics_list[-1]['n_unique_ids']}, gaps: {gaps}, fluct: {fluct}")
 
     # Generar plots
-    plot_comparison(all_metrics, sim_name, image_dir)
+    plot_comparison(all_metrics, all_gaps, sim_name, image_dir)
 
     # Tabla resumen
     summaries = {}
@@ -179,7 +181,7 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
             "n_clusters_final": metrics[-1]["n_clusters"],
         }
 
-    plot_summary_table(summaries, image_dir)
+    plot_summary_table(summaries, sim_name, image_dir)
 
 
 def main() -> None:
