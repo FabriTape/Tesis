@@ -111,7 +111,10 @@ def filter_F2I(
     prev_dump: pl.DataFrame | None = None,
     tol: float = 0.0,
 ) -> pl.DataFrame:
-    """F2I: z > bed_height (individual, sin diferencia con F1I).
+    """F2I: z > bed_height + post-filtro vz > 0 para bed (individual).
+
+    Inicial: z > bed_height (captura candidatas sin discriminar vz).
+    Post-filtro: vz > 0 para partículas de cama (proyectil sin filtro).
 
     Args:
         lf: LazyFrame del dump.
@@ -121,9 +124,16 @@ def filter_F2I(
         tol: No usado.
 
     Returns:
-        DataFrame con partículas sobre la cama.
+        DataFrame con partículas eyectadas + proyectil.
     """
-    return lf.filter(pl.col("z") > bed_height).collect()
+    df = lf.filter(pl.col("z") > bed_height).collect()
+
+    if df.is_empty():
+        return df
+
+    return df.filter(
+        (pl.col("type") != 2) & (pl.col("vz") > 0) | (pl.col("type") == 2)
+    )
 
 
 def filter_F3I(
@@ -133,7 +143,10 @@ def filter_F3I(
     prev_dump: pl.DataFrame | None = None,
     tol: float = 1e-6,
 ) -> pl.DataFrame:
-    """F3I: z > bed_height AND |Δv| < tol (individual).
+    """F3I: z > bed_height + vz > 0 + |Δv| < tol (individual).
+
+    Inicial: z > bed_height (candidatas).
+    Post-filtro: vz > 0 AND |Δv| < tol para bed, proj sin filtro adicional.
 
     Args:
         lf: LazyFrame del dump.
@@ -143,17 +156,35 @@ def filter_F3I(
         tol: Tolerancia de |Δv| [m/s].
 
     Returns:
-        DataFrame con partículas balísticas.
+        DataFrame con partículas balísticas + proyectil.
     """
     df = lf.filter(pl.col("z") > bed_height).collect()
+
+    if df.is_empty():
+        return df
+
+    # Post-filtro vz > 0 para bed particles
+    df = df.filter(
+        ((pl.col("type") != 2) & (pl.col("vz") > 0)) | (pl.col("type") == 2)
+    )
 
     if prev_dump is None or df.is_empty():
         return df
 
+    # Post-filtro Δv para bed particles
+    bed = df.filter(pl.col("type") != 2)
+    proj = df.filter(pl.col("type") == 2)
+
+    if bed.is_empty():
+        return proj if not proj.is_empty() else pl.DataFrame()
+
     prev = prev_dump.select(["id", "vx", "vy", "vz"]).rename(
         {"vx": "vx_prev", "vy": "vy_prev", "vz": "vz_prev"}
     )
-    merged = df.join(prev, on="id", how="inner")
+    merged = bed.join(prev, on="id", how="inner")
+
+    if merged.is_empty():
+        return proj if not proj.is_empty() else pl.DataFrame()
 
     merged = merged.with_columns(
         (
@@ -163,9 +194,10 @@ def filter_F3I(
         ).sqrt().alias("delta_v")
     )
 
-    filtered = merged.filter(pl.col("delta_v") < tol)
+    filtered_bed = merged.filter(pl.col("delta_v") < tol)
+    filtered_bed = filtered_bed.drop(["vx_prev", "vy_prev", "vz_prev", "delta_v"])
 
-    return filtered.drop(["vx_prev", "vy_prev", "vz_prev", "delta_v"])
+    return pl.concat([filtered_bed, proj], how="diagonal") if not proj.is_empty() else filtered_bed
 
 
 # ---------------------------------------------------------------------------
