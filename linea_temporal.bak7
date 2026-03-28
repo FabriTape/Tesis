@@ -1,0 +1,180 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{parskip}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{longtable}
+\newcommand{\textbffeat}{\textbf{feat}}
+\geometry{margin=2.5cm}
+
+\title{Línea Temporal del Repositorio Tesis}
+\author{Fabrizio}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section*{2026 -- Sesión Actual (Marzo)}
+
+\subsection*{Marzo 2026}
+
+\begin{longtable}{@{}llp{10cm}@{}}
+	\toprule
+	\textbf{Fecha} & \textbf{Commit} & \textbf{Descripción}                                                          \\
+	\midrule
+	2026-03-26     & 1c44b0b         & feat: tracking acumulativo de IDs erosionadas (fix gaps definitivo)           \\
+	2026-03-26     & 62590cf         & feat: filtro erosión por CM z del cluster (en vez de z individual)            \\
+	2026-03-26     & 8406f0e         & error en la lógica de filtrado                                                \\
+	2026-03-26     & 28546c0         & feat: unificar config.toml como fuente única (cluster + CARBOXI)              \\
+	2026-03-25     & 85d4c48         & feat: filtro erosión por comparación CM inter-timestep (reemplaza fz)         \\
+	2026-03-25     & ae631fc         & cambio de parámetros a 7 radios de filtro y umbral de velocidad               \\
+	2026-03-25     & fd77e27         & cambio de parámetros a 1e-12 en umbral de fz                                  \\
+	2026-03-25     & adcab92         & refactor: eliminar método taylor y código muerto (-242 líneas)                \\
+	2026-03-25     & ac6d996         & feat: método de erosión configurable + fix Xvfb/LD\_LIBRARY\_PATH             \\
+	2026-03-25     & 9ede3bc         & feat: agregar Xvfb para soporte headless de ovito en CARBOXI                  \\
+	2026-03-25     & 272950f         & fix: cambiar build backend de hatchling a setuptools (.pth vacío)             \\
+	2026-03-25     & a85a49d         & Merge PR \#9: CARBOXI como paquete instalable                                 \\
+	2026-03-25     & 1a7f352         & feat: crear \_\_init\_\_.py y pyproject.toml para CARBOXI                     \\
+	2026-03-25     & d3a1b37         & ediciones para lanzar nuevas sims en cluster                                  \\
+	2026-03-23     & 74a8d2e         & feat: recuperar simulaciones históricas y actualizar pipeline a CARBOXI       \\
+	2026-03-22     & 366cb55         & fix(cluster): corregir sintaxis booleana del if en loop trampa                \\
+	2026-03-22     & e3aa79d         & fix(cluster): corregir uso de step y defaults proc en collision\_erosion\_bed \\
+	2026-03-22     & 0bf5145         & fix: detectar halt por comparación de pasos                                   \\
+	2026-03-22     & 5439e8c         & fix: halt solo para simulaciones críticas (vel=-50 y move$\neq$0)             \\
+	2026-03-22     & 7afdaef         & fix: crear check\_wave antes del loop para evitar uncompute                   \\
+	2026-03-22     & 56dffee         & Edición en la lógica de collision\_erosion\_box.input                         \\
+	2026-03-22     & 1a528c6         & Ediciones de Gemini                                                           \\
+	2026-03-21     & 9d756ea         & Ediciones de Python y compatibilidades con miniconda                          \\
+	2026-03-21     & 23fbeca         & fix: restaurar doble for para desplazamiento X e Y en moves                   \\
+	2026-03-21     & 8c442e9         & Borrado de simulaciones y creación de carpeta legacy                          \\
+	2026-03-20     & 12d98db         & docs: agregar flujo de trabajo obligatorio + revisar engram                   \\
+	2026-03-20     & e84516a         & feat: distribución de procesadores MPI configurable                           \\
+	2026-03-20     & 8c4cab3         & feat: centralizar configuración en config.toml + read\_config.py              \\
+	2026-03-20     & 8b7ae1f         & feat: agregar convert.py para transformar dumps a formato legacy gzip         \\
+	2026-03-20     & b4e3c9e         & feat: agregar analyze.py para auto-detección de formato LAMMPS                \\
+	2026-03-20     & 30b49c6         & feat: implementar CARBOXI\_MINI - pipeline de análisis de clusters            \\
+	\bottomrule
+\end{longtable}
+
+\section*{2026 -- Refactorización Mayor (Marzo)}
+
+\begin{longtable}{@{}llp{10cm}@{}}
+	\toprule
+	\textbf{Fecha} & \textbf{Commit} & \textbf{Descripción}                                                                  \\
+	\midrule
+	2026-03-16     & de66ffa         & Merge branch 'desarrollo'                                                             \\
+	2026-03-16     & f493b8b         & fix: agregar radios al umbral de altura para erosión                                  \\
+	2026-03-15     & f50785a         & \textbf{refactor: reemplazar código legado por CARBOXI refactorizado}                 \\
+	2026-03-15     & 3c472b5         & refactor: eliminar get\_max\_bed\_height() y usar valores de config                   \\
+	2026-03-15     & 66707cf         & feat: incluir id y type en datos de onda                                              \\
+	2026-03-12     & cd086f1         & \textbf{feat:} refactor completo con máquina de estados y configuración externalizada \\
+	2026-03-12     & 3b4a68c         & refactor: análisis de onda automático y umbrales desde YAML                           \\
+	2026-03-12     & 9a05b10         & feat: procesar automáticamente todas las subcarpetas                                  \\
+	2026-03-09     & 864b432         & Refactorizar extracción de metadatos con Regex + caché OVITO                          \\
+	2026-03-09     & f3cf7d2         & Refactorizar orquestador, optimizar pipeline OVITO/Polars                             \\
+	2026-03-08     & 3762691         & Análisis de Ovito: primero detectar onda, luego análisis                              \\
+	\bottomrule
+\end{longtable}
+
+\section*{2026 -- Correcciones y Mejoras (Marzo)}
+
+\begin{longtable}{@{}llp{10cm}@{}}
+	\toprule
+	\textbf{Fecha} & \textbf{Commit} & \textbf{Descripción}                                          \\
+	\midrule
+	2026-03-08     & 3967bc2         & Corrección de detector\_ondas() - proyectil no parte de onda  \\
+	2026-03-07     & a9b3ecc         & Detección de bordes desde output.gz                           \\
+	2026-03-07     & 8acd421         & Quitar dependencias no usadas en data\_extractor.py           \\
+	2026-03-06     & 1a61de7         & Cambio en guardado de resultados y gestión de datos faltantes \\
+	2026-03-06     & c176632         & Edición en lógica de escritura de resultados                  \\
+	\bottomrule
+\end{longtable}
+
+\section*{2025 -- Final de Año (Diciembre)}
+
+\begin{longtable}{@{}llp{10cm}@{}}
+	\toprule
+	\textbf{Fecha} & \textbf{Commit} & \textbf{Descripción} \\
+	\midrule
+	2025-12-23 & 0670506 & Merge PR \#8 from desarrollo \\
+	2025-12-23 & e59ac08 & data\_extractor unificado con Lector.py + Polars \\
+	2025-12-23 & e9fbc1e & Mejoras en rendimiento de data\_extractor.py \\
+	2025-12-23 & 8e0f4b0 & \textbf{Módulo Lector con Polars} para leer .gz sin .parquet \\
+	2025-12-16 & 6098baa & Añadir gráficos y edición del código \\
+	2025-12-10 & 747cae7 & Versión final de data\_extractor\_2.py \\
+	2025-12-10 & d282329 & data\_extractor\_2.py hecho por DeepSeek \\
+	\bottomrule
+\end{longtable}
+
+\section*{2025 -- Versión 3 (Diciembre)}
+
+\begin{longtable}{@{}llp{10cm}@{}}
+	\toprule
+	\textbf{Fecha} & \textbf{Commit} & \textbf{Descripción} \\
+	\midrule
+	2025-12-10 & bd63843 & Solución de problemas de escritura/lectura, semi-automatización \\
+	2025-12-07 & 11e4cbd & Reordenamiento de carpetas de simulaciones \\
+	2025-12-05 & 5abf011 & \textbf{Desarrollo de nuevas funciones para versión 3.1} \\
+	2025-12-01 & a53ddab & \textbf{Versión 3 del código} + archivos extra \\
+	2025-12-01 & a2c3897 & \textbf{Version 3} \\
+	\bottomrule
+\end{longtable}
+
+\section*{2025 -- Inicio (Noviembre)}
+
+\begin{longtable}{@{}llp{10cm}@{}}
+	\toprule
+	\textbf{Fecha} & \textbf{Commit} & \textbf{Descripción} \\
+	\midrule
+	2025-11-30 & 1bf4f8d & Add files via upload \\
+	2025-11-30 & e31147d & Add files via upload (tag: Analisis) \\
+	2025-11-30 & 0f92fa7 & Update README with version history \\
+	2025-11-30 & 65c91d7 & \textbf{Initial commit} \\
+	\bottomrule
+\end{longtable}
+
+\pagebreak
+
+\section*{Resumen de Fases Principales}
+
+\subsection*{1. Inicial (Nov 2025)}
+Subida inicial de archivos al repositorio.
+
+\subsection*{2. Versión 3 (Dic 2025)}
+Reorganización completa del código y creación de la versión 3 del programa.
+
+\subsection*{3. Integración Polars (Dic 2025)}
+\begin{itemize}
+	\item Nuevo módulo Lector con Polars para lectura eficiente de .gz
+	\item data\_extractor\_2.py con paralelización
+	\item Integración de Ovito para cálculos de coordinación
+\end{itemize}
+
+\subsection*{4. Refactorización CARBOXI (Mar 2026)}
+\begin{itemize}
+	\item Máquina de estados para control de flujo
+	\item Configuración externalizada (config.toml)
+	\item Análisis de clusters
+	\item Pipeline completo de detección de ondas
+	\item Soporte para nuevo formato LAMMPS
+	\item Convertidor de formatos legacy
+\end{itemize}
+
+\subsection*{5. Empaquetamiento y Cluster (Mar 2026)}
+\begin{itemize}
+	\item CARBOXI como paquete instalable (pyproject.toml + setuptools)
+	\item Soporte headless con Xvfb para ovito
+	\item Fix GLIBC conflict (conda vs sistema)
+	\item Simplificación: eliminar método taylor y código muerto (-242 líneas)
+	\item Config unificado: un solo config.toml en cluster/ (fuente única)
+	\item Filtro erosión: comparación CM inter-timestep + filtro por CM z del cluster
+	\item Fix gaps: tracking acumulativo de IDs erosionadas (18/18 simulaciones con 0 gaps)
+\end{itemize}
+
+\end{document}

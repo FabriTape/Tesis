@@ -39,10 +39,10 @@ from plots import plot_comparison, plot_summary_table
 # Parámetros físicos (extraer de la simulación)
 BED_HEIGHT_FF_015 = 9.99989e-5
 BED_HEIGHT_FF_035 = 9.99999e-5
-RADIO_UM = 0.7602  ## Mas un 0.025% para que me tome las vibraciones
+RADIO_UM = 0.7603  ## Mas un 0.03% para que me tome las vibraciones
 RADIO_M = RADIO_UM * 1e-6
 CUTOFF = RADIO_M * 2
-TOLERANCIA_V_CM = 1e-6
+TOLERANCIA_V_CM = 1e-4
 
 _COLUMNS = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]
 
@@ -151,17 +151,13 @@ def run_simulation(
                     pipeline=pipeline_filter,
                 )
             elif use_dv:
-                df = filter_func(
-                    lf, bed_height, max_height, prev_dump, TOLERANCIA_V_CM
-                )
+                df = filter_func(lf, bed_height, max_height, prev_dump, TOLERANCIA_V_CM)
             else:
                 df = filter_func(lf, bed_height, max_height)
 
             # Tracking acumulativo
             if tracking and not df.is_empty() and "type" in df.columns:
-                current_eroded = set(
-                    df.filter(pl.col("type") != 2)["id"].to_list()
-                )
+                current_eroded = set(df.filter(pl.col("type") != 2)["id"].to_list())
                 eroded_ids.update(current_eroded)
 
                 current_ids = set(df["id"].to_list())

@@ -10,7 +10,6 @@ bed_height = altura cruda de la cama (sin margen)
 max_height = bed_height + margen (para filtro CM del cluster)
 """
 
-
 import polars as pl
 from numpy import empty as np_empty
 from ovito.data import DataCollection, SimulationCell  # type: ignore[import-untyped]
@@ -101,7 +100,7 @@ def filter_F1I(
     Returns:
         DataFrame con partículas sobre la cama.
     """
-    return lf.filter(pl.col("z") > bed_height).collect()
+    return lf.filter(pl.col("z") > max_height).collect()
 
 
 def filter_F2I(
@@ -131,9 +130,7 @@ def filter_F2I(
     if df.is_empty():
         return df
 
-    return df.filter(
-        (pl.col("type") != 2) & (pl.col("vz") > 0) | (pl.col("type") == 2)
-    )
+    return df.filter((pl.col("type") != 2) & (pl.col("vz") > 0) | (pl.col("type") == 2))
 
 
 def filter_F3I(
@@ -164,9 +161,7 @@ def filter_F3I(
         return df
 
     # Post-filtro vz > 0 para bed particles
-    df = df.filter(
-        ((pl.col("type") != 2) & (pl.col("vz") > 0)) | (pl.col("type") == 2)
-    )
+    df = df.filter(((pl.col("type") != 2) & (pl.col("vz") > 0)) | (pl.col("type") == 2))
 
     if prev_dump is None or df.is_empty():
         return df
@@ -191,13 +186,19 @@ def filter_F3I(
             (pl.col("vx") - pl.col("vx_prev")) ** 2
             + (pl.col("vy") - pl.col("vy_prev")) ** 2
             + (pl.col("vz") - pl.col("vz_prev")) ** 2
-        ).sqrt().alias("delta_v")
+        )
+        .sqrt()
+        .alias("delta_v")
     )
 
     filtered_bed = merged.filter(pl.col("delta_v") < tol)
     filtered_bed = filtered_bed.drop(["vx_prev", "vy_prev", "vz_prev", "delta_v"])
 
-    return pl.concat([filtered_bed, proj], how="diagonal") if not proj.is_empty() else filtered_bed
+    return (
+        pl.concat([filtered_bed, proj], how="diagonal")
+        if not proj.is_empty()
+        else filtered_bed
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -300,27 +301,35 @@ def filter_F3C(
     if bed.is_empty():
         return pl.DataFrame()
 
+    prev = prev_dump.select(["id", "vx", "vy", "vz"]).rename(
+        {"vx": "vx_old", "vy": "vy_old", "vz": "vz_old"}
+    )
+    merged = bed.join(prev, on="id", how="inner")
+
+    if merged.is_empty():
+        return pl.DataFrame()
+
+    # 2. Calcular los promedios reales para el cluster
     cluster_delta_v = (
-        bed.with_columns(pl.col("id").is_in(prev_ids).alias("in_prev"))
-        .group_by("cluster")
+        merged.group_by("cluster")
         .agg(
-            pl.col("vx").filter(pl.col("in_prev")).mean().alias("vx_prev"),
-            pl.col("vy").filter(pl.col("in_prev")).mean().alias("vy_prev"),
-            pl.col("vz").filter(pl.col("in_prev")).mean().alias("vz_prev"),
+            pl.col("vx_old").mean().alias("vx_prev"),
+            pl.col("vy_old").mean().alias("vy_prev"),
+            pl.col("vz_old").mean().alias("vz_prev"),
             pl.col("vx").mean().alias("vx_curr"),
             pl.col("vy").mean().alias("vy_curr"),
             pl.col("vz").mean().alias("vz_curr"),
-            pl.col("in_prev").sum().alias("n_prev"),
         )
-        .filter(pl.col("n_prev") > 0)
         .with_columns(
             (
                 (pl.col("vx_curr") - pl.col("vx_prev")) ** 2
                 + (pl.col("vy_curr") - pl.col("vy_prev")) ** 2
                 + (pl.col("vz_curr") - pl.col("vz_prev")) ** 2
-            ).sqrt().alias("delta_v_cm")
+            )
+            .sqrt()
+            .alias("delta_v_cm")
         )
-        .filter(pl.col("delta_v_cm") < tol)
+        .filter(pl.col("delta_v_cm") <= tol)
     )
 
     valid_clusters = cluster_delta_v["cluster"].to_list()
