@@ -112,17 +112,19 @@ def extract_config_names(csv_names: list[str]) -> list[str]:
         csv_names: Lista de stems de CSVs.
 
     Returns:
-        Lista de nombres de configuraciones únicas.
+        Lista de nombres de configuraciones únicas (con prefijo F).
     """
     configs = set()
     for name in csv_names:
-        match = re.search(r"_F([123][IC])$", name)
+        match = re.search(r"_(F[123][IC])$", name)
         if match:
             configs.add(match.group(1))
     return sorted(configs)
 
 
-def load_csv(results_dir: Path, subdir: str, sim_name: str, config: str) -> pl.DataFrame | None:
+def load_csv(
+    results_dir: Path, subdir: str, sim_name: str, config: str
+) -> pl.DataFrame | None:
     """Carga un CSV de resultados.
 
     Args:
@@ -191,7 +193,7 @@ def main() -> None:
     st.title("Comparación de Filtros de Erosión")
 
     # --- Selector de directorio ---
-    default_dir = str(Path(__file__).parent / "resultados")
+    default_dir = str(Path(__file__).parent / "resultados" / "v3(F3C arreglado)")
     results_path = st.sidebar.text_input(
         "Directorio de resultados",
         value=default_dir,
@@ -367,7 +369,9 @@ def main() -> None:
 
             # Fluctuaciones
             fluct = sum(
-                1 for j in range(1, len(n_bed_list)) if n_bed_list[j] < n_bed_list[j - 1]
+                1
+                for j in range(1, len(n_bed_list))
+                if n_bed_list[j] < n_bed_list[j - 1]
             )
 
             summary_data.append(
