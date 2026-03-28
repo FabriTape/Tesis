@@ -50,57 +50,43 @@ LINESTYLES = {
 def discover_results(results_dir: Path) -> dict[str, list[str]]:
     """Descubre subdirectorios y sus CSVs disponibles.
 
+    Maneja dos niveles de anidación:
+    - Nivel 1: resultados/subdir/*.csv
+    - Nivel 2: resultados/subdir/subsubdir/*.csv
+
+    Las claves del dict son rutas RELATIVAS al directorio seleccionado.
+
     Args:
         results_dir: Directorio raíz de resultados.
 
     Returns:
-        Dict con clave = nombre subdir, valor = lista de nombres de CSV.
+        Dict con clave = ruta relativa, valor = lista de nombres de CSV.
     """
     result: dict[str, list[str]] = {}
     if not results_dir.exists():
         return result
 
     for d in sorted(results_dir.iterdir()):
-        if d.is_dir():
-            csvs = [f.stem for f in sorted(d.glob("*.csv"))]
-            if csvs:
-                result[d.name] = csvs
+        if not d.is_dir():
+            continue
+
+        # Nivel 1: CSVs directamente en el subdirectorio
+        csvs = [f.stem for f in sorted(d.glob("*.csv"))]
+        if csvs:
+            # Clave = nombre relativo al directorio padre
+            key = d.relative_to(results_dir).as_posix()
+            result[key] = csvs
+            continue
+
+        # Nivel 2: buscar CSVs en sub-subdirectorios
+        for dd in sorted(d.iterdir()):
+            if dd.is_dir():
+                csvs = [f.stem for f in sorted(dd.glob("*.csv"))]
+                if csvs:
+                    key = dd.relative_to(results_dir).as_posix()
+                    result[key] = csvs
 
     return result
-
-
-def extract_sim_names(csv_names: list[str]) -> list[str]:
-    """Extrae nombres únicos de simulaciones de los CSVs.
-
-    Args:
-        csv_names: Lista de stems de CSVs.
-
-    Returns:
-        Lista de nombres de simulaciones únicas.
-    """
-    sims = set()
-    for name in csv_names:
-        # Quitar el sufijo _F1I, _F1C, etc.
-        sim = re.sub(r"_F[123][IC]$", "", name)
-        sims.add(sim)
-    return sorted(sims)
-
-
-def extract_config_names(csv_names: list[str]) -> list[str]:
-    """Extrae nombres únicos de configuraciones de los CSVs.
-
-    Args:
-        csv_names: Lista de stems de CSVs.
-
-    Returns:
-        Lista de nombres de configuraciones únicas.
-    """
-    configs = set()
-    for name in csv_names:
-        match = re.search(r"_F([123][IC])$", name)
-        if match:
-            configs.add(match.group(1))
-    return sorted(configs)
 
 
 def load_csv(results_dir: Path, subdir: str, sim_name: str, config: str) -> pl.DataFrame | None:
@@ -108,7 +94,7 @@ def load_csv(results_dir: Path, subdir: str, sim_name: str, config: str) -> pl.D
 
     Args:
         results_dir: Directorio raíz.
-        subdir: Subdirectorio (ej: "0r_no_tracking").
+        subdir: Ruta relativa (ej: "0r_no_tracking" o "v3/0r_tracking").
         sim_name: Nombre de simulación.
         config: Nombre de configuración (ej: "F1C").
 
