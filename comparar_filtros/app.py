@@ -89,6 +89,39 @@ def discover_results(results_dir: Path) -> dict[str, list[str]]:
     return result
 
 
+def extract_sim_names(csv_names: list[str]) -> list[str]:
+    """Extrae nombres únicos de simulaciones de los CSVs.
+
+    Args:
+        csv_names: Lista de stems de CSVs.
+
+    Returns:
+        Lista de nombres de simulaciones únicas.
+    """
+    sims = set()
+    for name in csv_names:
+        sim = re.sub(r"_F[123][IC]$", "", name)
+        sims.add(sim)
+    return sorted(sims)
+
+
+def extract_config_names(csv_names: list[str]) -> list[str]:
+    """Extrae nombres únicos de configuraciones de los CSVs.
+
+    Args:
+        csv_names: Lista de stems de CSVs.
+
+    Returns:
+        Lista de nombres de configuraciones únicas.
+    """
+    configs = set()
+    for name in csv_names:
+        match = re.search(r"_F([123][IC])$", name)
+        if match:
+            configs.add(match.group(1))
+    return sorted(configs)
+
+
 def load_csv(results_dir: Path, subdir: str, sim_name: str, config: str) -> pl.DataFrame | None:
     """Carga un CSV de resultados.
 
