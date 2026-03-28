@@ -39,7 +39,7 @@ from plots import plot_comparison, plot_summary_table
 # Parámetros físicos (extraer de la simulación)
 BED_HEIGHT_FF_015 = 9.99989e-5
 BED_HEIGHT_FF_035 = 9.99999e-5
-RADIO_UM = 0.7601551  ## Mas un 0.02% para que me tome las vibraciones
+RADIO_UM = 0.7602  ## Mas un 0.025% para que me tome las vibraciones
 RADIO_M = RADIO_UM * 1e-6
 CUTOFF = RADIO_M * 2
 TOLERANCIA_V_CM = 1e-6
@@ -60,16 +60,15 @@ FILTER_FUNCS = {
 CLUSTER_CONFIGS = {"F1C", "F2C", "F3C"}
 
 
-def _detect_bed_height(sim_dir: Path) -> float:
+def _detect_bed_height(sim_dir: Path, radios: int = 5) -> tuple[float, float]:
     """Detecta la altura de la cama según el nombre de la carpeta.
-
-    Aplica margen de 5 radios sobre la altura cruda.
 
     Args:
         sim_dir: Directorio de la simulación.
+        radios: Número de radios de margen sobre la cama cruda.
 
     Returns:
-        Altura de la cama con margen [m].
+        Tupla (bed_height crudo, max_height con margen).
     """
     name = sim_dir.name
     if "ff_0.15" in name:
@@ -78,24 +77,34 @@ def _detect_bed_height(sim_dir: Path) -> float:
         base = BED_HEIGHT_FF_035
     else:
         base = BED_HEIGHT_FF_015
-    return base + 2 * RADIO_M
+    return base, base + radios * RADIO_M
 
 
-def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
+def run_simulation(
+    sim_dir: Path,
+    output_dir: Path,
+    image_dir: Path,
+    radios: int = 5,
+    tracking: bool = False,
+) -> None:
     """Ejecuta las 6 configuraciones sobre una simulación.
 
     Args:
         sim_dir: Directorio con los dumps.
         output_dir: Directorio para CSVs.
         image_dir: Directorio para plots.
+        radios: Número de radios de margen sobre la cama cruda.
+        tracking: Si True, aplica tracking acumulativo de IDs.
     """
     sim_name = sim_dir.name
     print(f"\n  Simulación: {sim_name}")
 
-    bed_height = _detect_bed_height(sim_dir)
+    bed_height, max_height = _detect_bed_height(sim_dir, radios)
     dump_files = list_dump_files(sim_dir)
     print(f"  Dumps encontrados: {len(dump_files)}")
     print(f"  bed_height: {bed_height * 1e6:.3f} µm")
+    print(f"  max_height: {max_height * 1e6:.3f} µm (margen: {radios} radios)")
+    print(f"  tracking: {tracking}")
 
     if not dump_files:
         print("  Sin dumps. Saltando...")
@@ -123,32 +132,51 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
         metrics_list: list[dict] = []
         results_list: list[pl.DataFrame] = []
         prev_dump: pl.DataFrame | None = None
+        eroded_ids: set[int] = set()
 
         for i, dump_file in enumerate(dump_files):
             if i % 10 == 0:
                 print(f"    step {i}/{len(dump_files)}")
 
             lf = read_dump(dump_file, _COLUMNS)
+            df_raw = lf.collect()
 
             if use_cluster:
                 df = filter_func(
                     lf,
                     bed_height,
+                    max_height,
                     prev_dump=prev_dump,
                     tol=TOLERANCIA_V_CM,
                     pipeline=pipeline_filter,
                 )
             elif use_dv:
-                df = filter_func(lf, bed_height, prev_dump, TOLERANCIA_V_CM)
+                df = filter_func(
+                    lf, bed_height, max_height, prev_dump, TOLERANCIA_V_CM
+                )
             else:
-                df = filter_func(lf, bed_height)
+                df = filter_func(lf, bed_height, max_height)
+
+            # Tracking acumulativo
+            if tracking and not df.is_empty() and "type" in df.columns:
+                current_eroded = set(
+                    df.filter(pl.col("type") != 2)["id"].to_list()
+                )
+                eroded_ids.update(current_eroded)
+
+                current_ids = set(df["id"].to_list())
+                raw_ids = set(df_raw["id"].to_list())
+                missing = (eroded_ids & raw_ids) - current_ids
+
+                if missing:
+                    additional = df_raw.filter(pl.col("id").is_in(missing))
+                    df = pl.concat([df, additional], how="diagonal_relaxed")
 
             df = df.with_columns(i=pl.lit(i, dtype=pl.Int64))
             metrics_list.append(compute_metrics(df, i, pipeline=pipeline_metrics))
             results_list.append(df)
 
             # Guardar dump actual para filtros con Δv
-            df_raw = lf.collect()
             prev_dump = df_raw.select(["id", "vx", "vy", "vz"])
 
         # Concatenar resultados
@@ -201,24 +229,42 @@ def run_simulation(sim_dir: Path, output_dir: Path, image_dir: Path) -> None:
 
 
 def main() -> None:
-    """Punto de entrada del comparador de filtros."""
-    if len(sys.argv) > 1:
-        base_dir = Path(sys.argv[1])
-    else:
-        base_dir = Path(__file__).parent
+    """Punto de entrada del comparador de filtros.
+
+    Uso:
+        python main.py [radios] [tracking] [tol] [output_subdir]
+
+    Args de línea de comandos:
+        radios: Número de radios de margen (default: 5)
+        tracking: "on" o "off" (default: off)
+        tol: Tolerancia Δv (default: 1e-11)
+        output_subdir: Subdirectorio de salida (default: "")
+    """
+    radios = int(sys.argv[1]) if len(sys.argv) > 1 else 5
+    tracking = sys.argv[2].lower() == "on" if len(sys.argv) > 2 else False
+    tol = float(sys.argv[3]) if len(sys.argv) > 3 else 1e-11
+    subdir = sys.argv[4] if len(sys.argv) > 4 else ""
+
+    # Actualizar tolerancia global
+    global TOLERANCIA_V_CM
+    TOLERANCIA_V_CM = tol
+
+    base_dir = Path(__file__).parent
 
     sim_dir = base_dir / "simulaciones"
-    output_dir = base_dir / "resultados"
-    image_dir = base_dir / "Imagenes"
+    output_dir = base_dir / "resultados" / subdir if subdir else base_dir / "resultados"
+    image_dir = base_dir / "Imagenes" / subdir if subdir else base_dir / "Imagenes"
 
-    output_dir.mkdir(exist_ok=True)
-    image_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    image_dir.mkdir(parents=True, exist_ok=True)
 
     sim_dirs = sorted([d for d in sim_dir.iterdir() if d.is_dir()])
     print(f"  Encontradas {len(sim_dirs)} simulaciones en {sim_dir}")
+    print(f"  Radios: {radios}, Tracking: {tracking}, Tol: {tol}")
+    print(f"  Salida: {output_dir}")
 
     for sim_d in sim_dirs:
-        run_simulation(sim_d, output_dir, image_dir)
+        run_simulation(sim_d, output_dir, image_dir, radios=radios, tracking=tracking)
 
     print("\n  Comparación completada.")
 
