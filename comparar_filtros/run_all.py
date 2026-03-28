@@ -30,7 +30,7 @@ def main() -> None:
         print(f"{'=' * 60}")
 
         result = subprocess.run(
-            [PYTHON, str(BASE_DIR / "main.py"), str(radios), tracking, "1e-11", name],
+            [PYTHON, str(BASE_DIR / "main.py"), str(radios), tracking, "1e-6", name],
             cwd=str(BASE_DIR),
         )
 

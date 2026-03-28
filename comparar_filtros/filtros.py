@@ -85,8 +85,8 @@ def filter_F1I(
     lf: pl.LazyFrame,
     bed_height: float,
     max_height: float,
+    tol: float,
     prev_dump: pl.DataFrame | None = None,
-    tol: float = 0.0,
 ) -> pl.DataFrame:
     """F1I: z > bed_height (individual).
 
@@ -107,8 +107,8 @@ def filter_F2I(
     lf: pl.LazyFrame,
     bed_height: float,
     max_height: float,
+    tol: float,
     prev_dump: pl.DataFrame | None = None,
-    tol: float = 0.0,
 ) -> pl.DataFrame:
     """F2I: z > bed_height + post-filtro vz > 0 para bed (individual).
 
@@ -125,25 +125,21 @@ def filter_F2I(
     Returns:
         DataFrame con partículas eyectadas + proyectil.
     """
-    df = lf.filter(pl.col("z") > bed_height).collect()
-
-    if df.is_empty():
-        return df
-
-    return df.filter((pl.col("type") != 2) & (pl.col("vz") > 0) | (pl.col("type") == 2))
+    df = lf.filter((pl.col("z") > bed_height) & (pl.col("vz") > 0)).collect()
+    return df
 
 
 def filter_F3I(
     lf: pl.LazyFrame,
     bed_height: float,
     max_height: float,
+    tol: float,
     prev_dump: pl.DataFrame | None = None,
-    tol: float = 1e-6,
 ) -> pl.DataFrame:
     """F3I: z > bed_height + vz > 0 + |Δv| < tol (individual).
 
     Inicial: z > bed_height (candidatas).
-    Post-filtro: vz > 0 AND |Δv| < tol para bed, proj sin filtro adicional.
+    Post-filtro: vz > 0 AND |Δv| < tol para bed.
 
     Args:
         lf: LazyFrame del dump.
@@ -155,23 +151,18 @@ def filter_F3I(
     Returns:
         DataFrame con partículas balísticas + proyectil.
     """
-    df = lf.filter(pl.col("z") > bed_height).collect()
+    df = lf.filter((pl.col("z") > bed_height) & (pl.col("vz") > 0)).collect()
 
     if df.is_empty():
         return df
-
-    # Post-filtro vz > 0 para bed particles
-    df = df.filter(((pl.col("type") != 2) & (pl.col("vz") > 0)) | (pl.col("type") == 2))
 
     if prev_dump is None or df.is_empty():
         return df
 
     # Post-filtro Δv para bed particles
-    bed = df.filter(pl.col("type") != 2)
-    proj = df.filter(pl.col("type") == 2)
-
+    bed = df
     if bed.is_empty():
-        return proj if not proj.is_empty() else pl.DataFrame()
+        return pl.DataFrame()
 
     prev = prev_dump.select(["id", "vx", "vy", "vz"]).rename(
         {"vx": "vx_prev", "vy": "vy_prev", "vz": "vz_prev"}
@@ -179,7 +170,7 @@ def filter_F3I(
     merged = bed.join(prev, on="id", how="inner")
 
     if merged.is_empty():
-        return proj if not proj.is_empty() else pl.DataFrame()
+        return pl.DataFrame()
 
     merged = merged.with_columns(
         (
@@ -194,11 +185,7 @@ def filter_F3I(
     filtered_bed = merged.filter(pl.col("delta_v") < tol)
     filtered_bed = filtered_bed.drop(["vx_prev", "vy_prev", "vz_prev", "delta_v"])
 
-    return (
-        pl.concat([filtered_bed, proj], how="diagonal")
-        if not proj.is_empty()
-        else filtered_bed
-    )
+    return filtered_bed
 
 
 # ---------------------------------------------------------------------------
@@ -210,8 +197,8 @@ def filter_F1C(
     lf: pl.LazyFrame,
     bed_height: float,
     max_height: float,
+    tol: float,
     prev_dump: pl.DataFrame | None = None,
-    tol: float = 0.0,
     pipeline: Pipeline | None = None,
 ) -> pl.DataFrame:
     """F1C: z > bed_height → Ovito → z_cm > max_height (cluster).
@@ -239,8 +226,8 @@ def filter_F2C(
     lf: pl.LazyFrame,
     bed_height: float,
     max_height: float,
+    tol: float,
     prev_dump: pl.DataFrame | None = None,
-    tol: float = 0.0,
     pipeline: Pipeline | None = None,
 ) -> pl.DataFrame:
     """F2C: z > bed_height → Ovito → z_cm > max_height AND vz_cm > 0 (cluster).
@@ -268,49 +255,35 @@ def filter_F3C(
     lf: pl.LazyFrame,
     bed_height: float,
     max_height: float,
+    tol: float,
     prev_dump: pl.DataFrame | None = None,
-    tol: float = 1e-6,
     pipeline: Pipeline | None = None,
 ) -> pl.DataFrame:
-    """F3C: z > bed_height → Ovito → z_cm > max_height AND vz_cm > 0 AND |Δv_cm| < tol.
-
-    Args:
-        lf: LazyFrame del dump.
-        bed_height: Altura de la cama cruda [m] (filtro inicial).
-        max_height: Umbral CM del cluster [m].
-        prev_dump: Dump anterior con columnas ["id", "vx", "vy", "vz"].
-        tol: Tolerancia de |Δv_cm| [m/s].
-        pipeline: Pipeline de Ovito.
-
-    Returns:
-        DataFrame con clusters balísticos.
-    """
     df = lf.filter(pl.col("z") > bed_height).collect()
 
     if pipeline is None or df.is_empty():
         return df
 
+    # Filtro de Ovito
     df = _apply_cluster_filter(df, pipeline, max_height, require_vz=True)
 
     if prev_dump is None or df.is_empty():
         return df
 
-    prev_ids = set(prev_dump["id"].to_list())
-    bed = df.filter(pl.col("type") != 2)
-
-    if bed.is_empty():
-        return pl.DataFrame()
-
+    # 1. YA NO FILTRAMOS type != 2. El proyectil pasa.
+    # Preparamos las velocidades del dump anterior
     prev = prev_dump.select(["id", "vx", "vy", "vz"]).rename(
         {"vx": "vx_old", "vy": "vy_old", "vz": "vz_old"}
     )
-    merged = bed.join(prev, on="id", how="inner")
+
+    # 2. Cruce duro (inner join) de los IDs que sobrevivieron
+    merged = df.join(prev, on="id", how="inner")
 
     if merged.is_empty():
         return pl.DataFrame()
 
-    # 2. Calcular los promedios reales para el cluster
-    cluster_delta_v = (
+    # 3. Cálculo directo del CM con la data unida
+    cm_data = (
         merged.group_by("cluster")
         .agg(
             pl.col("vx_old").mean().alias("vx_prev"),
@@ -329,10 +302,17 @@ def filter_F3C(
             .sqrt()
             .alias("delta_v_cm")
         )
-        .filter(pl.col("delta_v_cm") <= tol)
     )
 
-    valid_clusters = cluster_delta_v["cluster"].to_list()
+    # ==========================================
+    # ZONA DE DEBUG: ESTO SE IMPRIME EN TU TERMINAL
+    # ==========================================
+    # print(f"\n[DEBUG F3C] Tolerancia actual: {tol}")
+    # print(cm_data.select(["cluster", "delta_v_cm"]))
+    # ==========================================
+
+    # 4. Ahora sí, aplicamos tu filtro de tolerancia
+    valid_clusters = cm_data.filter(pl.col("delta_v_cm") < tol)["cluster"].to_list()
 
     if valid_clusters:
         return df.filter(pl.col("cluster").is_in(valid_clusters))

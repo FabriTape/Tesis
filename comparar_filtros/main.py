@@ -151,13 +151,13 @@ def run_simulation(
                     pipeline=pipeline_filter,
                 )
             elif use_dv:
-                df = filter_func(lf, bed_height, max_height, prev_dump, TOLERANCIA_V_CM)
+                df = filter_func(lf, bed_height, max_height, TOLERANCIA_V_CM, prev_dump)
             else:
-                df = filter_func(lf, bed_height, max_height)
+                df = filter_func(lf, bed_height, max_height, TOLERANCIA_V_CM)
 
             # Tracking acumulativo
             if tracking and not df.is_empty() and "type" in df.columns:
-                current_eroded = set(df.filter(pl.col("type") != 2)["id"].to_list())
+                current_eroded = set(df["id"].to_list())
                 eroded_ids.update(current_eroded)
 
                 current_ids = set(df["id"].to_list())
@@ -238,7 +238,7 @@ def main() -> None:
     """
     radios = int(sys.argv[1]) if len(sys.argv) > 1 else 5
     tracking = sys.argv[2].lower() == "on" if len(sys.argv) > 2 else False
-    tol = float(sys.argv[3]) if len(sys.argv) > 3 else 1e-11
+    tol = float(sys.argv[3]) if len(sys.argv) > 3 else 1e-6
     subdir = sys.argv[4] if len(sys.argv) > 4 else ""
 
     # Actualizar tolerancia global
