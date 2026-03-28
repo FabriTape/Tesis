@@ -125,7 +125,7 @@ def filter_F2I(
     Returns:
         DataFrame con partículas eyectadas + proyectil.
     """
-    df = lf.filter((pl.col("z") > bed_height) & (pl.col("vz") > 0)).collect()
+    df = lf.filter((pl.col("z") > max_height) & (pl.col("vz") > 0)).collect()
     return df
 
 
@@ -151,7 +151,7 @@ def filter_F3I(
     Returns:
         DataFrame con partículas balísticas + proyectil.
     """
-    df = lf.filter((pl.col("z") > bed_height) & (pl.col("vz") > 0)).collect()
+    df = lf.filter((pl.col("z") > max_height) & (pl.col("vz") > 0)).collect()
 
     if df.is_empty():
         return df
