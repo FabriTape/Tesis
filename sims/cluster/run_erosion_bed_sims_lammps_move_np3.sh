@@ -37,7 +37,7 @@ Fills=${FILLS[@]}
 Vels=${VELS[@]}
 Angles=${ANGLES[@]}
 Moves=${MOVES[@]}
-OUTDIR="${BASE_DIR}/Buffer/sims_SI_erosion_bed_100um_ff_${Fills// /_}_vel_${Vels// /_}_move_${Moves// /_}_NP_${NP}_angle_${Angles// /_}cores_${CORES}"
+OUTDIR="${BASE_DIR}/Buffer/sims_SI_erosion_bed_100um_ff_${Fills// /_}_vel_${Vels// /_}_move_${Moves// /_}_NP_${NP}_angle_${Angles// /_}_cores_${CORES}"
 COUNTER=0
 
 mkdir -p "$OUTDIR"
