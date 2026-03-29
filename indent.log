@@ -1,7 +1,7 @@
 INFO:  latexindent version 3.24.4, 2024-07-18, a script to indent .tex files
        latexindent lives here: /usr/share/texlive/texmf-dist/scripts/latexindent/
-       Fri Mar 27 00:51:40 2026
-       Filename: /home/tutturuu/Documentos/Universidad/Tesis/errores_timeline.tex
+       Sat Mar 28 21:25:53 2026
+       Filename: /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.tex
 INFO:  Processing switches:
        -s|--silent: Silent mode active (you have used either -s or --silent)
        -w|--overwrite: Overwrite mode active, will make a back up before overwriting
@@ -14,18 +14,26 @@ INFO:  YAML reading settings
        latexindent.pl didn't find indentconfig.yaml or .indentconfig.yaml
        see all possible locations: https://latexindentpl.readthedocs.io/en/latest/sec-appendices.html#indentconfig-options)
 INFO:  Backup procedure (-w flag active):
-       /home/tutturuu/Documentos/Universidad/Tesis/errores_timeline.bak0 already exists, incrementing by 1 (see maxNumberOfBackUps)
-       /home/tutturuu/Documentos/Universidad/Tesis/errores_timeline.bak1 already exists, incrementing by 1 (see maxNumberOfBackUps)
-       /home/tutturuu/Documentos/Universidad/Tesis/errores_timeline.bak2 already exists, incrementing by 1 (see maxNumberOfBackUps)
-       /home/tutturuu/Documentos/Universidad/Tesis/errores_timeline.bak3 already exists, incrementing by 1 (see maxNumberOfBackUps)
-       Backing up /home/tutturuu/Documentos/Universidad/Tesis/errores_timeline.tex to /home/tutturuu/Documentos/Universidad/Tesis/errores_timeline.bak4...
-       /home/tutturuu/Documentos/Universidad/Tesis/errores_timeline.tex will be overwritten after indentation
+       /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.bak0 already exists, incrementing by 1 (see maxNumberOfBackUps)
+       /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.bak1 already exists, incrementing by 1 (see maxNumberOfBackUps)
+       /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.bak2 already exists, incrementing by 1 (see maxNumberOfBackUps)
+       /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.bak3 already exists, incrementing by 1 (see maxNumberOfBackUps)
+       /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.bak4 already exists, incrementing by 1 (see maxNumberOfBackUps)
+       /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.bak5 already exists, incrementing by 1 (see maxNumberOfBackUps)
+       /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.bak6 already exists, incrementing by 1 (see maxNumberOfBackUps)
+       /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.bak7 already exists, incrementing by 1 (see maxNumberOfBackUps)
+       /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.bak8 already exists, incrementing by 1 (see maxNumberOfBackUps)
+       /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.bak9 already exists, incrementing by 1 (see maxNumberOfBackUps)
+       /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.bak10 already exists, incrementing by 1 (see maxNumberOfBackUps)
+       /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.bak11 already exists, incrementing by 1 (see maxNumberOfBackUps)
+       Backing up /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.tex to /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.bak12...
+       /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.tex will be overwritten after indentation
 INFO:  Phase 1: searching for objects
 INFO:  Phase 2: finding surrounding indentation
 INFO:  Phase 3: indenting objects
 INFO:  Phase 4: final indentation check
 INFO:  Output routine:
-       Overwriting file /home/tutturuu/Documentos/Universidad/Tesis/errores_timeline.tex
+       Overwriting file /home/tutturuu/Documentos/Universidad/Tesis/linea_temporal.tex
        --------------
 INFO:  Please direct all communication/issues to:
         https://github.com/cmhughes/latexindent.pl

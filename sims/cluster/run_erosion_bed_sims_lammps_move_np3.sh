@@ -33,7 +33,11 @@ done
 
 # Configuración MPI
 MPIRUN="mpirun --allow-run-as-root -np $CORES ${BASE_DIR}/$EXE"
-OUTDIR="${BASE_DIR}/Buffer/sims_SI_erosion_bed_100um_ff_${FILLS// /_}_vel_${VELS// /_}_move_${MOVES// /_}_NP_${NP}_cores_${CORES}"
+Fills=${FILLS[@]}
+Vels=${VELS[@]}
+Angles=${ANGLES[@]}
+Moves=${MOVES[@]}
+OUTDIR="${BASE_DIR}/Buffer/sims_SI_erosion_bed_100um_ff_${Fills// /_}_vel_${Vels// /_}_move_${Moves// /_}_NP_${NP}_angle_${Angles// /_}cores_${CORES}"
 COUNTER=0
 
 mkdir -p "$OUTDIR"
@@ -107,20 +111,6 @@ echo "  Simulaciones completadas."
 echo "  Ejecutando análisis..."
 echo "========================================"
 
-# Display virtual para ovito (headless)
-# Limpieza de lock files previos y restauración de LD_LIBRARY_PATH
-# (conda corrompe glibc, Xvfb necesita el del sistema)
-killall Xvfb 2>/dev/null
-rm -f /tmp/.X99-lock /tmp/.X11-unix/X99
-export LD_LIBRARY_PATH="$ORIGINAL_LDLIB"
-export DISPLAY=:99
-Xvfb :99 -screen 0 1024x768x24 &
-XVFB_PID=$!
-sleep 2
-
 # CARBOXI editable install funciona desde el home
 cd ~
 $PY311 -m CARBOXI "$OUTDIR"
-
-# Limpieza del display virtual
-kill $XVFB_PID 2>/dev/null
