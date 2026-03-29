@@ -103,14 +103,3 @@ do
 	done
 	COUNTER=0
 done
-
-# Análisis automático al terminar todas las simulaciones
-echo ""
-echo "========================================"
-echo "  Simulaciones completadas."
-echo "  Ejecutando análisis..."
-echo "========================================"
-
-# CARBOXI editable install funciona desde el home
-cd ~
-$PY311 -m CARBOXI "$OUTDIR"

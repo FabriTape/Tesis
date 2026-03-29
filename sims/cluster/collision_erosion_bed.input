@@ -113,7 +113,7 @@ velocity sphere set 0.0 0.0 ${velocity} units box
 thermo ${nthermo}
 thermo_modify lost warn
 
-dump 1 all custom ${ndumps} output.*.gz id type x y z vx vy vz fz
+dump 1 all custom ${ndumps} output.*.gz id type x y z vx vy vz 
 
 # ==========================================================
 # TRAMPA: congela partículas que escapan de la cama
