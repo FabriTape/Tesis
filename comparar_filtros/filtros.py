@@ -22,6 +22,7 @@ from ovito.pipeline import Pipeline, StaticSource  # type: ignore[import-untyped
 _COLUMNS = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]
 
 CONFIG_NAMES = ["F1I", "F1C", "F2I", "F2C", "F3I", "F3C"]
+_FREEZE_HEIGHT = 1e-4
 
 
 def build_ovito_pipeline(cutoff: float) -> Pipeline:
@@ -125,7 +126,9 @@ def filter_F2I(
     Returns:
         DataFrame con partículas eyectadas + proyectil.
     """
-    df = lf.filter((pl.col("z") > max_height) & (pl.col("vz") > 0)).collect()
+    df = lf.filter(
+        (pl.col("z") > max_height) & (pl.col("vz") > 0) | (pl.col("z") > _FREEZE_HEIGHT)
+    ).collect()
     return df
 
 
@@ -151,18 +154,12 @@ def filter_F3I(
     Returns:
         DataFrame con partículas balísticas + proyectil.
     """
-    df = lf.filter((pl.col("z") > max_height) & (pl.col("vz") > 0)).collect()
+    bed = lf.filter(
+        (pl.col("z") > max_height) & (pl.col("vz") > 0) | (pl.col("z") > _FREEZE_HEIGHT)
+    ).collect()
 
-    if df.is_empty():
-        return df
-
-    if prev_dump is None or df.is_empty():
-        return df
-
-    # Post-filtro Δv para bed particles
-    bed = df
-    if bed.is_empty():
-        return pl.DataFrame()
+    if prev_dump is None or bed.is_empty():
+        return bed
 
     prev = prev_dump.select(["id", "vx", "vy", "vz"]).rename(
         {"vx": "vx_prev", "vy": "vy_prev", "vz": "vz_prev"}
@@ -182,7 +179,9 @@ def filter_F3I(
         .alias("delta_v")
     )
 
-    filtered_bed = merged.filter(pl.col("delta_v") < tol)
+    filtered_bed = merged.filter(
+        (pl.col("delta_v") < tol) | (pl.col("z") > _FREEZE_HEIGHT)
+    )
     filtered_bed = filtered_bed.drop(["vx_prev", "vy_prev", "vz_prev", "delta_v"])
 
     return filtered_bed
@@ -243,7 +242,9 @@ def filter_F2C(
     Returns:
         DataFrame con clusters eyectados.
     """
-    df = lf.filter(pl.col("z") > bed_height).collect()
+    df = lf.filter(
+        (pl.col("z") > bed_height) | (pl.col("z") > _FREEZE_HEIGHT)
+    ).collect()
 
     if pipeline is None or df.is_empty():
         return df
@@ -259,7 +260,9 @@ def filter_F3C(
     prev_dump: pl.DataFrame | None = None,
     pipeline: Pipeline | None = None,
 ) -> pl.DataFrame:
-    df = lf.filter(pl.col("z") > bed_height).collect()
+    df = lf.filter(
+        (pl.col("z") > bed_height) | (pl.col("z") > _FREEZE_HEIGHT)
+    ).collect()
 
     if pipeline is None or df.is_empty():
         return df
@@ -292,6 +295,7 @@ def filter_F3C(
             pl.col("vx").mean().alias("vx_curr"),
             pl.col("vy").mean().alias("vy_curr"),
             pl.col("vz").mean().alias("vz_curr"),
+            pl.col("z").mean().alias("z_cm"),
         )
         .with_columns(
             (
@@ -312,7 +316,9 @@ def filter_F3C(
     # ==========================================
 
     # 4. Ahora sí, aplicamos tu filtro de tolerancia
-    valid_clusters = cm_data.filter(pl.col("delta_v_cm") < tol)["cluster"].to_list()
+    valid_clusters = cm_data.filter(
+        (pl.col("delta_v_cm") < tol) | (pl.col("z_cm") > _FREEZE_HEIGHT)
+    )["cluster"].to_list()
 
     if valid_clusters:
         return df.filter(pl.col("cluster").is_in(valid_clusters))
@@ -354,7 +360,7 @@ def _apply_cluster_filter(
 
     mask = pl.col("z_cm") > max_height
     if require_vz:
-        mask = mask & (pl.col("vz_cm") > 0)
+        mask = mask & (pl.col("vz_cm") > 0) | (pl.col("z_cm") > _FREEZE_HEIGHT)
 
     valid = cluster_cm.filter(mask)["cluster"].to_list()
 

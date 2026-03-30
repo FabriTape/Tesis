@@ -41,7 +41,7 @@ def list_dump_files(directory: Path) -> list[Path]:
         Lista de rutas ordenadas por timestep.
     """
     files = list(directory.glob("output.*.gz"))
-    files.sort(key=lambda p: _extract_timestep(p.name))
+    files.sort(key=lambda p: _extract_timestep(p.name), reverse=True)
     return files
 
 
