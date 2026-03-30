@@ -88,6 +88,8 @@ def filter_F1I(
     max_height: float,
     tol: float,
     prev_dump: pl.DataFrame | None = None,
+    pipeline: Pipeline | None = None,
+    eroded_ids: list = [],
 ) -> pl.DataFrame:
     """F1I: z > bed_height (individual).
 
@@ -101,7 +103,10 @@ def filter_F1I(
     Returns:
         DataFrame con partículas sobre la cama.
     """
-    return lf.filter(pl.col("z") > max_height).collect()
+    mask = pl.col("z") > bed_height
+    if eroded_ids:
+        mask = mask & (pl.col("id").is_in(eroded_ids))
+    return lf.filter(mask).collect()
 
 
 def filter_F2I(
@@ -110,6 +115,8 @@ def filter_F2I(
     max_height: float,
     tol: float,
     prev_dump: pl.DataFrame | None = None,
+    pipeline: Pipeline | None = None,
+    eroded_ids: list = [],
 ) -> pl.DataFrame:
     """F2I: z > bed_height + post-filtro vz > 0 para bed (individual).
 
@@ -126,10 +133,12 @@ def filter_F2I(
     Returns:
         DataFrame con partículas eyectadas + proyectil.
     """
-    df = lf.filter(
-        (pl.col("z") > max_height) & (pl.col("vz") > 0) | (pl.col("z") > _FREEZE_HEIGHT)
+    mask = pl.col("z") > bed_height
+    if eroded_ids:
+        mask = mask & (pl.col("id").is_in(eroded_ids))
+    return lf.filter(
+        mask & (pl.col("vz") > 0) | (pl.col("z") > _FREEZE_HEIGHT)
     ).collect()
-    return df
 
 
 def filter_F3I(
@@ -138,6 +147,8 @@ def filter_F3I(
     max_height: float,
     tol: float,
     prev_dump: pl.DataFrame | None = None,
+    pipeline: Pipeline | None = None,
+    eroded_ids: list = [],
 ) -> pl.DataFrame:
     """F3I: z > bed_height + vz > 0 + |Δv| < tol (individual).
 
@@ -154,8 +165,12 @@ def filter_F3I(
     Returns:
         DataFrame con partículas balísticas + proyectil.
     """
+    mask = pl.col("z") > bed_height
+    if eroded_ids:
+        mask = mask & (pl.col("id").is_in(eroded_ids))
+
     bed = lf.filter(
-        (pl.col("z") > max_height) & (pl.col("vz") > 0) | (pl.col("z") > _FREEZE_HEIGHT)
+        mask & (pl.col("vz") > 0) | (pl.col("z") > _FREEZE_HEIGHT)
     ).collect()
 
     if prev_dump is None or bed.is_empty():
@@ -199,6 +214,7 @@ def filter_F1C(
     tol: float,
     prev_dump: pl.DataFrame | None = None,
     pipeline: Pipeline | None = None,
+    eroded_ids: list = [],
 ) -> pl.DataFrame:
     """F1C: z > bed_height → Ovito → z_cm > max_height (cluster).
 
@@ -209,11 +225,15 @@ def filter_F1C(
         prev_dump: No usado.
         tol: No usado.
         pipeline: Pipeline de Ovito.
+        eroded_ids:
 
     Returns:
         DataFrame con clusters sobre max_height.
     """
-    df = lf.filter(pl.col("z") > bed_height).collect()
+    mask = pl.col("z") > bed_height
+    if eroded_ids:
+        mask = mask & (pl.col("id").is_in(eroded_ids))
+    df = lf.filter(mask).collect()
 
     if pipeline is None or df.is_empty():
         return df
@@ -228,6 +248,7 @@ def filter_F2C(
     tol: float,
     prev_dump: pl.DataFrame | None = None,
     pipeline: Pipeline | None = None,
+    eroded_ids: list = [],
 ) -> pl.DataFrame:
     """F2C: z > bed_height → Ovito → z_cm > max_height AND vz_cm > 0 (cluster).
 
@@ -242,9 +263,10 @@ def filter_F2C(
     Returns:
         DataFrame con clusters eyectados.
     """
-    df = lf.filter(
-        (pl.col("z") > bed_height) | (pl.col("z") > _FREEZE_HEIGHT)
-    ).collect()
+    mask = pl.col("z") > bed_height
+    if eroded_ids:
+        mask = mask & (pl.col("id").is_in(eroded_ids))
+    df = lf.filter(mask).collect()
 
     if pipeline is None or df.is_empty():
         return df
@@ -259,10 +281,13 @@ def filter_F3C(
     tol: float,
     prev_dump: pl.DataFrame | None = None,
     pipeline: Pipeline | None = None,
+    eroded_ids: list = [],
 ) -> pl.DataFrame:
-    df = lf.filter(
-        (pl.col("z") > bed_height) | (pl.col("z") > _FREEZE_HEIGHT)
-    ).collect()
+
+    mask = pl.col("z") > bed_height
+    if eroded_ids:
+        mask = mask & (pl.col("id").is_in(eroded_ids))
+    df = lf.filter(mask).collect()
 
     if pipeline is None or df.is_empty():
         return df

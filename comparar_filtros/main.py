@@ -44,7 +44,7 @@ RADIO_M = RADIO_UM * 1e-6
 CUTOFF = RADIO_M * 2
 TOLERANCIA_V_CM = 1e-4
 
-_COLUMNS = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
+_COLUMNS = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]
 
 # Mapeo nombre → función de filtrado
 FILTER_FUNCS = {
@@ -138,17 +138,12 @@ def run_simulation(
             if i % 10 == 0:
                 print(f"    step {i}/{len(dump_files)}")
 
-            # 1. Leemos el archivo UNA SOLA VEZ y lo guardamos en memoria
             lf = read_dump(dump_file, _COLUMNS)
             df_raw = lf.collect()
 
-            # 2. Convertimos el df en memoria a LazyFrame para reciclarlo sin tocar el disco
-            lf_cached = df_raw.lazy()
-
-            # Usamos lf_cached en lugar de lf
             if use_cluster:
                 df = filter_func(
-                    lf_cached,
+                    lf,
                     bed_height,
                     max_height,
                     prev_dump=prev_dump,
@@ -156,29 +151,22 @@ def run_simulation(
                     pipeline=pipeline_filter,
                 )
             elif use_dv:
-                df = filter_func(
-                    lf_cached, bed_height, max_height, TOLERANCIA_V_CM, prev_dump
-                )
+                df = filter_func(lf, bed_height, max_height, TOLERANCIA_V_CM, prev_dump)
             else:
-                df = filter_func(lf_cached, bed_height, max_height, TOLERANCIA_V_CM)
+                df = filter_func(lf, bed_height, max_height, TOLERANCIA_V_CM)
 
-            # Tracking acumulativo OPTIMIZADO
+            # Tracking acumulativo
             if tracking and not df.is_empty() and "type" in df.columns:
+                current_eroded = set(df["id"].to_list())
+                eroded_ids.update(current_eroded)
+
                 current_ids = set(df["id"].to_list())
-                eroded_ids.update(current_ids)
+                raw_ids = set(df_raw["id"].to_list())
+                missing = (eroded_ids & raw_ids) - current_ids
 
-                # Extraemos solo los IDs que erosionaron antes pero no están en el frame actual
-                missing_candidates = eroded_ids - current_ids
-
-                if missing_candidates:
-                    # Convertimos a lista (requisito de Polars) y filtramos directo sobre df_raw
-                    # Es rapidísimo y si el ID ya no está en la simulación, simplemente no lo trae.
-                    additional = df_raw.filter(
-                        pl.col("id").is_in(list(missing_candidates))
-                    )
-
-                    if not additional.is_empty():
-                        df = pl.concat([df, additional], how="diagonal_relaxed")
+                if missing:
+                    additional = df_raw.filter(pl.col("id").is_in(missing))
+                    df = pl.concat([df, additional], how="diagonal_relaxed")
 
             df = df.with_columns(i=pl.lit(i, dtype=pl.Int64))
             metrics_list.append(compute_metrics(df, i, pipeline=pipeline_metrics))
