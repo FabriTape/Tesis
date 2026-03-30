@@ -135,6 +135,37 @@ def compute_gaps_per_step(df: pl.DataFrame) -> list[dict]:
     return result
 
 
+def compute_gaps_per_step_raw(df: pl.DataFrame) -> list[dict]:
+    """Calcula gaps POR step (no acumulados).
+
+    Para cada step, cuenta cuántos IDs NO están presentes en el step siguiente
+    (IDs que desaparecieron hacia adelante).
+
+    Args:
+        df: DataFrame concatenado de todos los steps con columna "i".
+
+    Returns:
+        Lista de dicts con "step" y "gaps".
+    """
+    bed = df.filter(pl.col("type") != 2)
+    if bed.is_empty():
+        return []
+
+    max_step = bed["i"].max()
+    result = []
+
+    for step in range(max_step + 1):
+        step_ids = set(bed.filter(pl.col("i") == step)["id"].to_list())
+        if step < max_step:
+            next_ids = set(bed.filter(pl.col("i") == step + 1)["id"].to_list())
+            gaps = len(step_ids - next_ids)
+        else:
+            gaps = 0
+        result.append({"step": step, "gaps": gaps})
+
+    return result
+
+
 def compute_gaps(df: pl.DataFrame) -> int:
     """Cuenta partículas con gaps (entran y salen entre steps).
 

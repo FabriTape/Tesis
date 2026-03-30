@@ -8,8 +8,10 @@ import matplotlib.pyplot as plt
 def plot_comparison(
     all_metrics: dict[str, list[dict]],
     all_gaps: dict[str, list[dict]],
-    sim_name: str,
-    output_dir: Path,
+    all_gaps_raw: dict[str, list[dict]] | None = None,
+    sim_name: str = "",
+    output_dir: Path | None = None,
+    title_suffix: str = "",
 ) -> None:
     """Genera plots comparativos de las 6 configuraciones de filtro.
 
@@ -18,9 +20,14 @@ def plot_comparison(
             y valor = lista de métricas por step.
         all_gaps: Dict con clave = nombre config y valor = lista de gaps
             acumulados por step.
+        all_gaps_raw: Dict con clave = nombre config y valor = lista de gaps
+            por step (no acumulados).
         sim_name: Nombre de la simulación (para título).
         output_dir: Directorio de salida para los SVG.
+        title_suffix: Sufijo para el título del plot.
     """
+    if output_dir is None:
+        return
     colors = {
         "F1I": "#e74c3c",
         "F1C": "#e74c3c",
@@ -29,10 +36,17 @@ def plot_comparison(
         "F3I": "#2ecc71",
         "F3C": "#2ecc71",
     }
-    linestyles = {"F1I": "-", "F1C": "--", "F2I": "-", "F2C": "--", "F3I": "-", "F3C": "--"}
+    linestyles = {
+        "F1I": "-",
+        "F1C": "--",
+        "F2I": "-",
+        "F2C": "--",
+        "F3I": "-",
+        "F3C": "--",
+    }
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-    fig.suptitle(f"Comparación de filtros — {sim_name}", fontsize=14)
+    fig.suptitle(f"Comparación de filtros — {sim_name} — {title_suffix}", fontsize=14)
 
     # Plot 1: n_bed vs step
     ax = axes[0, 0]
@@ -93,11 +107,35 @@ def plot_comparison(
     ax.legend(fontsize=8, ncol=2)
     ax.grid(alpha=0.3)
 
-    # Plot 4: vacío (placeholder)
-    axes[1, 1].axis("off")
+    # Plot 4: gaps por step (no acumulados)
+    ax = axes[1, 1]
+    if all_gaps_raw:
+        for config, gaps_data in all_gaps_raw.items():
+            if not gaps_data:
+                continue
+            steps = [g["step"] for g in gaps_data]
+            gaps = [g["gaps"] for g in gaps_data]
+            ax.plot(
+                steps,
+                gaps,
+                label=config,
+                color=colors.get(config, "gray"),
+                linestyle=linestyles.get(config, "-"),
+                linewidth=1.5,
+            )
+        ax.set_xlabel("Step")
+        ax.set_ylabel("Gaps por step")
+        ax.set_title("IDs que desaparecen hacia el siguiente step")
+        ax.legend(fontsize=8, ncol=2)
+        ax.grid(alpha=0.3)
+    else:
+        ax.axis("off")
+        ax.text(0.5, 0.5, "Sin datos de gaps por step", ha="center", va="center")
 
     plt.tight_layout()
-    output_path = output_dir / f"comparacion_{sim_name}.svg"
+    output_path = (
+        output_dir / f"comparacion_{sim_name}_{title_suffix.replace(' ', '_')}.svg"
+    )
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  Plot guardado: {output_path}")
@@ -107,6 +145,7 @@ def plot_summary_table(
     summaries: dict[str, dict],
     sim_name: str,
     output_dir: Path,
+    title_suffix: str = "",
 ) -> None:
     """Genera una tabla resumen en formato SVG.
 
@@ -119,13 +158,15 @@ def plot_summary_table(
     data = []
     for c in configs:
         s = summaries[c]
-        data.append([
-            c,
-            str(s.get("n_ids", 0)),
-            str(s.get("gaps", 0)),
-            str(s.get("fluct", 0)),
-            str(s.get("n_clusters_final", 0)),
-        ])
+        data.append(
+            [
+                c,
+                str(s.get("n_ids", 0)),
+                str(s.get("gaps", 0)),
+                str(s.get("fluct", 0)),
+                str(s.get("n_clusters_final", 0)),
+            ]
+        )
 
     fig, ax = plt.subplots(figsize=(10, 4))
     ax.axis("off")
@@ -140,10 +181,12 @@ def plot_summary_table(
     table.set_fontsize(10)
     table.scale(1.2, 1.5)
 
-    ax.set_title(f"Resumen — {sim_name}", fontsize=14, pad=20)
+    ax.set_title(f"Resumen — {sim_name} — {title_suffix}", fontsize=14, pad=20)
 
     plt.tight_layout()
-    output_path = output_dir / f"tabla_resumen_{sim_name}.svg"
+    output_path = (
+        output_dir / f"tabla_resumen_{sim_name}_{title_suffix.replace(' ', '_')}.svg"
+    )
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  Tabla guardada: {output_path}")

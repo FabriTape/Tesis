@@ -32,6 +32,7 @@ from metricas import (
     build_cluster_pipeline,
     compute_gaps,
     compute_gaps_per_step,
+    compute_gaps_per_step_raw,
     compute_metrics,
 )
 from plots import plot_comparison, plot_summary_table
@@ -44,7 +45,7 @@ RADIO_M = RADIO_UM * 1e-6
 CUTOFF = RADIO_M * 2
 TOLERANCIA_V_CM = 1e-4
 
-_COLUMNS = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]
+_COLUMNS = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 
 # Mapeo nombre → función de filtrado
 FILTER_FUNCS = {
@@ -85,7 +86,6 @@ def run_simulation(
     output_dir: Path,
     image_dir: Path,
     radios: int = 5,
-    tracking: bool = False,
 ) -> None:
     """Ejecuta las 6 configuraciones sobre una simulación.
 
@@ -104,7 +104,6 @@ def run_simulation(
     print(f"  Dumps encontrados: {len(dump_files)}")
     print(f"  bed_height: {bed_height * 1e6:.3f} µm")
     print(f"  max_height: {max_height * 1e6:.3f} µm (margen: {radios} radios)")
-    print(f"  tracking: {tracking}")
 
     if not dump_files:
         print("  Sin dumps. Saltando...")
@@ -121,18 +120,19 @@ def run_simulation(
     # Resultados por config
     all_metrics: dict[str, list[dict]] = {}
     all_gaps: dict[str, list[dict]] = {}
+    all_gaps_raw: dict[str, list[dict]] = {}
     all_results: dict[str, list[pl.DataFrame]] = {}
-
+    all_metrics_tracking: dict[str, list[dict]] = {}
+    all_results_tracking: dict[str, list[pl.DataFrame]] = {}
+    all_gaps_tracking: dict[str, list[dict]] = {}
+    all_gaps_raw_tracking: dict[str, list[dict]] = {}
     for config_name in CONFIG_NAMES:
         print(f"\n  Procesando {config_name}...")
         filter_func = FILTER_FUNCS[config_name]
-        use_cluster = config_name in CLUSTER_CONFIGS
-        use_dv = config_name in {"F3I", "F3C"}
 
         metrics_list: list[dict] = []
         results_list: list[pl.DataFrame] = []
         prev_dump: pl.DataFrame | None = None
-        eroded_ids: set[int] = set()
 
         for i, dump_file in enumerate(dump_files):
             if i % 10 == 0:
@@ -140,35 +140,20 @@ def run_simulation(
 
             lf = read_dump(dump_file, _COLUMNS)
             df_raw = lf.collect()
-
-            if use_cluster:
-                df = filter_func(
-                    lf,
-                    bed_height,
-                    max_height,
-                    prev_dump=prev_dump,
-                    tol=TOLERANCIA_V_CM,
-                    pipeline=pipeline_filter,
-                )
-            elif use_dv:
-                df = filter_func(lf, bed_height, max_height, TOLERANCIA_V_CM, prev_dump)
+            df = filter_func(
+                lf,
+                bed_height,
+                max_height,
+                prev_dump=prev_dump,
+                tol=TOLERANCIA_V_CM,
+                pipeline=pipeline_filter,
+            )
+            if not df.is_empty():
+                df = df.with_columns(i=pl.lit(i, dtype=pl.Int64))
             else:
-                df = filter_func(lf, bed_height, max_height, TOLERANCIA_V_CM)
-
-            # Tracking acumulativo
-            if tracking and not df.is_empty() and "type" in df.columns:
-                current_eroded = set(df["id"].to_list())
-                eroded_ids.update(current_eroded)
-
-                current_ids = set(df["id"].to_list())
-                raw_ids = set(df_raw["id"].to_list())
-                missing = (eroded_ids & raw_ids) - current_ids
-
-                if missing:
-                    additional = df_raw.filter(pl.col("id").is_in(missing))
-                    df = pl.concat([df, additional], how="diagonal_relaxed")
-
-            df = df.with_columns(i=pl.lit(i, dtype=pl.Int64))
+                df = pl.DataFrame().with_columns(
+                    i=pl.lit(i, dtype=pl.Int64), id=pl.lit(None, dtype=pl.Int64)
+                )
             metrics_list.append(compute_metrics(df, i, pipeline=pipeline_metrics))
             results_list.append(df)
 
@@ -193,18 +178,85 @@ def run_simulation(
         all_gaps[config_name] = (
             compute_gaps_per_step(df_total) if not df_total.is_empty() else []
         )
+        all_gaps_raw[config_name] = (
+            compute_gaps_per_step_raw(df_total) if not df_total.is_empty() else []
+        )
 
         # Guardar CSV
-        csv_path = output_dir / f"{sim_name}_{config_name}.csv"
+        csv_path = output_dir / f"{sim_name}_{config_name}_sin_tracking.csv"
         if not df_total.is_empty():
             df_total.write_csv(csv_path)
         print(
             f"    → IDs: {metrics_list[-1]['n_unique_ids']}, gaps: {gaps}, fluct: {fluct}"
         )
 
-    # Generar plots
-    plot_comparison(all_metrics, all_gaps, sim_name, image_dir)
+        final_df = results_list[-1]
+        eroded_ids = final_df["id"].to_list()
+        list_tracking = []
+        metrics_tracking = []
+        for i in range(len(results_list)):
+            if not results_list[i].is_empty():
+                list_tracking.append(
+                    results_list[i].filter(pl.col("id").is_in(eroded_ids))
+                )
+                metrics_tracking.append(
+                    compute_metrics(list_tracking[i], i, pipeline=pipeline_metrics)
+                )
 
+        df_total_tracking = (
+            pl.concat(list_tracking, how="diagonal_relaxed")
+            if list_tracking
+            else pl.DataFrame()
+        )
+
+        gaps_tracking = (
+            compute_gaps(df_total_tracking) if not df_total_tracking.is_empty() else 0
+        )
+
+        fluct_tracking = sum(
+            1
+            for j in range(1, len(metrics_tracking))
+            if metrics_tracking[j]["n_bed"] < metrics_tracking[j - 1]["n_bed"]
+        )
+
+        all_metrics_tracking[config_name] = metrics_tracking
+        all_results_tracking[config_name] = list_tracking
+        all_gaps_tracking[config_name] = (
+            compute_gaps_per_step(df_total_tracking)
+            if not df_total_tracking.is_empty()
+            else []
+        )
+        all_gaps_raw_tracking[config_name] = (
+            compute_gaps_per_step_raw(df_total_tracking)
+            if not df_total_tracking.is_empty()
+            else []
+        )
+
+        # Guardar CSV
+        csv_path = output_dir / f"{sim_name}_{config_name}_con_tracking.csv"
+        if not df_total_tracking.is_empty():
+            df_total_tracking.write_csv(csv_path)
+        print(
+            f"    → IDs: {metrics_tracking[-1]['n_unique_ids']}, gaps: {gaps_tracking}, fluct: {fluct_tracking}"
+        )
+
+    # Generar plots
+    plot_comparison(
+        all_metrics_tracking,
+        all_gaps_tracking,
+        all_gaps_raw_tracking,
+        sim_name,
+        image_dir,
+        "con tracking",
+    )
+    plot_comparison(
+        all_metrics,
+        all_gaps,
+        all_gaps_raw,
+        sim_name,
+        image_dir,
+        "sin tracking",
+    )
     # Tabla resumen
     summaries = {}
     for config_name in CONFIG_NAMES:
@@ -221,7 +273,24 @@ def run_simulation(
             "n_clusters_final": metrics[-1]["n_clusters"],
         }
 
-    plot_summary_table(summaries, sim_name, image_dir)
+    plot_summary_table(summaries, sim_name, image_dir, "sin tracking")
+    # Tabla resumen
+    summaries_tracking = {}
+    for config_name in CONFIG_NAMES:
+        metrics = all_metrics_tracking[config_name]
+        df_total = pl.concat(all_results_tracking[config_name], how="diagonal_relaxed")
+        summaries_tracking[config_name] = {
+            "n_ids": metrics[-1]["n_unique_ids"],
+            "gaps": compute_gaps(df_total),
+            "fluct": sum(
+                1
+                for j in range(1, len(metrics))
+                if metrics[j]["n_bed"] < metrics[j - 1]["n_bed"]
+            ),
+            "n_clusters_final": metrics[-1]["n_clusters"],
+        }
+
+    plot_summary_table(summaries_tracking, sim_name, image_dir, "con tracking")
 
 
 def main() -> None:
@@ -237,9 +306,8 @@ def main() -> None:
         output_subdir: Subdirectorio de salida (default: "")
     """
     radios = int(sys.argv[1]) if len(sys.argv) > 1 else 5
-    tracking = sys.argv[2].lower() == "on" if len(sys.argv) > 2 else False
-    tol = float(sys.argv[3]) if len(sys.argv) > 3 else 1e-6
-    subdir = sys.argv[4] if len(sys.argv) > 4 else ""
+    tol = float(sys.argv[2]) if len(sys.argv) > 3 else 1e-6
+    subdir = sys.argv[3] if len(sys.argv) > 1 else ""
 
     # Actualizar tolerancia global
     global TOLERANCIA_V_CM
@@ -256,11 +324,11 @@ def main() -> None:
 
     sim_dirs = sorted([d for d in sim_dir.iterdir() if d.is_dir()])
     print(f"  Encontradas {len(sim_dirs)} simulaciones en {sim_dir}")
-    print(f"  Radios: {radios}, Tracking: {tracking}, Tol: {tol}")
+    print(f"  Radios: {radios} Tol: {tol}")
     print(f"  Salida: {output_dir}")
 
     for sim_d in sim_dirs:
-        run_simulation(sim_d, output_dir, image_dir, radios=radios, tracking=tracking)
+        run_simulation(sim_d, output_dir, image_dir, radios=radios)
 
     print("\n  Comparación completada.")
 

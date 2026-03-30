@@ -13,24 +13,21 @@ PYTHON = sys.executable
 
 # (nombre_subdir, radios, tracking_on_off)
 CONFIGS = [
-    ("0r_no_tracking", 0, "off"),
-    ("0r_tracking", 0, "on"),
-    ("2r_no_tracking", 2, "off"),
-    ("2r_tracking", 2, "on"),
-    ("5r_no_tracking", 5, "off"),
-    ("5r_tracking", 5, "on"),
+    ("0r", 0),
+    ("2r", 2),
+    ("5r", 5),
 ]
 
 
 def main() -> None:
     """Ejecuta las 6 variaciones."""
-    for name, radios, tracking in CONFIGS:
+    for name, radios in CONFIGS:
         print(f"\n{'=' * 60}")
-        print(f"  {name}: radios={radios}, tracking={tracking}")
+        print(f"  {name}: radios={radios}")
         print(f"{'=' * 60}")
 
         result = subprocess.run(
-            [PYTHON, str(BASE_DIR / "main.py"), str(radios), tracking, "1e-6", name],
+            [PYTHON, str(BASE_DIR / "main.py"), str(radios), "1e-6", name],
             cwd=str(BASE_DIR),
         )
 

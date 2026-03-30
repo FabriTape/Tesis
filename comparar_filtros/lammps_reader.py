@@ -5,7 +5,7 @@ from pathlib import Path
 
 import polars as pl
 
-_ALL_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]
+_ALL_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 
 
 def read_dump(path: Path, columns: list[str] | None = None) -> pl.LazyFrame:

@@ -19,10 +19,10 @@ from ovito.modifiers import (  # type: ignore[import-untyped]
 )
 from ovito.pipeline import Pipeline, StaticSource  # type: ignore[import-untyped]
 
-_COLUMNS = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]
+_COLUMNS = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 
 CONFIG_NAMES = ["F1I", "F1C", "F2I", "F2C", "F3I", "F3C"]
-_FREEZE_HEIGHT = 1e-4
+_FREEZE_HEIGHT = 2.4e-4
 
 
 def build_ovito_pipeline(cutoff: float) -> Pipeline:
@@ -89,7 +89,6 @@ def filter_F1I(
     tol: float,
     prev_dump: pl.DataFrame | None = None,
     pipeline: Pipeline | None = None,
-    eroded_ids: list = [],
 ) -> pl.DataFrame:
     """F1I: z > bed_height (individual).
 
@@ -103,10 +102,7 @@ def filter_F1I(
     Returns:
         DataFrame con partículas sobre la cama.
     """
-    mask = pl.col("z") > bed_height
-    if eroded_ids:
-        mask = mask & (pl.col("id").is_in(eroded_ids))
-    return lf.filter(mask).collect()
+    return lf.filter(pl.col("z") > bed_height).collect()
 
 
 def filter_F2I(
@@ -116,7 +112,6 @@ def filter_F2I(
     tol: float,
     prev_dump: pl.DataFrame | None = None,
     pipeline: Pipeline | None = None,
-    eroded_ids: list = [],
 ) -> pl.DataFrame:
     """F2I: z > bed_height + post-filtro vz > 0 para bed (individual).
 
@@ -133,11 +128,8 @@ def filter_F2I(
     Returns:
         DataFrame con partículas eyectadas + proyectil.
     """
-    mask = pl.col("z") > bed_height
-    if eroded_ids:
-        mask = mask & (pl.col("id").is_in(eroded_ids))
     return lf.filter(
-        mask & (pl.col("vz") > 0) | (pl.col("z") > _FREEZE_HEIGHT)
+        (pl.col("z") > bed_height) & (pl.col("vz") > 0) | (pl.col("z") > _FREEZE_HEIGHT)
     ).collect()
 
 
@@ -148,7 +140,6 @@ def filter_F3I(
     tol: float,
     prev_dump: pl.DataFrame | None = None,
     pipeline: Pipeline | None = None,
-    eroded_ids: list = [],
 ) -> pl.DataFrame:
     """F3I: z > bed_height + vz > 0 + |Δv| < tol (individual).
 
@@ -165,12 +156,8 @@ def filter_F3I(
     Returns:
         DataFrame con partículas balísticas + proyectil.
     """
-    mask = pl.col("z") > bed_height
-    if eroded_ids:
-        mask = mask & (pl.col("id").is_in(eroded_ids))
-
     bed = lf.filter(
-        mask & (pl.col("vz") > 0) | (pl.col("z") > _FREEZE_HEIGHT)
+        (pl.col("z") > bed_height) & (pl.col("vz") > 0) | (pl.col("z") > _FREEZE_HEIGHT)
     ).collect()
 
     if prev_dump is None or bed.is_empty():
@@ -214,7 +201,6 @@ def filter_F1C(
     tol: float,
     prev_dump: pl.DataFrame | None = None,
     pipeline: Pipeline | None = None,
-    eroded_ids: list = [],
 ) -> pl.DataFrame:
     """F1C: z > bed_height → Ovito → z_cm > max_height (cluster).
 
@@ -225,15 +211,12 @@ def filter_F1C(
         prev_dump: No usado.
         tol: No usado.
         pipeline: Pipeline de Ovito.
-        eroded_ids:
 
     Returns:
         DataFrame con clusters sobre max_height.
     """
-    mask = pl.col("z") > bed_height
-    if eroded_ids:
-        mask = mask & (pl.col("id").is_in(eroded_ids))
-    df = lf.filter(mask).collect()
+
+    df = lf.filter(pl.col("z") > bed_height).collect()
 
     if pipeline is None or df.is_empty():
         return df
@@ -248,7 +231,6 @@ def filter_F2C(
     tol: float,
     prev_dump: pl.DataFrame | None = None,
     pipeline: Pipeline | None = None,
-    eroded_ids: list = [],
 ) -> pl.DataFrame:
     """F2C: z > bed_height → Ovito → z_cm > max_height AND vz_cm > 0 (cluster).
 
@@ -263,10 +245,8 @@ def filter_F2C(
     Returns:
         DataFrame con clusters eyectados.
     """
-    mask = pl.col("z") > bed_height
-    if eroded_ids:
-        mask = mask & (pl.col("id").is_in(eroded_ids))
-    df = lf.filter(mask).collect()
+
+    df = lf.filter(pl.col("z") > bed_height).collect()
 
     if pipeline is None or df.is_empty():
         return df
@@ -281,13 +261,9 @@ def filter_F3C(
     tol: float,
     prev_dump: pl.DataFrame | None = None,
     pipeline: Pipeline | None = None,
-    eroded_ids: list = [],
 ) -> pl.DataFrame:
 
-    mask = pl.col("z") > bed_height
-    if eroded_ids:
-        mask = mask & (pl.col("id").is_in(eroded_ids))
-    df = lf.filter(mask).collect()
+    df = lf.filter(pl.col("z") > bed_height).collect()
 
     if pipeline is None or df.is_empty():
         return df
@@ -332,13 +308,6 @@ def filter_F3C(
             .alias("delta_v_cm")
         )
     )
-
-    # ==========================================
-    # ZONA DE DEBUG: ESTO SE IMPRIME EN TU TERMINAL
-    # ==========================================
-    # print(f"\n[DEBUG F3C] Tolerancia actual: {tol}")
-    # print(cm_data.select(["cluster", "delta_v_cm"]))
-    # ==========================================
 
     # 4. Ahora sí, aplicamos tu filtro de tolerancia
     valid_clusters = cm_data.filter(
