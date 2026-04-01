@@ -102,7 +102,7 @@ def filter_F1I(
     Returns:
         DataFrame con partículas sobre la cama.
     """
-    return lf.filter(pl.col("z") > bed_height).collect()
+    return lf.filter(pl.col("z") > max_height).collect()
 
 
 def filter_F2I(
@@ -129,7 +129,7 @@ def filter_F2I(
         DataFrame con partículas eyectadas + proyectil.
     """
     return lf.filter(
-        (pl.col("z") > bed_height) & (pl.col("vz") > 0) | (pl.col("z") > _FREEZE_HEIGHT)
+        (pl.col("z") > max_height) & (pl.col("vz") > 0) | (pl.col("z") > _FREEZE_HEIGHT)
     ).collect()
 
 

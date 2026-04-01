@@ -35,6 +35,7 @@ from metricas import (
     compute_gaps_per_step_raw,
     compute_metrics,
 )
+from ovito.pipeline import Pipeline  # type: ignore[import-untyped]
 from plots import plot_comparison, plot_summary_table
 
 # Parámetros físicos (extraer de la simulación)
@@ -43,7 +44,6 @@ BED_HEIGHT_FF_035 = 9.99999e-5
 RADIO_UM = 0.7603  ## Mas un 0.03% para que me tome las vibraciones
 RADIO_M = RADIO_UM * 1e-6
 CUTOFF = RADIO_M * 2
-TOLERANCIA_V_CM = 1e-4
 
 _COLUMNS = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 
@@ -81,11 +81,172 @@ def _detect_bed_height(sim_dir: Path, radios: int = 5) -> tuple[float, float]:
     return base, base + radios * RADIO_M
 
 
+def _process_config(
+    config_name: str,
+    dump_files: list[Path],
+    bed_height: float,
+    max_height: float,
+    tol: float,
+    pipeline_filter: Pipeline,
+    pipeline_metrics: Pipeline,
+) -> dict:
+    """Procesa una configuración: filtra, calcula métricas y gaps.
+
+    Args:
+        config_name: Nombre de la configuración (F1I, F1C, ...).
+        dump_files: Lista de archivos dump ordenados.
+        bed_height: Altura de la cama cruda [m].
+        max_height: Umbral CM del cluster [m].
+        tol: Tolerancia de |Δv| [m/s].
+        pipeline_filter: Pipeline de Ovito para filtros cluster.
+        pipeline_metrics: Pipeline de Ovito para métricas de clusters.
+
+    Returns:
+        Dict con keys: metrics_list, results_list, df_total, gaps, fluct.
+    """
+    filter_func = FILTER_FUNCS[config_name]
+    use_cluster = config_name in CLUSTER_CONFIGS
+    use_dv = config_name in {"F3I", "F3C"}
+
+    metrics_list: list[dict] = []
+    results_list: list[pl.DataFrame] = []
+    prev_dump: pl.DataFrame | None = None
+
+    for i, dump_file in enumerate(dump_files):
+        if i % 10 == 0:
+            print(f"    step {i}/{len(dump_files)}")
+
+        lf = read_dump(dump_file, _COLUMNS)
+        df_raw = lf.collect()
+        df = filter_func(
+            lf,
+            bed_height,
+            max_height,
+            prev_dump=prev_dump if use_dv else None,
+            tol=tol,
+            pipeline=pipeline_filter,
+        )
+        if not df.is_empty():
+            df = df.with_columns(i=pl.lit(i, dtype=pl.Int64))
+        else:
+            df = pl.DataFrame().with_columns(
+                i=pl.lit(i, dtype=pl.Int64), id=pl.lit(None, dtype=pl.Int64)
+            )
+        metrics_list.append(
+            compute_metrics(df, i, pipeline=pipeline_metrics if use_cluster else None)
+        )
+        results_list.append(df)
+
+        prev_dump = df_raw.select(["id", "vx", "vy", "vz"])
+
+    df_total = (
+        pl.concat(results_list, how="diagonal_relaxed")
+        if results_list
+        else pl.DataFrame()
+    )
+    gaps = compute_gaps(df_total) if not df_total.is_empty() else 0
+    fluct = sum(
+        1
+        for j in range(1, len(metrics_list))
+        if metrics_list[j]["n_bed"] < metrics_list[j - 1]["n_bed"]
+    )
+
+    return {
+        "metrics_list": metrics_list,
+        "results_list": results_list,
+        "df_total": df_total,
+        "gaps": gaps,
+        "fluct": fluct,
+    }
+
+
+def _apply_tracking(
+    results_list: list[pl.DataFrame],
+    pipeline_metrics: Pipeline,
+    use_cluster: bool,
+) -> dict:
+    """Aplica tracking acumulativo sobre resultados filtrados.
+
+    Toma los IDs del último step y filtra todos los steps para
+    mantener solo esas partículas.
+
+    Args:
+        results_list: Lista de DataFrames por step.
+        pipeline_metrics: Pipeline de Ovito para métricas de clusters.
+        use_cluster: Si True, usar Ovito para métricas.
+
+    Returns:
+        Dict con keys: metrics_tracking, list_tracking, df_total, gaps, fluct.
+    """
+    final_df = results_list[-1]
+    eroded_ids = final_df["id"].to_list()
+
+    list_tracking: list[pl.DataFrame] = []
+    metrics_tracking: list[dict] = []
+    for i in range(len(results_list)):
+        if not results_list[i].is_empty():
+            list_tracking.append(results_list[i].filter(pl.col("id").is_in(eroded_ids)))
+            metrics_tracking.append(
+                compute_metrics(
+                    list_tracking[i],
+                    i,
+                    pipeline=pipeline_metrics if use_cluster else None,
+                )
+            )
+
+    df_total = (
+        pl.concat(list_tracking, how="diagonal_relaxed")
+        if list_tracking
+        else pl.DataFrame()
+    )
+    gaps = compute_gaps(df_total) if not df_total.is_empty() else 0
+    fluct = sum(
+        1
+        for j in range(1, len(metrics_tracking))
+        if metrics_tracking[j]["n_bed"] < metrics_tracking[j - 1]["n_bed"]
+    )
+
+    return {
+        "metrics_tracking": metrics_tracking,
+        "list_tracking": list_tracking,
+        "df_total": df_total,
+        "gaps": gaps,
+        "fluct": fluct,
+    }
+
+
+def _build_summary(
+    metrics: list[dict],
+    results: list[pl.DataFrame],
+) -> dict[str, dict]:
+    """Construye tabla resumen para una configuración.
+
+    Args:
+        metrics: Lista de métricas por step.
+        results: Lista de DataFrames por step.
+
+    Returns:
+        Dict con claves de configuración y valores de resumen.
+    """
+    df_total = pl.concat(results, how="diagonal_relaxed")
+    return {
+        "n_ids": metrics[-1]["n_unique_ids"],
+        "gaps": compute_gaps(df_total),
+        "fluct": sum(
+            1
+            for j in range(1, len(metrics))
+            if metrics[j]["n_bed"] < metrics[j - 1]["n_bed"]
+        ),
+        "n_clusters_final": metrics[-1]["n_clusters"],
+    }
+
+
 def run_simulation(
     sim_dir: Path,
     output_dir: Path,
     image_dir: Path,
     radios: int = 5,
+    tol: float = 1e-4,
 ) -> None:
     """Ejecuta las 6 configuraciones sobre una simulación.
 
@@ -94,7 +255,7 @@ def run_simulation(
         output_dir: Directorio para CSVs.
         image_dir: Directorio para plots.
         radios: Número de radios de margen sobre la cama cruda.
-        tracking: Si True, aplica tracking acumulativo de IDs.
+        tol: Tolerancia de |Δv| [m/s].
     """
     sim_name = sim_dir.name
     print(f"\n  Simulación: {sim_name}")
@@ -109,15 +270,9 @@ def run_simulation(
         print("  Sin dumps. Saltando...")
         return
 
-    # Pipelines de Ovito
-    pipeline_filter = build_ovito_pipeline(
-        cutoff=CUTOFF
-    )  # para filtros cluster (con coordinación)
-    pipeline_metrics = build_cluster_pipeline(
-        cutoff=CUTOFF
-    )  # para métricas (solo clusters)
+    pipeline_filter = build_ovito_pipeline(cutoff=CUTOFF)
+    pipeline_metrics = build_cluster_pipeline(cutoff=CUTOFF)
 
-    # Resultados por config
     all_metrics: dict[str, list[dict]] = {}
     all_gaps: dict[str, list[dict]] = {}
     all_gaps_raw: dict[str, list[dict]] = {}
@@ -126,121 +281,67 @@ def run_simulation(
     all_results_tracking: dict[str, list[pl.DataFrame]] = {}
     all_gaps_tracking: dict[str, list[dict]] = {}
     all_gaps_raw_tracking: dict[str, list[dict]] = {}
+
     for config_name in CONFIG_NAMES:
         print(f"\n  Procesando {config_name}...")
-        filter_func = FILTER_FUNCS[config_name]
+        use_cluster = config_name in CLUSTER_CONFIGS
 
-        metrics_list: list[dict] = []
-        results_list: list[pl.DataFrame] = []
-        prev_dump: pl.DataFrame | None = None
-
-        for i, dump_file in enumerate(dump_files):
-            if i % 10 == 0:
-                print(f"    step {i}/{len(dump_files)}")
-
-            lf = read_dump(dump_file, _COLUMNS)
-            df_raw = lf.collect()
-            df = filter_func(
-                lf,
-                bed_height,
-                max_height,
-                prev_dump=prev_dump,
-                tol=TOLERANCIA_V_CM,
-                pipeline=pipeline_filter,
-            )
-            if not df.is_empty():
-                df = df.with_columns(i=pl.lit(i, dtype=pl.Int64))
-            else:
-                df = pl.DataFrame().with_columns(
-                    i=pl.lit(i, dtype=pl.Int64), id=pl.lit(None, dtype=pl.Int64)
-                )
-            metrics_list.append(compute_metrics(df, i, pipeline=pipeline_metrics))
-            results_list.append(df)
-
-            # Guardar dump actual para filtros con Δv
-            prev_dump = df_raw.select(["id", "vx", "vy", "vz"])
-
-        # Concatenar resultados
-        df_total = (
-            pl.concat(results_list, how="diagonal_relaxed")
-            if results_list
-            else pl.DataFrame()
-        )
-        gaps = compute_gaps(df_total) if not df_total.is_empty() else 0
-        fluct = sum(
-            1
-            for j in range(1, len(metrics_list))
-            if metrics_list[j]["n_bed"] < metrics_list[j - 1]["n_bed"]
+        result = _process_config(
+            config_name,
+            dump_files,
+            bed_height,
+            max_height,
+            tol,
+            pipeline_filter,
+            pipeline_metrics,
         )
 
-        all_metrics[config_name] = metrics_list
-        all_results[config_name] = results_list
+        all_metrics[config_name] = result["metrics_list"]
+        all_results[config_name] = result["results_list"]
         all_gaps[config_name] = (
-            compute_gaps_per_step(df_total) if not df_total.is_empty() else []
+            compute_gaps_per_step(result["df_total"])
+            if not result["df_total"].is_empty()
+            else []
         )
         all_gaps_raw[config_name] = (
-            compute_gaps_per_step_raw(df_total) if not df_total.is_empty() else []
+            compute_gaps_per_step_raw(result["df_total"])
+            if not result["df_total"].is_empty()
+            else []
         )
 
-        # Guardar CSV
-        csv_path = output_dir / f"{sim_name}_{config_name}_sin_tracking.csv"
-        if not df_total.is_empty():
-            df_total.write_csv(csv_path)
+        if not result["df_total"].is_empty():
+            csv_path = output_dir / f"{sim_name}_{config_name}_sin_tracking.csv"
+            result["df_total"].write_csv(csv_path)
         print(
-            f"    → IDs: {metrics_list[-1]['n_unique_ids']}, gaps: {gaps}, fluct: {fluct}"
+            f"    → IDs: {result['metrics_list'][-1]['n_unique_ids']}, "
+            f"gaps: {result['gaps']}, fluct: {result['fluct']}"
         )
 
-        final_df = results_list[-1]
-        eroded_ids = final_df["id"].to_list()
-        list_tracking = []
-        metrics_tracking = []
-        for i in range(len(results_list)):
-            if not results_list[i].is_empty():
-                list_tracking.append(
-                    results_list[i].filter(pl.col("id").is_in(eroded_ids))
-                )
-                metrics_tracking.append(
-                    compute_metrics(list_tracking[i], i, pipeline=pipeline_metrics)
-                )
-
-        df_total_tracking = (
-            pl.concat(list_tracking, how="diagonal_relaxed")
-            if list_tracking
-            else pl.DataFrame()
+        tracking = _apply_tracking(
+            result["results_list"], pipeline_metrics, use_cluster
         )
 
-        gaps_tracking = (
-            compute_gaps(df_total_tracking) if not df_total_tracking.is_empty() else 0
-        )
-
-        fluct_tracking = sum(
-            1
-            for j in range(1, len(metrics_tracking))
-            if metrics_tracking[j]["n_bed"] < metrics_tracking[j - 1]["n_bed"]
-        )
-
-        all_metrics_tracking[config_name] = metrics_tracking
-        all_results_tracking[config_name] = list_tracking
+        all_metrics_tracking[config_name] = tracking["metrics_tracking"]
+        all_results_tracking[config_name] = tracking["list_tracking"]
         all_gaps_tracking[config_name] = (
-            compute_gaps_per_step(df_total_tracking)
-            if not df_total_tracking.is_empty()
+            compute_gaps_per_step(tracking["df_total"])
+            if not tracking["df_total"].is_empty()
             else []
         )
         all_gaps_raw_tracking[config_name] = (
-            compute_gaps_per_step_raw(df_total_tracking)
-            if not df_total_tracking.is_empty()
+            compute_gaps_per_step_raw(tracking["df_total"])
+            if not tracking["df_total"].is_empty()
             else []
         )
 
-        # Guardar CSV
-        csv_path = output_dir / f"{sim_name}_{config_name}_con_tracking.csv"
-        if not df_total_tracking.is_empty():
-            df_total_tracking.write_csv(csv_path)
+        if not tracking["df_total"].is_empty():
+            csv_path = output_dir / f"{sim_name}_{config_name}_con_tracking.csv"
+            tracking["df_total"].write_csv(csv_path)
         print(
-            f"    → IDs: {metrics_tracking[-1]['n_unique_ids']}, gaps: {gaps_tracking}, fluct: {fluct_tracking}"
+            f"    → IDs: {tracking['metrics_tracking'][-1]['n_unique_ids']}, "
+            f"gaps: {tracking['gaps']}, fluct: {tracking['fluct']}"
         )
 
-    # Generar plots
     plot_comparison(
         all_metrics_tracking,
         all_gaps_tracking,
@@ -257,39 +358,19 @@ def run_simulation(
         image_dir,
         "sin tracking",
     )
-    # Tabla resumen
+
     summaries = {}
     for config_name in CONFIG_NAMES:
-        metrics = all_metrics[config_name]
-        df_total = pl.concat(all_results[config_name], how="diagonal_relaxed")
-        summaries[config_name] = {
-            "n_ids": metrics[-1]["n_unique_ids"],
-            "gaps": compute_gaps(df_total),
-            "fluct": sum(
-                1
-                for j in range(1, len(metrics))
-                if metrics[j]["n_bed"] < metrics[j - 1]["n_bed"]
-            ),
-            "n_clusters_final": metrics[-1]["n_clusters"],
-        }
-
+        summaries[config_name] = _build_summary(
+            all_metrics[config_name], all_results[config_name]
+        )
     plot_summary_table(summaries, sim_name, image_dir, "sin tracking")
-    # Tabla resumen
+
     summaries_tracking = {}
     for config_name in CONFIG_NAMES:
-        metrics = all_metrics_tracking[config_name]
-        df_total = pl.concat(all_results_tracking[config_name], how="diagonal_relaxed")
-        summaries_tracking[config_name] = {
-            "n_ids": metrics[-1]["n_unique_ids"],
-            "gaps": compute_gaps(df_total),
-            "fluct": sum(
-                1
-                for j in range(1, len(metrics))
-                if metrics[j]["n_bed"] < metrics[j - 1]["n_bed"]
-            ),
-            "n_clusters_final": metrics[-1]["n_clusters"],
-        }
-
+        summaries_tracking[config_name] = _build_summary(
+            all_metrics_tracking[config_name], all_results_tracking[config_name]
+        )
     plot_summary_table(summaries_tracking, sim_name, image_dir, "con tracking")
 
 
@@ -297,21 +378,16 @@ def main() -> None:
     """Punto de entrada del comparador de filtros.
 
     Uso:
-        python main.py [radios] [tracking] [tol] [output_subdir]
+        python main.py [radios] [tol] [output_subdir]
 
     Args de línea de comandos:
         radios: Número de radios de margen (default: 5)
-        tracking: "on" o "off" (default: off)
-        tol: Tolerancia Δv (default: 1e-11)
+        tol: Tolerancia Δv (default: 1e-6)
         output_subdir: Subdirectorio de salida (default: "")
     """
     radios = int(sys.argv[1]) if len(sys.argv) > 1 else 5
-    tol = float(sys.argv[2]) if len(sys.argv) > 3 else 1e-6
-    subdir = sys.argv[3] if len(sys.argv) > 1 else ""
-
-    # Actualizar tolerancia global
-    global TOLERANCIA_V_CM
-    TOLERANCIA_V_CM = tol
+    tol = float(sys.argv[2]) if len(sys.argv) > 2 else 1e-6
+    subdir = sys.argv[3] if len(sys.argv) > 3 else ""
 
     base_dir = Path(__file__).parent
 
@@ -328,7 +404,7 @@ def main() -> None:
     print(f"  Salida: {output_dir}")
 
     for sim_d in sim_dirs:
-        run_simulation(sim_d, output_dir, image_dir, radios=radios)
+        run_simulation(sim_d, output_dir, image_dir, radios=radios, tol=tol)
 
     print("\n  Comparación completada.")
 

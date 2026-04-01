@@ -14,6 +14,7 @@ PYTHON = sys.executable
 # (nombre_subdir, radios, tracking_on_off)
 CONFIGS = [
     ("0r", 0),
+    ("1r", 1),
     ("2r", 2),
     ("5r", 5),
 ]

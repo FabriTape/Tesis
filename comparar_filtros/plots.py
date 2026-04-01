@@ -4,6 +4,9 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+_STEP_TO_US = 1.25
+_AXIS_FONTSIZE = 14
+
 
 def plot_comparison(
     all_metrics: dict[str, list[dict]],
@@ -28,6 +31,7 @@ def plot_comparison(
     """
     if output_dir is None:
         return
+
     colors = {
         "F1I": "#e74c3c",
         "F1C": "#e74c3c",
@@ -46,97 +50,148 @@ def plot_comparison(
     }
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-    fig.suptitle(f"Comparación de filtros — {sim_name} — {title_suffix}", fontsize=14)
+    fig.subplots_adjust(top=0.90, right=0.82, wspace=0.28)
+    fig.suptitle(
+        f"Comparación de filtros — {sim_name.replace('_', ' ')} — {title_suffix.replace('_', ' ')}",
+        fontsize=14,
+    )
 
-    # Plot 1: n_bed vs step
+    # Plot (a): n_bed vs tiempo
     ax = axes[0, 0]
     for config, metrics in all_metrics.items():
-        steps = [m["step"] for m in metrics]
+        time_us = [m["step"] * _STEP_TO_US for m in metrics]
         n_bed = [m["n_bed"] for m in metrics]
         ax.plot(
-            steps,
+            time_us,
             n_bed,
             label=config,
             color=colors.get(config, "gray"),
             linestyle=linestyles.get(config, "-"),
             linewidth=1.5,
         )
-    ax.set_xlabel("Step")
-    ax.set_ylabel("Partículas de cama")
-    ax.set_title("N partículas erosionadas por step")
-    ax.legend(fontsize=8, ncol=2)
+    ax.set_xlabel(r"tiempo [$\mu$s]", fontsize=_AXIS_FONTSIZE)
+    ax.set_ylabel("Y", fontsize=_AXIS_FONTSIZE)
+    ax.tick_params(labelsize=_AXIS_FONTSIZE)
+    ax.text(
+        0.02,
+        0.98,
+        "(a)",
+        transform=ax.transAxes,
+        fontsize=14,
+        fontweight="bold",
+        va="top",
+        ha="left",
+    )
     ax.grid(alpha=0.3)
 
-    # Plot 2: n_clusters vs step
+    # Plot (b): n_clusters vs tiempo
     ax = axes[0, 1]
     for config, metrics in all_metrics.items():
-        steps = [m["step"] for m in metrics]
+        time_us = [m["step"] * _STEP_TO_US for m in metrics]
         n_clusters = [m["n_clusters"] for m in metrics]
         ax.plot(
-            steps,
+            time_us,
             n_clusters,
             label=config,
             color=colors.get(config, "gray"),
             linestyle=linestyles.get(config, "-"),
             linewidth=1.5,
         )
-    ax.set_xlabel("Step")
-    ax.set_ylabel("N clusters")
-    ax.set_title("Número de clusters por step")
-    ax.legend(fontsize=8, ncol=2)
+    ax.set_xlabel(r"tiempo [$\mu$s]", fontsize=_AXIS_FONTSIZE)
+    ax.set_ylabel("N clusters", fontsize=_AXIS_FONTSIZE)
+    ax.tick_params(labelsize=_AXIS_FONTSIZE)
+    ax.text(
+        0.02,
+        0.98,
+        "(b)",
+        transform=ax.transAxes,
+        fontsize=14,
+        fontweight="bold",
+        va="top",
+        ha="left",
+    )
     ax.grid(alpha=0.3)
 
-    # Plot 3: gaps acumulados vs step
+    # Plot (c): gaps acumulados vs tiempo
     ax = axes[1, 0]
     for config, gaps_data in all_gaps.items():
         if not gaps_data:
             continue
-        steps = [g["step"] for g in gaps_data]
+        time_us = [g["step"] * _STEP_TO_US for g in gaps_data]
         gaps = [g["gaps_acumulados"] for g in gaps_data]
         ax.plot(
-            steps,
+            time_us,
             gaps,
             label=config,
             color=colors.get(config, "gray"),
             linestyle=linestyles.get(config, "-"),
             linewidth=1.5,
         )
-    ax.set_xlabel("Step")
-    ax.set_ylabel("Gaps acumulados")
-    ax.set_title("IDs que desaparecen entre steps")
-    ax.legend(fontsize=8, ncol=2)
+    ax.set_xlabel(r"tiempo [$\mu$s]", fontsize=_AXIS_FONTSIZE)
+    ax.set_ylabel("Gaps acumulados", fontsize=_AXIS_FONTSIZE)
+    ax.tick_params(labelsize=_AXIS_FONTSIZE)
+    ax.text(
+        0.02,
+        0.98,
+        "(c)",
+        transform=ax.transAxes,
+        fontsize=14,
+        fontweight="bold",
+        va="top",
+        ha="left",
+    )
     ax.grid(alpha=0.3)
 
-    # Plot 4: gaps por step (no acumulados)
+    # Plot (d): gaps por step vs tiempo
     ax = axes[1, 1]
     if all_gaps_raw:
         for config, gaps_data in all_gaps_raw.items():
             if not gaps_data:
                 continue
-            steps = [g["step"] for g in gaps_data]
+            time_us = [g["step"] * _STEP_TO_US for g in gaps_data]
             gaps = [g["gaps"] for g in gaps_data]
             ax.plot(
-                steps,
+                time_us,
                 gaps,
                 label=config,
                 color=colors.get(config, "gray"),
                 linestyle=linestyles.get(config, "-"),
                 linewidth=1.5,
             )
-        ax.set_xlabel("Step")
-        ax.set_ylabel("Gaps por step")
-        ax.set_title("IDs que desaparecen hacia el siguiente step")
-        ax.legend(fontsize=8, ncol=2)
+        ax.set_xlabel(r"tiempo [$\mu$s]", fontsize=_AXIS_FONTSIZE)
+        ax.set_ylabel("Gaps por step", fontsize=_AXIS_FONTSIZE)
+        ax.tick_params(labelsize=_AXIS_FONTSIZE)
+        ax.text(
+            0.02,
+            0.98,
+            "(d)",
+            transform=ax.transAxes,
+            fontsize=14,
+            fontweight="bold",
+            va="top",
+            ha="left",
+        )
         ax.grid(alpha=0.3)
     else:
         ax.axis("off")
         ax.text(0.5, 0.5, "Sin datos de gaps por step", ha="center", va="center")
 
-    plt.tight_layout()
+    # Leyenda única a la derecha, arriba en dos columnas
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(
+        handles,
+        labels,
+        loc="upper left",
+        bbox_to_anchor=(0.84, 0.92),
+        fontsize=12,
+        ncol=2,
+        frameon=True,
+    )
+
     output_path = (
         output_dir / f"comparacion_{sim_name}_{title_suffix.replace(' ', '_')}.svg"
     )
-    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    plt.savefig(output_path, dpi=250, bbox_inches="tight")
     plt.close()
     print(f"  Plot guardado: {output_path}")
 
