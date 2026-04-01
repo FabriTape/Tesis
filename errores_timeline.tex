@@ -111,6 +111,24 @@
 	\end{tabular}
 \end{table}
 
+\subsection*{2026-03-28/30 -- Refactorización y visualización}
+
+\begin{table}[H]
+	\centering
+	\begin{tabular}{@{}llp{9cm}@{}}
+		\toprule
+		\textbf{Fecha} & \textbf{Commit} & \textbf{Error y Solución}                                                                                                                                                                                                                                                    \\
+		\midrule
+		2026-03-30     & 46c10a8         & \textbf{Refactor main.py:} Función \texttt{run\_simulation()} de 210 líneas hacía todo (filtrado, métricas, tracking, gaps, CSV, plots, tablas). Solución: extracción en \texttt{\_process\_config()}, \texttt{\_apply\_tracking()}, \texttt{\_build\_summary()} (SRP, DRY). \\
+		2026-03-30     & b33a2d9         & \textbf{Cuarto plot faltante:} Solo había 3 subplots (n\_bed, n\_clusters, gaps acumulados). Solución: agregar \texttt{compute\_gaps\_per\_raw()} y cuarto plot de gaps por step (no acumulados).                                                                            \\
+		2026-03-30     & b33a2d9         & \textbf{Ylabel de subplot (d) se superpone con (c):} Espacio insuficiente entre columnas. Solución: agregar \texttt{wspace=0.28} en \texttt{subplots\_adjust()}.                                                                                                             \\
+		2026-03-30     & 6c7a324         & \textbf{Partículas congeladas no incluidas:} El filtro inicial solo capturaba partículas con $z > bed\_height$ sin considerar partículas estáticas. Solución: incluir partículas congeladas en el filtro.                                                                    \\
+		2026-03-30     & c570419         & \textbf{Revert main.py:} La reescritura completa introdujo bugs. Se restauró versión anterior y se aplicaron cambios incrementales.                                                                                                                                          \\
+		2026-03-29     & 974d93c         & \textbf{Estructura de archivos desordenada:} Archivos sueltos en raíz del proyecto. Solución: reorganizar en carpetas lógicas.                                                                                                                                               \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
 \subsection*{2026-03-15 -- Errores de tipos en Parquet}
 
 \begin{table}[H]
@@ -259,6 +277,15 @@
 	\item \textbf{Filtro fz:} Caótico → reemplazado por comparación CM inter-timestep
 	\item \textbf{Gaps:} Partículas oscilan alrededor de max\_height → tracking acumulativo de IDs (18/18 con 0 gaps)
 	\item \textbf{Config unificado:} Dos config.toml con overlap → merge en cluster/config.toml
+\end{itemize}
+
+\subsection*{Comparar Filtros}
+\begin{itemize}[leftmargin=*]
+	\item \textbf{Función monolítica:} \texttt{run\_simulation()} de 210 líneas → dividida en 3 funciones (SRP)
+	\item \textbf{Estado global:} \texttt{global TOLERANCIA\_V\_CM} → parámetro \texttt{tol} en cadena de llamadas
+	\item \textbf{Ovito innecesario:} Se ejecutaba para métricas de filtros individuales → solo en cluster
+	\item \textbf{Ylabel superpuesto:} Subplot (d) tapaba con (c) → \texttt{wspace=0.28}
+	\item \textbf{Partículas congeladas:} No incluidas en filtro inicial → filtro corregido
 \end{itemize}
 
 \subsection*{Data Extractor}
