@@ -1,0 +1,35 @@
+[defaults]
+radio_um = 0.76
+usar_caja = true
+bed_height_ff_015 = 1.0e-4
+bed_height_ff_035 = 1.0e-4
+caja_x = 1.0e-4
+caja_y = 1.0e-4
+freeze_height = 2.4e-4
+
+[analisis_onda]
+v_objetivo = 50.0
+tolerancia_v = 5.0
+np_criticos = [1, 3]
+move_referencia = [0.0, 0.0, 0.0]
+tolerancia_move = 1e-6
+
+[onda]
+umbral_v2_min = 0.0064
+umbral_v2_max = 1.0
+particulas_criticas = 2000
+umbral_techo = 10
+umbral_pared = 10
+
+[filtros]
+umbral_vz_min = 0.0
+umbral_techo_radios = 2.0
+tolerancia_v_cm = 1e-6
+filtro_activo = "F3C"
+
+[jkr]
+factor_cutoff = 2.02
+
+[rutas]
+resultados = "./resultados"
+imagenes = "./resultados/Imagenes"

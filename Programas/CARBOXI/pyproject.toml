@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "carboxi"
+version = "0.1.0"
+description = "Análisis de simulaciones de erosión granular (LAMMPS)"
+requires-python = ">=3.11"
+dependencies = [
+    "polars",
+    "matplotlib",
+    "ovito",
+    "numpy",
+]
+
+[tool.setuptools.packages.find]
+include = ["CARBOXI*"]
