@@ -1,59 +1,68 @@
 """
-Pipeline principal de análisis para CARBOXI.
+Pipeline principal y punto de entrada de CARBOXI.
 
 Orquesta el flujo completo de procesamiento de simulaciones LAMMPS:
-análisis de onda de choque (Fase 1), análisis topológico con OVITO (Fase 2),
-exportación de resultados y generación de gráficos SVG.
+- Análisis de onda de choque (Fase 1)
+- Análisis topológico con OVITO (Fase 2)
+- Exportación de resultados y gráficos SVG
 
 Física: Cada simulación representa un experimento de impacto de un
-proyectil sobre una cama de partículas de sílice. El pipeline extrae
-las partículas eyectadas, sus propiedades topológicas y el instante
-en que se propaga una onda macroscópica en la cama.
+proyectil sobre una cama de partículas de sílice.
 """
 
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import polars as pl
 
-from .analysis.topology import build_ovito_pipeline, run_topology_analysis
-from .analysis.wave import is_critical_simulation, run_wave_scan
-from .config import Config
-from .discovery import discover_simulations
-from .io.lammps_reader import (
+from .config_and_discovery import (
+    Config,
+    browse_for_simulation,
+    discover_simulations,
+    extraer_metadatos,
+    load_config,
+)
+from .erosion_analysis import build_ovito_pipeline, run_topology_analysis
+from .storage_and_viz import (
     get_timestep_interval,
     list_dump_files,
-)
-from .io.result_writer import (
+    plot_erosion,
     save_erosion_results,
     save_no_erosion_flag,
 )
-from .plot import _plot_empty, plot_erosion
-from .utils import extraer_metadatos
+from .wave_analysis import is_critical_simulation, run_wave_scan
 
-# Prefijo estándar de las carpetas de simulación LAMMPS de erosión.
 _SIM_PREFIX: str = "erosion_bed_SI_"
-
-# Zona horaria de Argentina (UTC-3) para timestamps de los resultados.
 _TZ_ARG = timezone(timedelta(hours=-3))
 
 
+def main() -> None:
+    """Punto de entrada principal de CARBOXI."""
+    if len(sys.argv) > 1:
+        base_dir = Path(sys.argv[1]).resolve()
+    else:
+        selected = browse_for_simulation()
+        if not selected:
+            print("No se seleccionó ninguna carpeta. Saliendo.")
+            return
+        base_dir = selected[0].parent if len(selected) == 1 else selected[0].parent
+
+    config = load_config()
+    run_all(base_dir, config)
+
+
 def run_simulation(sim_dir: Path, config: Config) -> None:
-    """Ejecuta el pipeline completo de análisis para una simulación individual.
+    """Ejecuta el pipeline completo para una simulación individual.
 
     Flujo:
     1. Preparación: listar dumps, extraer metadatos, calcular alturas.
     2. Decisión de onda: determinar si aplicar Fase 1.
-    3. Fase 1 (opcional): escaneo rápido de onda de choque.
-    4. Fase 2: análisis topológico con OVITO sobre frames relevantes.
+    3. Fase 1 (opcional): escaneo de onda de choque.
+    4. Fase 2: análisis topológico con OVITO.
     5. Exportación: guarda resultados Parquet y gráfico SVG.
-
-    Args:
-        sim_dir: Directorio de la simulación (nombre comienza con
-            ``erosion_bed_SI_``).
-        config: Configuración completa cargada desde ``config.toml``.
     """
     sim_id = sim_dir.name.removeprefix(_SIM_PREFIX)
     timestamp = datetime.now(_TZ_ARG).strftime("%Y-%m-%d_%H-%M-%S")
@@ -104,7 +113,6 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
             timestamp=timestamp,
             output_dir=config.dir_resultados,
             config=config,
-            filter_name=filter_name,
         )
     else:
         cut_index = len(dump_files)
@@ -119,7 +127,6 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         timestep_interval=timestep_interval,
         tolerancia_v_cm=config.filters.tolerancia_v_cm,
         freeze_height=config.freeze_height,
-        filter_name=filter_name,
     )
 
     filter_thresholds = {
@@ -152,19 +159,16 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         _plot_empty(sim_id, timestamp, config.dir_imagenes, filter_name)
         return
 
+    total_timesteps = len(results) - 1
+
     try:
-        plot_erosion(df_total, sim_id, timestamp, config.dir_imagenes, filter_name)
-    except Exception as exc:  # noqa: BLE001
+        plot_erosion(df_total, sim_id, timestamp, config.dir_imagenes, filter_name, total_timesteps=total_timesteps)
+    except Exception as exc:
         print(f"  Advertencia: no se pudo generar el gráfico: {exc}")
 
 
 def run_all(base_dir: Path, config: Config) -> None:
-    """Procesa todas las simulaciones encontradas en el directorio base.
-
-    Args:
-        base_dir: Directorio que contiene una o varias carpetas de simulación.
-        config: Configuración completa del programa.
-    """
+    """Procesa todas las simulaciones encontradas en el directorio base."""
     config.dir_resultados.mkdir(parents=True, exist_ok=True)
     config.dir_imagenes.mkdir(parents=True, exist_ok=True)
 
@@ -179,20 +183,8 @@ def run_all(base_dir: Path, config: Config) -> None:
     print(f"{'=' * 55}\n")
 
 
-# ---------------------------------------------------------------------------
-# Helpers privados
-# ---------------------------------------------------------------------------
-
-
 def _metadata_valid(metadata: dict[str, str]) -> bool:
-    """Verifica que los metadatos esenciales estén presentes.
-
-    Args:
-        metadata: Diccionario con parámetros extraídos del nombre de carpeta.
-
-    Returns:
-        True si ff, np y vel0 están presentes y no son "N/A".
-    """
+    """Verifica que los metadatos esenciales estén presentes."""
     return (
         metadata.get("ff") != "N/A"
         and metadata.get("np") != "N/A"
@@ -201,15 +193,7 @@ def _metadata_valid(metadata: dict[str, str]) -> bool:
 
 
 def _select_bed_height(metadata: dict[str, str], config: Config) -> float:
-    """Selecciona la altura de la cama según el valor de ff.
-
-    Args:
-        metadata: Diccionario con clave ``"ff"``.
-        config: Configuración con alturas para ff_015 y ff_035.
-
-    Returns:
-        Altura de la cama en metros [m].
-    """
+    """Selecciona la altura de la cama según el valor de ff."""
     ff_value = metadata.get("ff", "N/A")
     if ff_value == "0.15":
         return config.bed_height_ff_015
@@ -220,3 +204,18 @@ def _select_bed_height(metadata: dict[str, str], config: Config) -> float:
             f"  Advertencia: ff={ff_value} no reconocido, usando ff_0.15 por defecto."
         )
         return config.bed_height_ff_015
+
+
+def _plot_empty(
+    sim_id: str,
+    timestamp: str,
+    dir_imagenes: Path,
+    filter_name: str = "F3C",
+) -> None:
+    """Genera un gráfico vacío cuando no hay erosión."""
+    from .storage_and_viz import _plot_empty as plot_empty
+    plot_empty(sim_id, timestamp, dir_imagenes, filter_name)
+
+
+if __name__ == "__main__":
+    main()
