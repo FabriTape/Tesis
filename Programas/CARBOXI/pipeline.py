@@ -30,7 +30,7 @@ from .io.result_writer import (
     save_erosion_results,
     save_no_erosion_flag,
 )
-from .plot import plot_erosion
+from .plot import _plot_empty, plot_erosion
 from .utils import extraer_metadatos
 
 # Prefijo estándar de las carpetas de simulación LAMMPS de erosión.
@@ -145,8 +145,14 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
     )
     print(f"\n  Resultados guardados en: {result_path}")
 
+    df_total = pl.concat(results, how="vertical_relaxed")
+
+    if df_total.is_empty() or df_total.height == 0:
+        print("  Sin datos para graficar. Generando gráfico vacío...")
+        _plot_empty(sim_id, timestamp, config.dir_imagenes, filter_name)
+        return
+
     try:
-        df_total = pl.concat(results, how="vertical_relaxed")
         plot_erosion(df_total, sim_id, timestamp, config.dir_imagenes, filter_name)
     except Exception as exc:  # noqa: BLE001
         print(f"  Advertencia: no se pudo generar el gráfico: {exc}")

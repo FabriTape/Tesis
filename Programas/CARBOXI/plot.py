@@ -326,3 +326,51 @@ def _draw_gaps_per_step(
         fontsize=14, fontweight="bold", va="top", ha="left",
     )
     ax.grid(alpha=0.3)
+
+
+def _plot_empty(
+    sim_id: str,
+    timestamp: str,
+    dir_imagenes: Path,
+    filter_name: str = "F3C",
+    step_to_us: float = _STEP_TO_US,
+) -> None:
+    """Genera un gráfico vacío cuando no hay erosión.
+
+    Args:
+        sim_id: Identificador de la simulación.
+        timestamp: Marca temporal en formato ``"YYYY-MM-DD_HH-MM-SS"``.
+        dir_imagenes: Directorio de destino para el archivo SVG.
+        filter_name: Nombre del filtro de erosión aplicado.
+        step_to_us: Factor de conversión timestep a microsegundos.
+    """
+    dir_imagenes.mkdir(parents=True, exist_ok=True)
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig.subplots_adjust(top=0.90, right=0.82, wspace=0.28)
+    fig.suptitle(
+        f"Erosión — {filter_name} — {sim_id.replace('_', ' ')} (sin datos)",
+        fontsize=14,
+    )
+
+    for ax in axes.flat:
+        ax.set_xlabel(r"tiempo [$\mu$s]", fontsize=_AXIS_FONTSIZE)
+        ax.set_ylabel("0", fontsize=_AXIS_FONTSIZE)
+        ax.tick_params(labelsize=_AXIS_FONTSIZE)
+        ax.grid(alpha=0.3)
+        ax.text(
+            0.5, 0.5, "Sin erosión", transform=ax.transAxes,
+            fontsize=12, ha="center", va="center",
+            color="gray", style="italic",
+        )
+
+    axes[0, 0].set_ylabel("Y", fontsize=_AXIS_FONTSIZE)
+    axes[0, 1].set_ylabel("N clusters", fontsize=_AXIS_FONTSIZE)
+    axes[1, 0].set_ylabel("Gaps acumulados", fontsize=_AXIS_FONTSIZE)
+    axes[1, 1].set_ylabel("Gaps por step", fontsize=_AXIS_FONTSIZE)
+
+    output_path = dir_imagenes / f"plot_{sim_id}_{filter_name}_{timestamp}.svg"
+    plt.savefig(output_path, dpi=250, bbox_inches="tight")
+    plt.close()
+
+    print(f"  Gráfico guardado en: {output_path}")
