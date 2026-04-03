@@ -252,7 +252,7 @@ def _compute_gaps_per_step(df: pl.DataFrame, total_timesteps: int | None = None)
     all_steps = _get_all_timesteps(df, total_timesteps)
     
     return all_steps.join(gaps_per_step, on="i", how="left").fill_null(0).sort("i").with_columns(
-        pl.col("gaps_cum").cumsum().alias("gaps_cum")
+        pl.col("gaps_cum").cast(pl.Int64).cum_sum().alias("gaps_cum")
     )
 
 
