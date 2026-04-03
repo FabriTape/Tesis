@@ -23,7 +23,7 @@ timestep        = 5e-11      # Paso temporal [s]
 # -----------------------------------------------------------------------------
 [sweep]
 fills           = [0.35]
-vels            = [-5]
+vels            = [-10]
 angles          = [0]
 moves           = [-2, 0, 2]
 total_steps     = [2000000]   # Un valor por cada combinación fill×vel×angle
