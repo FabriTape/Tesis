@@ -86,7 +86,13 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         return
 
     bed_height = _select_bed_height(metadata, config)
-    max_height = bed_height + config.filters.umbral_techo_radios * config.radio_m
+    umbral_radios = config.filters.umbral_techo_radios
+    
+    if umbral_radios < 0:
+        max_height = bed_height - abs(umbral_radios) * config.radio_m
+        bed_height = max_height
+    else:
+        max_height = bed_height + umbral_radios * config.radio_m
 
     box_limits = {"x": [0.0, config.caja_x], "y": [0.0, config.caja_y]}
 
