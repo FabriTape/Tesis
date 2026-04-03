@@ -15,7 +15,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
+
 
 
 def read_config(config_path: Path) -> dict:

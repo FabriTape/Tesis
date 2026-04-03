@@ -1,9 +1,0 @@
-Metadata-Version: 2.4
-Name: carboxi
-Version: 0.1.0
-Summary: Análisis de simulaciones de erosión granular (LAMMPS)
-Requires-Python: >=3.11
-Requires-Dist: polars
-Requires-Dist: matplotlib
-Requires-Dist: ovito
-Requires-Dist: numpy

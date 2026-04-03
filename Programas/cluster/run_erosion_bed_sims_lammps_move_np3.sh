@@ -8,12 +8,12 @@
 
 INPUT="collision_erosion_bed.input"
 BASE_DIR=$(pwd)
-ORIGINAL_LDLIB="$LD_LIBRARY_PATH"
-source ~/miniconda/bin/activate tesis_env
-PY311="python"
+#source ~/.venv/bin/activate
+PY311="python3"
 # Cargar configuración centralizada
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 $PY311 ${SCRIPT_DIR}/read_config.py ${SCRIPT_DIR}/config.toml
+#$PY311 ${BASE_DIR}/read_config.py ${BASE_DIR}/config.toml
 source config_vars.sh
 
 # Variables derivadas

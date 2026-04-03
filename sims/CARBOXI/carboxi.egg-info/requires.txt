@@ -1,4 +1,0 @@
-polars
-matplotlib
-ovito
-numpy
