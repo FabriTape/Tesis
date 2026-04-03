@@ -43,12 +43,14 @@ def export_to_dump(df: pl.DataFrame, timestep: int, output_path: Path) -> None:
         str(timestep),
         "ITEM: NUMBER OF ATOMS",
         str(n_atoms),
-        "ITEM: ATOMS id type x y z vx vy vz fx fy fz",
+        "ITEM: ATOMS id type x y z vx vy vz fx fy fz cluster coordinacion",
     ]
     
     for row in df_step.iter_rows():
-        id, type_, x, y, z, vx, vy, vz, fz = row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8]
-        lines.append(f"{id} {type_} {x:.6e} {y:.6e} {z:.6e} {vx:.6e} {vy:.6e} {vz:.6e} {0.0:.6e} {0.0:.6e} {fz:.6e}")
+        id, type_, x, y, z, vx, vy, vz, fz, coord, cluster = row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10]
+        coord_val = coord if coord is not None else 0
+        cluster_val = cluster if cluster is not None else 0
+        lines.append(f"{id} {type_} {x:.6e} {y:.6e} {z:.6e} {vx:.6e} {vy:.6e} {vz:.6e} {0.0:.6e} {0.0:.6e} {fz:.6e} {cluster_val} {coord_val}")
     
     output_path.write_text("\n".join(lines))
 
@@ -68,9 +70,11 @@ def export_to_xyz(df: pl.DataFrame, timestep: int, output_path: Path) -> None:
     ]
     
     for row in df_step.iter_rows():
-        id, type_, x, y, z = row[0], row[1], row[2], row[3], row[4]
+        id, type_, x, y, z, coord, cluster = row[0], row[1], row[2], row[3], row[4], row[9], row[10]
         element = "Si" if type_ == 1 else "C"  # Si = sílice (cama), C = proyectil
-        lines.append(f"{element} {x:.6e} {y:.6e} {z:.6e}")
+        coord_val = coord if coord is not None else 0
+        cluster_val = cluster if cluster is not None else 0
+        lines.append(f"{element} {x:.6e} {y:.6e} {z:.6e} {cluster_val} {coord_val}")
     
     output_path.write_text("\n".join(lines))
 
