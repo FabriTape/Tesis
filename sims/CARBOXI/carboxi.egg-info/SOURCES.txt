@@ -1,6 +1,0 @@
-pyproject.toml
-carboxi.egg-info/PKG-INFO
-carboxi.egg-info/SOURCES.txt
-carboxi.egg-info/dependency_links.txt
-carboxi.egg-info/requires.txt
-carboxi.egg-info/top_level.txt
