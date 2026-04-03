@@ -78,7 +78,8 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
 
     bed_height = _select_bed_height(metadata, config)
     max_height = bed_height + config.filters.umbral_techo_radios * config.radio_m
-
+    if config.filters.umbral_techo_radios < 0:
+        bed_height = max_height
     box_limits = {"x": [0.0, config.caja_x], "y": [0.0, config.caja_y]}
 
     run_wave = is_critical_simulation(metadata, config)
