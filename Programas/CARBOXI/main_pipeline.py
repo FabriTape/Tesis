@@ -165,7 +165,7 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         _plot_empty(sim_id, timestamp, config.dir_imagenes, filter_name)
         return
 
-    total_timesteps = len(results) - 1
+    total_timesteps = df_total["i"].max()
 
     try:
         plot_erosion(df_total, sim_id, timestamp, config.dir_imagenes, filter_name, total_timesteps=total_timesteps)
