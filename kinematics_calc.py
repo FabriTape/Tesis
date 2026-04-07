@@ -126,7 +126,7 @@ def compute_heatmap_data(df: pd.DataFrame, ff: float, vel0: float) -> pd.DataFra
         vel0: Velocidad inicial.
 
     Returns:
-        DataFrame pivot con IDs por posición.
+        DataFrame pivot con IDs por posición, índices y columnas normalizados por 1.52.
     """
     df_filt = filter_by_ff(df, ff)
     df_filt = filter_by_vel0(df_filt, vel0)
@@ -134,4 +134,10 @@ def compute_heatmap_data(df: pd.DataFrame, ff: float, vel0: float) -> pd.DataFra
     df_filt = filter_exclude_erosion(df_filt)
 
     grouped = df_filt.groupby(["posx", "posy"])["id"].nunique().reset_index()
-    return grouped.pivot(index="posy", columns="posx", values="id").fillna(0)
+
+    pivot = grouped.pivot(index="posy", columns="posx", values="id").fillna(0)
+
+    pivot.index = (pivot.index / 1.52).round(2)
+    pivot.columns = (pivot.columns / 1.52).round(2)
+
+    return pivot

@@ -58,8 +58,7 @@ def compute_params_vs_energy(df: pd.DataFrame, ff: float) -> pd.DataFrame:
         if cm_data.empty:
             continue
 
-        ek = 0.5 * (cm_data["avg_vx"]**2 + cm_data["avg_vy"]**2 + cm_data["avg_vz"]**2)
-        km = ek.mean()
+        km = (vel0**2) / 2
 
         # MLE para alpha
         xmin_options = [1, int(raw_sizes.min())]
