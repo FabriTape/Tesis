@@ -26,75 +26,76 @@
 
 \begin{longtable}{@{}llp{10cm}@{}}
 	\toprule
-	\textbf{Fecha} & \textbf{Commit} & \textbf{Descripción}                                                                     \\
+	\textbf{Fecha} & \textbf{Commit} & \textbf{Descripción}                                                                                                  \\
 	\midrule
-	2026-03-30     & 46c10a8         & refactor: mejorar plots (ejes en $\mu$s, leyenda, colores) y refactor main.py (SRP, DRY) \\
-	2026-03-30     & b33a2d9         & feat: agregar cuarto plot de gaps por step (no acumulados)                               \\
-	2026-03-30     & c570419         & revert: reescritura de main.py a versión anterior                                        \\
-	2026-03-30     & 6c7a324         & fix: lógica de filtrado en comparar\_filtros, incluir partículas congeladas              \\
-	2026-03-29     & ce29233         & fix: nombre de función run\_erosion\_bed (faltaba \_)                                    \\
-	2026-03-29     & 974d93c         & refactor: reorganizar estructura de archivos del proyecto                                \\
-	2026-03-29     & bd135fb         & fix: bug en nombres de directorios + eliminar desktop virtual                            \\
-	2026-03-28     & 36bd84c         & docs: agregar commits de Streamlit app al timeline                                       \\
-	2026-03-28     & aff2a04         & save: cambios en filtros.py + resultados v3(F3C arreglado) + SVGs                        \\
-	2026-03-28     & 6b2276b         & fix: extract\_config\_names incluye prefijo F (F1I en vez de 1I)                         \\
-	2026-03-28     & 3202d02         & fix: restaurar extract\_sim/config\_names en app Streamlit                               \\
-	2026-03-28     & 6f75670         & fix: app Streamlit soporta directorios anidados (2 niveles)                              \\
-	2026-03-28     & c40001b         & feat: app Streamlit para comparación visual de filtros                                   \\
-	2026-03-28     & 59a7390         & docs: agregar commits de corrección de filtros al timeline                               \\
-	2026-03-28     & 02127fd         & fix: corrección filtros F3C (join inner antes de agrupar), firma funciones, tracking     \\
-	2026-03-28     & c7903bd         & fix: arreglo de filtro F3C                                                               \\
-	2026-03-28     & e19e52d         & fix: corregir lógica de filtros F2I y F3I                                                \\
-	2026-03-28     & c41885a         & save: resultados completos de 6 variaciones (0r/2r/5r $\times$ tracking/no\_tracking)    \\
-	2026-03-27     & e65376d         & revert: quitar tracking acumulativo (volver a versión base)                              \\
-	2026-03-27     & 36dcb06         & save: resultados con tracking acumulativo (varias configs de tol y radios)               \\
-	2026-03-27     & b83c0ac         & fix: check empty DataFrame before tracking (F3C vacío)                                   \\
-	2026-03-27     & cb33d80         & feat: tracking acumulativo de IDs en las 6 configuraciones                               \\
-	2026-03-27     & e2f85b2         & save: estado actual comparar\_filtros antes de tracking acumulativo                      \\
-	2026-03-27     & 6bc876f         & feat: gaps acumulados por step + tabla con nombre de simulación                          \\
-	2026-03-27     & 3a29151         & docs: actualizar timeline con proyecto comparar\_filtros y errores                       \\
-	2026-03-27     & 7fbc8cd         & fix: handle empty DataFrame in compute\_metrics (F3C returns empty)                      \\
-	2026-03-27     & 8f6c678         & refactor: simplificar F3I y F3C (quitar proyectil y partículas nuevas)                   \\
-	2026-03-27     & 82cc1d5         & feat: ejecutar Ovito en TODOS los filtros para métricas n\_clusters                      \\
-	2026-03-27     & cad8c1d         & refactor: reemplazar métricas z\_cm/vz\_cm por n\_clusters y z\_max                      \\
-	2026-03-26     & 5f3abed         & fix: diagonal\_relaxed + Int64 cast para schema mismatch                                 \\
-	2026-03-26     & 1992457         & fix: agregar margen de 5 radios al filtro z                                              \\
-	2026-03-26     & 5826f4f         & fix: quitar prefijo \_ de parámetros en filtros.py                                       \\
-	2026-03-26     & 3e3ea72         & feat: proyecto comparar\_filtros - 6 configuraciones de filtro de erosión                \\
-	2026-03-26     & 6d09796         & actualizacion de archivos temporales y del filtro de config.toml                         \\
-	2026-03-26     & b8e5412         & fix: usar longtable en ambos archivos .tex + fix neq                                     \\
-	2026-03-26     & e3ecfa6         & docs: actualizar timeline con fix de gaps (tracking acumulativo)                         \\
-	2026-03-26     & 1c44b0b         & feat: tracking acumulativo de IDs erosionadas (fix gaps definitivo)                      \\
-	2026-03-26     & 62590cf         & feat: filtro erosión por CM z del cluster (en vez de z individual)                       \\
-	2026-03-26     & 8406f0e         & error en la lógica de filtrado                                                           \\
-	2026-03-26     & 28546c0         & feat: unificar config.toml como fuente única (cluster + CARBOXI)                         \\
-	2026-03-25     & 85d4c48         & feat: filtro erosión por comparación CM inter-timestep (reemplaza fz)                    \\
-	2026-03-25     & ae631fc         & cambio de parámetros a 7 radios de filtro y umbral de velocidad                          \\
-	2026-03-25     & fd77e27         & cambio de parámetros a 1e-12 en umbral de fz                                             \\
-	2026-03-25     & adcab92         & refactor: eliminar método taylor y código muerto (-242 líneas)                           \\
-	2026-03-25     & ac6d996         & feat: método de erosión configurable + fix Xvfb/LD\_LIBRARY\_PATH                        \\
-	2026-03-25     & 9ede3bc         & feat: agregar Xvfb para soporte headless de ovito en CARBOXI                             \\
-	2026-03-25     & 272950f         & fix: cambiar build backend de hatchling a setuptools (.pth vacío)                        \\
-	2026-03-25     & a85a49d         & Merge PR \#9: CARBOXI como paquete instalable                                            \\
-	2026-03-25     & 1a7f352         & feat: crear \_\_init\_\_.py y pyproject.toml para CARBOXI                                \\
-	2026-03-25     & d3a1b37         & ediciones para lanzar nuevas sims en cluster                                             \\
-	2026-03-23     & 74a8d2e         & feat: recuperar simulaciones históricas y actualizar pipeline a CARBOXI                  \\
-	2026-03-22     & 366cb55         & fix(cluster): corregir sintaxis booleana del if en loop trampa                           \\
-	2026-03-22     & e3aa79d         & fix(cluster): corregir uso de step y defaults proc en collision\_erosion\_bed            \\
-	2026-03-22     & 0bf5145         & fix: detectar halt por comparación de pasos                                              \\
-	2026-03-22     & 5439e8c         & fix: halt solo para simulaciones críticas (vel=-50 y move$\neq$0)                        \\
-	2026-03-22     & 7afdaef         & fix: crear check\_wave antes del loop para evitar uncompute                              \\
-	2026-03-22     & 56dffee         & Edición en la lógica de collision\_erosion\_box.input                                    \\
-	2026-03-22     & 1a528c6         & Ediciones de Gemini                                                                      \\
-	2026-03-21     & 9d756ea         & Ediciones de Python y compatibilidades con miniconda                                     \\
-	2026-03-21     & 23fbeca         & fix: restaurar doble for para desplazamiento X e Y en moves                              \\
-	2026-03-21     & 8c442e9         & Borrado de simulaciones y creación de carpeta legacy                                     \\
-	2026-03-20     & 12d98db         & docs: agregar flujo de trabajo obligatorio + revisar engram                              \\
-	2026-03-20     & e84516a         & feat: distribución de procesadores MPI configurable                                      \\
-	2026-03-20     & 8c4cab3         & feat: centralizar configuración en config.toml + read\_config.py                         \\
-	2026-03-20     & 8b7ae1f         & feat: agregar convert.py para transformar dumps a formato legacy gzip                    \\
-	2026-03-20     & b4e3c9e         & feat: agregar analyze.py para auto-detección de formato LAMMPS                           \\
-	2026-03-20     & 30b49c6         & feat: implementar CARBOXI\_MINI - pipeline de análisis de clusters                       \\
+	2026-03-30     & 46c10a8         & refactor: mejor plots (ejes en $\mu$s, leyenda, colores) y refactor main.py (SRP, DRY)                                \\
+	2026-03-30     & b33a2d9         & feat: agregar cuarto plot de gaps por step (no acumulados)                                                            \\
+	2026-03-30     & c570419         & revert: reescritura de main.py a versión anterior                                                                     \\
+	2026-04-03     & ee92b93         & fix: usar df\_total["i"].max() en vez de len(results)-1 para total\_timesteps (gráfico no llegaba al último timestep) \\
+	2026-03-30     & 6c7a324         & fix: lógica de filtrado en comparar\_filtros, incluir partículas congeladas                                           \\
+	2026-03-29     & ce29233         & fix: nombre de función run\_erosion\_bed (faltaba \_)                                                                 \\
+	2026-03-29     & 974d93c         & refactor: reorganizar estructura de archivos del proyecto                                                             \\
+	2026-03-29     & bd135fb         & fix: bug en nombres de directorios + eliminar desktop virtual                                                         \\
+	2026-03-28     & 36bd84c         & docs: agregar commits de Streamlit app al timeline                                                                    \\
+	2026-03-28     & aff2a04         & save: cambios en filtros.py + resultados v3(F3C arreglado) + SVGs                                                     \\
+	2026-03-28     & 6b2276b         & fix: extract\_config\_names incluye prefijo F (F1I en vez de 1I)                                                      \\
+	2026-03-28     & 3202d02         & fix: restaurar extract\_sim/config\_names en app Streamlit                                                            \\
+	2026-03-28     & 6f75670         & fix: app Streamlit soporta directorios anidados (2 niveles)                                                           \\
+	2026-03-28     & c40001b         & feat: app Streamlit para comparación visual de filtros                                                                \\
+	2026-03-28     & 59a7390         & docs: agregar commits de corrección de filtros al timeline                                                            \\
+	2026-03-28     & 02127fd         & fix: corrección filtros F3C (join inner antes de agrupar), firma funciones, tracking                                  \\
+	2026-03-28     & c7903bd         & fix: arreglo de filtro F3C                                                                                            \\
+	2026-03-28     & e19e52d         & fix: corregir lógica de filtros F2I y F3I                                                                             \\
+	2026-03-28     & c41885a         & save: resultados completos de 6 variaciones (0r/2r/5r $\times$ tracking/no\_tracking)                                 \\
+	2026-03-27     & e65376d         & revert: quitar tracking acumulativo (volver a versión base)                                                           \\
+	2026-03-27     & 36dcb06         & save: resultados con tracking acumulativo (varias configs de tol y radios)                                            \\
+	2026-03-27     & b83c0ac         & fix: check empty DataFrame before tracking (F3C vacío)                                                                \\
+	2026-03-27     & cb33d80         & feat: tracking acumulativo de IDs en las 6 configuraciones                                                            \\
+	2026-03-27     & e2f85b2         & save: estado actual comparar\_filtros antes de tracking acumulativo                                                   \\
+	2026-03-27     & 6bc876f         & feat: gaps acumulados por step + tabla con nombre de simulación                                                       \\
+	2026-03-27     & 3a29151         & docs: actualizar timeline con proyecto comparar\_filtros y errores                                                    \\
+	2026-03-27     & 7fbc8cd         & fix: handle empty DataFrame in compute\_metrics (F3C returns empty)                                                   \\
+	2026-03-27     & 8f6c678         & refactor: simplificar F3I y F3C (quitar proyectil y partículas nuevas)                                                \\
+	2026-03-27     & 82cc1d5         & feat: ejecutar Ovito en TODOS los filtros para métricas n\_clusters                                                   \\
+	2026-03-27     & cad8c1d         & refactor: reemplazar métricas z\_cm/vz\_cm por n\_clusters y z\_max                                                   \\
+	2026-03-26     & 5f3abed         & fix: diagonal\_relaxed + Int64 cast para schema mismatch                                                              \\
+	2026-03-26     & 1992457         & fix: agregar margen de 5 radios al filtro z                                                                           \\
+	2026-03-26     & 5826f4f         & fix: quitar prefijo \_ de parámetros en filtros.py                                                                    \\
+	2026-03-26     & 3e3ea72         & feat: proyecto comparar\_filtros - 6 configuraciones de filtro de erosión                                             \\
+	2026-03-26     & 6d09796         & actualizacion de archivos temporales y del filtro de config.toml                                                      \\
+	2026-03-26     & b8e5412         & fix: usar longtable en ambos archivos .tex + fix neq                                                                  \\
+	2026-03-26     & e3ecfa6         & docs: actualizar timeline con fix de gaps (tracking acumulativo)                                                      \\
+	2026-03-26     & 1c44b0b         & feat: tracking acumulativo de IDs erosionadas (fix gaps definitivo)                                                   \\
+	2026-03-26     & 62590cf         & feat: filtro erosión por CM z del cluster (en vez de z individual)                                                    \\
+	2026-03-26     & 8406f0e         & error en la lógica de filtrado                                                                                        \\
+	2026-03-26     & 28546c0         & feat: unificar config.toml como fuente única (cluster + CARBOXI)                                                      \\
+	2026-03-25     & 85d4c48         & feat: filtro erosión por comparación CM inter-timestep (reemplaza fz)                                                 \\
+	2026-03-25     & ae631fc         & cambio de parámetros a 7 radios de filtro y umbral de velocidad                                                       \\
+	2026-03-25     & fd77e27         & cambio de parámetros a 1e-12 en umbral de fz                                                                          \\
+	2026-03-25     & adcab92         & refactor: eliminar método taylor y código muerto (-242 líneas)                                                        \\
+	2026-03-25     & ac6d996         & feat: método de erosión configurable + fix Xvfb/LD\_LIBRARY\_PATH                                                     \\
+	2026-03-25     & 9ede3bc         & feat: agregar Xvfb para soporte headless de ovito en CARBOXI                                                          \\
+	2026-03-25     & 272950f         & fix: cambiar build backend de hatchling a setuptools (.pth vacío)                                                     \\
+	2026-03-25     & a85a49d         & Merge PR \#9: CARBOXI como paquete instalable                                                                         \\
+	2026-03-25     & 1a7f352         & feat: crear \_\_init\_\_.py y pyproject.toml para CARBOXI                                                             \\
+	2026-03-25     & d3a1b37         & ediciones para lanzar nuevas sims en cluster                                                                          \\
+	2026-03-23     & 74a8d2e         & feat: recuperar simulaciones históricas y actualizar pipeline a CARBOXI                                               \\
+	2026-03-22     & 366cb55         & fix(cluster): corregir sintaxis booleana del if en loop trampa                                                        \\
+	2026-03-22     & e3aa79d         & fix(cluster): corregir uso de step y defaults proc en collision\_erosion\_bed                                         \\
+	2026-03-22     & 0bf5145         & fix: detectar halt por comparación de pasos                                                                           \\
+	2026-03-22     & 5439e8c         & fix: halt solo para simulaciones críticas (vel=-50 y move$\neq$0)                                                     \\
+	2026-03-22     & 7afdaef         & fix: crear check\_wave antes del loop para evitar uncompute                                                           \\
+	2026-03-22     & 56dffee         & Edición en la lógica de collision\_erosion\_box.input                                                                 \\
+	2026-03-22     & 1a528c6         & Ediciones de Gemini                                                                                                   \\
+	2026-03-21     & 9d756ea         & Ediciones de Python y compatibilidades con miniconda                                                                  \\
+	2026-03-21     & 23fbeca         & fix: restaurar doble for para desplazamiento X e Y en moves                                                           \\
+	2026-03-21     & 8c442e9         & Borrado de simulaciones y creación de carpeta legacy                                                                  \\
+	2026-03-20     & 12d98db         & docs: agregar flujo de trabajo obligatorio + revisar engram                                                           \\
+	2026-03-20     & e84516a         & feat: distribución de procesadores MPI configurable                                                                   \\
+	2026-03-20     & 8c4cab3         & feat: centralizar configuración en config.toml + read\_config.py                                                      \\
+	2026-03-20     & 8b7ae1f         & feat: agregar convert.py para transformar dumps a formato legacy gzip                                                 \\
+	2026-03-20     & b4e3c9e         & feat: agregar analyze.py para auto-detección de formato LAMMPS                                                        \\
+	2026-03-20     & 30b49c6         & feat: implementar CARBOXI\_MINI - pipeline de análisis de clusters                                                    \\
 	\bottomrule
 \end{longtable}
 
@@ -229,6 +230,15 @@ Reorganización completa del código y creación de la versión 3 del programa.
 	\item Ovito solo en métricas de filtros cluster (F1C/F2C/F3C), no en individuales
 	\item Cuarto plot agregado: gaps por step (no acumulados)
 	\item Mejoras visuales: ejes en $\mu$s (step $\times$ 1.25), leyenda única arriba a la derecha en 2 columnas, colores restaurados
+	\item Bug fix (abr 2026): gráficos no llegaban al último timestep - usaban len(results)-1 en vez de i.max()
+	\item Investigación de anomalías:
+	      \begin{itemize}
+		      \item Partículas extrañas (IDs 69374-69380, 72565) aparecen en i=77, desaparecen en 78-79, reaparecen en i=80
+		      \item Comparación directorio resultados-5r (12 partículas, umbral\_techo\_radios = -5) vs resultados (4 partículas, umbral\_techo\_radios = 0)
+		      \item Análisis de dumps filtrados vs parquet: bug confirmado en código de visualización, no en dumps originales
+		      \item El tracking acumulativo no filtra estas partículas porque usa IDs del último timestep
+		      \item Fix: total\_timesteps = df\_total["i"].max() en main\_pipeline.py línea 168
+	      \end{itemize}
 \end{itemize}
 
 \end{document}

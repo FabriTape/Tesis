@@ -138,9 +138,7 @@ def _resolve_config_path(path: Path) -> Path:
     if module_config.exists():
         return module_config
 
-    raise FileNotFoundError(
-        f"config.toml embebido no encontrado en '{module_config}'."
-    )
+    raise FileNotFoundError(f"config.toml embebido no encontrado en '{module_config}'.")
 
 
 def _build_config(raw: dict) -> Config:
@@ -187,11 +185,15 @@ def _build_config(raw: dict) -> Config:
     )
 
 
-def discover_simulations(base_dir: Path) -> list[Path]:
+def discover_simulations(
+    base_dir: Path, prefix: str = _SIM_PREFIX, type: str = "dir"
+) -> list[Path]:
     """Encuentra las carpetas de simulación a procesar desde un directorio base.
 
     Args:
         base_dir: Directorio raíz donde buscar.
+        prefix: Prefijo de las carpetas de simulación a buscar.
+        type: Tipo de simulación a buscar ("dir" para carpetas, "file" para archivos).
 
     Returns:
         Lista ordenada de rutas a las carpetas de simulación encontradas.
@@ -199,16 +201,20 @@ def discover_simulations(base_dir: Path) -> list[Path]:
     Raises:
         SystemExit: Si no se encuentra ninguna simulación válida.
     """
-    if base_dir.name.startswith(_SIM_PREFIX):
+    if base_dir.name.startswith(prefix):
         return [base_dir]
-
-    sims = sorted(
-        p for p in base_dir.iterdir() if p.is_dir() and p.name.startswith(_SIM_PREFIX)
-    )
+    if type == "dir":
+        sims = sorted(
+            p for p in base_dir.iterdir() if p.is_dir() and p.name.startswith(prefix)
+        )
+    else:
+        sims = sorted(
+            p for p in base_dir.iterdir() if p.is_file() and p.name.startswith(prefix)
+        )
 
     if not sims:
         print(
-            f"Error: No se encontraron carpetas '{_SIM_PREFIX}*' en '{base_dir}'.\n"
+            f"Error: No se encontraron {'carpetas' if type == 'dir' else 'archivos'} '{prefix}*' en '{base_dir}'.\n"
             "Verifique que la ruta seleccionada sea correcta."
         )
         sys.exit(1)
