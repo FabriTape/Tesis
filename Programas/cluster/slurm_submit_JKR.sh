@@ -1,7 +1,7 @@
 #!/bin/bash
 ### Reserve time in slurm queue manager.
 
-#SBATCH -J N3v10a0
+#SBATCH -J N3v25a0ff0.35
 #SBATCH -n 32
 #SBATCH --nodes 1
 #SBATCH --ntasks-per-node=32
