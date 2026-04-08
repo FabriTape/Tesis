@@ -118,11 +118,11 @@ def compute_penetration_depth(df: pd.DataFrame, ff: float) -> pd.DataFrame:
     return result.sort_values("vel0")
 
 
-GRID_POSITIONS = [0.0, 1.52, 3.04]
+GRID_POSITIONS = [-1.52, 0.0, 1.52, 3.04]
 
 
 def compute_heatmap_data(df: pd.DataFrame, ff: float, vel0: float) -> pd.DataFrame:
-    """Calcula IDs únicos erosionadas por posición (posx, posy).
+    """Calcula partículas erosionadas por posición usando el último time step.
 
     Args:
         df: DataFrame con datos.
@@ -134,9 +134,11 @@ def compute_heatmap_data(df: pd.DataFrame, ff: float, vel0: float) -> pd.DataFra
     """
     df_filt = filter_by_ff(df, ff)
     df_filt = filter_by_vel0(df_filt, vel0)
+    max_i = df_filt["i"].max()
+    df_filt = filter_by_i_value(df_filt, max_i)
     df_filt = filter_is_erosion(df_filt)
 
-    grouped = df_filt.groupby(["posx", "posy"]).size().reset_index(name="id")
+    grouped = df_filt.groupby(["posx", "posy"])["id"].nunique().reset_index()
 
     pivot = grouped.pivot(index="posy", columns="posx", values="id")
 
