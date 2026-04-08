@@ -20,7 +20,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-_SIM_PREFIX: str = "erosion_bed_SI_"
+_SIM_PREFIX: str = "sims_SI_"
 
 _PATRONES: dict[str, str] = {
     "ff": r"ff_([^_]+)",
