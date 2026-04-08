@@ -56,10 +56,17 @@ def list_dump_files(directory: Path, recursive: bool = False) -> list[Path]:
         directory: Directorio donde buscar.
         recursive: Si True, busca en subdirectorios.
     """
+    files = []
     if recursive:
-        files = list(directory.rglob("output.*.gz"))
+        for subdir in directory.iterdir():
+            if subdir.is_dir():
+                for f in subdir.iterdir():
+                    if f.is_file() and f.name.startswith("output") and f.name.endswith(".gz"):
+                        files.append(f)
     else:
-        files = list(directory.glob("output.*.gz"))
+        for f in directory.iterdir():
+            if f.is_file() and f.name.startswith("output") and f.name.endswith(".gz"):
+                files.append(f)
     files.sort(key=lambda p: _extract_timestep(p.name))
     return files
 
