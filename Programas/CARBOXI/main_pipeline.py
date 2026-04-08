@@ -73,9 +73,9 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
     print(f"  Filtro activo: {filter_name}")
     print(f"{'=' * 55}")
 
-    dump_files = list_dump_files(sim_dir)
+    dump_files = list_dump_files(sim_dir, recursive=True)
     if not dump_files:
-        print(f"  Sin archivos output.*.gz en '{sim_dir.name}'. Saltando...")
+        print(f"  Sin archivos output.*.gz en '{sim_dir.name}' (o subdirectorios). Saltando...")
         return
 
     timestep_interval = get_timestep_interval(dump_files)

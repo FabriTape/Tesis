@@ -49,9 +49,15 @@ def read_dump(path: Path, columns: list[str] | None = None) -> pl.LazyFrame:
     return lf.select(columns or _ALL_COLUMNS)
 
 
-def list_dump_files(directory: Path) -> list[Path]:
-    """Lista y ordena cronológicamente los archivos dump de una simulación."""
-    files = list(directory.glob("output.*.gz"))
+def list_dump_files(directory: Path, recursive: bool = False) -> list[Path]:
+    """Lista y ordena cronológicamente los archivos dump de una simulación.
+
+    Args:
+        directory: Directorio donde buscar.
+        recursive: Si True, busca en subdirectorios.
+    """
+    pattern = "**/output.*.gz" if recursive else "output.*.gz"
+    files = list(directory.glob(pattern))
     files.sort(key=lambda p: _extract_timestep(p.name))
     return files
 
