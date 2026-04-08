@@ -144,10 +144,12 @@ def compute_heatmap_data(df: pd.DataFrame, ff: float, vel0: float) -> pd.DataFra
     full_index = pd.Index(GRID_POSITIONS, name="posy")
     full_columns = pd.Index(GRID_POSITIONS, name="posx")
 
-    pivot = pivot.reindex(index=full_index, columns=full_columns).fillna(0)
+    pivot = pivot.reindex(index=full_index, columns=full_columns).fillna(-1)
 
     pivot.index = (pivot.index / 1.52).round(2)
     pivot.columns = (pivot.columns / 1.52).round(2)
+
+    pivot = pivot.replace(-1, float("nan"))
 
     return pivot
 
