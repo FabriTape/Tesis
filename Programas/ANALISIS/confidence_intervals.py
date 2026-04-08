@@ -242,67 +242,43 @@ def _round_1sf(val: float) -> str:
     return f"{rounded:.{decimals}f}"
 
 
-def create_per_ff_consolidated_figure(
-    ff: float,
-    results: list[dict],
-) -> Figure:
-    """Crea una tabla vertical consolidada por ff con todas las vel0.
-
-    Filas: Métricas (n, Student, Bootstrap, Binomial) por bloque (Crudos, MAD, Tukey).
-    Columnas: vel0 ordenadas de mayor a menor energía (-50, -25, -10, -5).
-
-    Args:
-        ff: Factor de fricción.
-        results: Lista de dicts con métricas por vel0 para este ff.
-
-    Returns:
-        Figura matplotlib con la tabla consolidada.
-    """
+def create_per_ff_consolidated_figure(ff: float, results: list[dict]) -> Figure:
     fs = 9
     sorted_results = sorted(results, key=lambda r: r["vel0"], reverse=True)
     vel_values = [str(int(r["vel0"])) for r in sorted_results]
 
-    def _fmt(metrics: dict | None, key: str) -> str:
-        if metrics is None:
+    # Mapeo de claves a etiquetas y bloques
+    metrics_map = {"S": "Student", "B": "Bootstrap", "Bin": "Binomial"}
+    blocks = [("raw", "Crudos"), ("mad", "MAD"), ("tukey", "Tukey")]
+
+    def _get_val(res, block_key, metric_key):
+        m = res.get(block_key)
+        if not m:
             return "—"
-        if key == "n":
-            return str(metrics["n"])
-        s_lo = metrics["student_lo"]
-        s_hi = metrics["student_hi"]
-        b_lo = metrics["bootstrap_lo"]
-        b_hi = metrics["bootstrap_hi"]
-        bin_lo = metrics["binomial_lo"]
-        bin_hi = metrics["binomial_hi"]
-        if key == "S":
-            c = (s_lo + s_hi) / 2
-            h = (s_hi - s_lo) / 2
-            return f"{_round_1sf(c)} ± {_round_1sf(h)}"
-        if key == "B":
-            c = (b_lo + b_hi) / 2
-            h = (b_hi - b_lo) / 2
-            return f"{_round_1sf(c)} ± {_round_1sf(h)}"
-        return f"[{_round_1sf(bin_lo)}, {_round_1sf(bin_hi)}]"
 
+        # Helper para formatear intervalos
+        f = lambda lo, hi: f"{_round_1sf((lo + hi) / 2)} ± {_round_1sf((hi - lo) / 2)}"
+
+        if metric_key == "S":
+            return f(m["student_lo"], m["student_hi"])
+        if metric_key == "B":
+            return f(m["bootstrap_lo"], m["bootstrap_hi"])
+        return f"[{_round_1sf(m['binomial_lo'])}, {_round_1sf(m['binomial_hi'])}]"
+
+    # Construcción dinámica de etiquetas y texto
     row_labels = [
-        "Crudos Student",
-        "Crudos Bootstrap",
-        "Crudos Binomial",
-        "MAD Student",
-        "MAD Bootstrap",
-        "MAD Binomial",
-        "Tukey Student",
-        "Tukey Bootstrap",
-        "Tukey Binomial",
+        f"{b_label} {metrics_map[m]}"
+        for m in ["S", "B", "Bin"]
+        for _, b_label in blocks
     ]
-    n_rows = len(row_labels)
-
-    cell_text = []
-    for key in ["S", "B", "Bin"]:
-        for block in ["raw", "mad", "tukey"]:
-            cell_text.append([_fmt(r[block], key) for r in sorted_results])
+    cell_text = [
+        [_get_val(r, b, m) for r in sorted_results]
+        for m in ["S", "B", "Bin"]
+        for b, _ in blocks
+    ]
 
     fig, ax = plt.subplots(
-        1, 1, figsize=(4 + 2.5 * len(vel_values), 1.2 + 0.45 * n_rows)
+        figsize=(4 + 2.5 * len(vel_values), 1.2 + 0.45 * len(row_labels))
     )
     ax.set_title(
         f"Intervalos de Confianza — ff = {ff}",
@@ -310,7 +286,6 @@ def create_per_ff_consolidated_figure(
         fontweight="bold",
         pad=12,
     )
-    ax.axis("tight")
     ax.axis("off")
 
     table = ax.table(
@@ -324,128 +299,106 @@ def create_per_ff_consolidated_figure(
     table.set_fontsize(fs - 1)
     table.scale(1.2, 1.5)
 
-    for (row_idx, col_idx), cell in table.get_celld().items():
-        if col_idx == -1:
-            cell.set_facecolor("#3b82f6")
-            cell.set_text_props(
-                color="white", fontweight="bold", fontsize=fs - 1, ha="right"
-            )
-        elif row_idx % 2 == 0:
-            cell.set_facecolor("#f0f4ff")
-        else:
-            cell.set_facecolor("#ffffff")
-        cell.set_edgecolor("#cccccc")
+    for (r, c), cell in table.get_celld().items():
+        # 1. Estilo para el Encabezado de Columnas (vel0)
+        if r == 0:
+            cell.set_facecolor("#1e40af")  # Azul oscuro para jerarquía superior
+            cell.set_text_props(color="white", fontweight="bold")
 
-        if row_idx in (3, 7):
-            cell.set_edgecolor("#aaaaaa")
-            cell.set_linewidth(1.5)
+        # 2. Estilo para las etiquetas de fila (Crudos/MAD/Tukey + Método)
+        elif c == -1:
+            cell.set_facecolor("#3b82f6")  # Azul medio
+            cell.set_text_props(
+                color="white", fontweight="bold", ha="right", fontsize=fs - 2
+            )
+
+        # 3. Estilo para el cuerpo de la tabla (Bloques de datos)
+        else:
+            # Agrupación por Filtro (Cada 3 filas cambia el bloque)
+            # Ajustamos los índices: r=1,2,3 -> Crudos; r=4,5,6 -> MAD; r=7,8,9 -> Tukey
+            if 1 <= r <= 3:
+                cell.set_facecolor("#ffffff")  # Blanco para Crudos
+            elif 4 <= r <= 6:
+                cell.set_facecolor("#f9fafb")  # Gris muy tenue para MAD
+            elif 7 <= r <= 9:
+                cell.set_facecolor("#f3f4f6")  # Gris tenue para Tukey
+
+        # 4. Líneas de división de bloques y bordes generales
+        cell.set_edgecolor("#cccccc")
+        if r in (4, 7):
+            cell.set_linewidth(2.0)
+            cell.set_edgecolor("#4b5563")  # Separador de bloque más fuerte
 
     plt.tight_layout()
     return fig
 
 
 def build_master_table_figure(all_results: list[dict]) -> Figure:
-    """Genera figura con tabla maestra multi-nivel consolidada.
-
-    Filas: MultiIndex (ff, vel0) ordenado por energía (-50 a -5).
-    Columnas: MultiIndex (filtro → métrica) sin Binomial.
-
-    Args:
-        all_results: Lista de dicts con métricas numéricas por ff/vel0.
-
-    Returns:
-        Figura matplotlib con la tabla maestra.
-    """
-    records = []
-    for r in all_results:
-        ff = r["ff"]
-        vel0 = r["vel0"]
-        records.append(
-            {
-                "ff": ff,
-                "vel0": vel0,
-                "Crudo_n": r["raw"]["n"],
-                "Crudo_errS": round(r["raw"]["err_student"], 2),
-                "Crudo_errB": round(r["raw"]["err_bootstrap"], 2),
-                "MAD_n": r["mad"]["n"] if r["mad"] else None,
-                "MAD_errS": round(r["mad"]["err_student"], 2) if r["mad"] else None,
-                "MAD_errB": round(r["mad"]["err_bootstrap"], 2) if r["mad"] else None,
-                "Tukey_n": r["tukey"]["n"] if r["tukey"] else None,
-                "Tukey_errS": round(r["tukey"]["err_student"], 2)
-                if r["tukey"]
-                else None,
-                "Tukey_errB": round(r["tukey"]["err_bootstrap"], 2)
-                if r["tukey"]
-                else None,
-            }
-        )
-
-    df = pd.DataFrame(records).sort_values(by=["ff", "vel0"], ascending=[True, False])
-
-    fs = 9
-    fig, ax = plt.subplots(1, 1, figsize=(20, 1 + 0.5 * len(df)))
-    ax.set_title(
-        "TABLA MAESTRA: Intervalos de Confianza Consolidados",
-        fontsize=fs + 3,
-        fontweight="bold",
-        pad=12,
+    # 1. Crear el DataFrame con MultiIndex en las columnas
+    columns = pd.MultiIndex.from_tuples(
+        [
+            ("Parámetros", "ff"),
+            ("Parámetros", "vel0"),
+            ("Crudos", "n"),
+            ("Crudos", "err% S"),
+            ("Crudos", "err% B"),
+            ("MAD", "n"),
+            ("MAD", "err% S"),
+            ("MAD", "err% B"),
+            ("Tukey", "n"),
+            ("Tukey", "err% S"),
+            ("Tukey", "err% B"),
+        ]
     )
-    ax.axis("tight")
+
+    rows = []
+    for r in all_results:
+        # Extraemos los datos puros (sin formatear a string todavía) [cite: 4, 6]
+        res = [r["ff"], int(r["vel0"])]
+        for b in ["raw", "mad", "tukey"]:
+            m = r.get(b)
+            if m:
+                res.extend(
+                    [
+                        int(m["n"]),
+                        round(m["err_student"], 2),
+                        round(m["err_bootstrap"], 2),
+                    ]
+                )
+            else:
+                res.extend([None, None, None])
+        rows.append(res)
+
+    df = pd.DataFrame(rows, columns=columns).sort_values(
+        [("Parámetros", "ff"), ("Parámetros", "vel0")], ascending=[True, False]
+    )
+
+    # 2. El truco de la doble fila de encabezado
+    # ax.table no soporta MultiIndex nativo, así que inyectamos los nombres de los filtros
+    # manualmente sobre la primera fila de la tabla de Matplotlib
+    fig, ax = plt.subplots(figsize=(20, 1 + 0.4 * len(df)))
     ax.axis("off")
 
-    cell_text = []
-    for _, row in df.iterrows():
-        cell_text.append(
-            [
-                f"{row['ff']:.2f}",
-                f"{int(row['vel0'])}",
-                f"{int(row['Crudo_n'])}",
-                f"{row['Crudo_errS']:.2f}",
-                f"{row['Crudo_errB']:.2f}",
-                f"{int(row['MAD_n'])}" if pd.notna(row["MAD_n"]) else "—",
-                f"{row['MAD_errS']:.2f}" if pd.notna(row["MAD_errS"]) else "—",
-                f"{row['MAD_errB']:.2f}" if pd.notna(row["MAD_errB"]) else "—",
-                f"{int(row['Tukey_n'])}" if pd.notna(row["Tukey_n"]) else "—",
-                f"{row['Tukey_errS']:.2f}" if pd.notna(row["Tukey_errS"]) else "—",
-                f"{row['Tukey_errB']:.2f}" if pd.notna(row["Tukey_errB"]) else "—",
-            ]
-        )
+    # Combinamos los niveles del MultiIndex para las etiquetas de columna
+    col_labels = [f"{c[0]}\n{c[1]}" for c in df.columns]
 
-    col_labels = [
-        "ff",
-        "vel0",
-        "n",
-        "err% S",
-        "err% B",
-        "n",
-        "err% S",
-        "err% B",
-        "n",
-        "err% S",
-        "err% B",
-    ]
+    # Formateamos los datos para la tabla (reemplazando None por '—') [cite: 4, 12]
+    cell_text = df.fillna("—").values
 
     table = ax.table(
-        cellText=cell_text,
-        colLabels=col_labels,
-        loc="center",
-        cellLoc="center",
+        cellText=cell_text, colLabels=col_labels, loc="center", cellLoc="center"
     )
-    table.auto_set_font_size(False)
-    table.set_fontsize(fs - 1)
-    table.scale(1.0, 1.8)
 
-    for (row_idx, col_idx), cell in table.get_celld().items():
-        if row_idx == 0:
-            cell.set_facecolor("#3b82f6")
-            cell.set_text_props(color="white", fontweight="bold", fontsize=fs)
-        elif row_idx % 2 == 0:
-            cell.set_facecolor("#f0f4ff")
-        else:
-            cell.set_facecolor("#ffffff")
-        cell.set_edgecolor("#cccccc")
+    # Estilo: Resaltamos las columnas de los parámetros físicos [cite: 2, 10]
+    for (r, c), cell in table.get_celld().items():
+        if r == 0:
+            cell.set_facecolor("#1e40af")  # Azul más oscuro para encabezados
+            cell.set_text_props(color="white", fontweight="bold")
+        elif c in [0, 1]:  # ff y vel0
+            cell.set_facecolor("#f8fafc")
+            cell.set_text_props(fontweight="bold")
 
-    plt.tight_layout()
+    table.scale(1, 2)
     return fig
 
 
@@ -554,6 +507,7 @@ def create_sensitivity_figure(all_results: list[dict]) -> Figure:
         palette=palette,
         order=vel_order,
         hue_order=method_order,
+        facet_kws={"despine": True},
     )
     # 1. LA OPCIÓN NUCLEAR: Destruir cualquier leyenda residual
     # Primero, eliminamos la leyenda global si Seaborn la forzó de todos modos
@@ -578,30 +532,34 @@ def create_sensitivity_figure(all_results: list[dict]) -> Figure:
         "Sensibilidad del Error % por Método de IC y Filtro",
         fontsize=fs + 2,
         fontweight="bold",
-        y=1.02,
+        y=1.005,
     )
-    plt.tight_layout()
+    g.fig.tight_layout()
     return g.fig
 
 
-def run_confidence_intervals() -> list[Figure]:
+def run_confidence_intervals(i_value: int) -> list[Figure]:
     """Ejecuta el análisis completo de intervalos de confianza.
 
-    Genera tres tablas comparativas (Datos Crudos, Filtro MAD, Filtro Tukey)
-    para cada combinación de ff y vel0. Retorna las figuras matplotlib.
+    Args:
+        i_value: Paso temporal a usar para filtrar los datos.
 
     Returns:
-        Lista de figuras con las tablas de ICs.
+        Lista de figuras matplotlib con las tablas de ICs.
     """
     print("Cargando datos...")
     df = load_data()
     print(f"Datos cargados: {len(df)} filas\n")
 
+    I_VALUE = i_value
+
+    print(f"I_VALUE: {I_VALUE}\n")
+
     figures: list[Figure] = []
     all_results: list[dict] = []
 
     for ff in FF_VALUES:
-        erosion_data = compute_unique_ids_raw_with_positions(df, ff)
+        erosion_data = compute_unique_ids_raw_with_positions(df, ff, I_VALUE)
         print(f"{'=' * 100}")
         print(f"Factor de fricción: ff = {ff}")
         print(f"{'=' * 100}\n")

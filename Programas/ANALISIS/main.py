@@ -36,11 +36,15 @@ def run_analysis() -> None:
     df = load_data()
     print(f"Datos cargados: {len(df)} filas")
 
+    # I_VALUE dinámico: usar el paso temporal máximo del dataset
+    I_VALUE = int(df["i"].max())
+    print(f"I_VALUE dinámico: {I_VALUE}\n")
+
     SALIDA_DIR.mkdir(parents=True, exist_ok=True)
 
     # Tablas de intervalos de confianza (van primero en el PDF)
-    print("\nGenerando tablas de intervalos de confianza...")
-    figuras = run_confidence_intervals()
+    print("Generando tablas de intervalos de confianza...")
+    figuras = run_confidence_intervals(I_VALUE)
     print(f"Tablas de IC generadas: {len(figuras)}\n")
 
     valores_vel0 = sorted(df["vel0"].unique())

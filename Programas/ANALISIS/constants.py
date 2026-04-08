@@ -7,12 +7,13 @@ from pathlib import Path
 
 # Rutas
 CARBOXI_DIR = Path("/home/tutturuu/Documentos/Universidad/Tesis/Programas/CARBOXI")
-RESULTADOS_DIR = Path("/home/tutturuu/Documentos/resultados0r")
+RESULTADOS_DIR = Path("/home/tutturuu/Documentos")
 CSV_PATH = RESULTADOS_DIR / "merge_resultados.csv"
 SALIDA_DIR = RESULTADOS_DIR / "figuras"
 
-# Parámetros de simulación
-I_VALUE = 80
+# Parámetros de simulación (se usa I_VALUE dinámico en main.py, mantener para otros módulos)
+I_VALUE = 52
+THRESHOLD_Z = 1e-4
 THRESHOLD_Z = 1e-4
 
 # Valores de fricción a analizar

@@ -50,19 +50,20 @@ def compute_unique_ids_by_velocity(
 
 
 def compute_unique_ids_raw_with_positions(
-    df: pd.DataFrame, ff: float
+    df: pd.DataFrame, ff: float, i_value: int
 ) -> dict[float, pd.DataFrame]:
     """Calcula IDs únicos por cada simulación individual con posiciones.
 
     Args:
         df: DataFrame con datos.
         ff: Factor de fricción.
+        i_value: Paso temporal a filtrar.
 
     Returns:
         Dict con vel0 -> DataFrame con columnas [vel0, angulo, posx, posy, unique_ids].
     """
     df_filt = filter_by_ff(df, ff)
-    df_filt = filter_by_i_value(df_filt, I_VALUE)
+    df_filt = filter_by_i_value(df_filt, i_value)
     df_filt = filter_exclude_erosion(df_filt)
 
     grouped = (
