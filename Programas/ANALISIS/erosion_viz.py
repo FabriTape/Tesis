@@ -81,11 +81,11 @@ def plot_erosion_heatmap(df: pd.DataFrame, ff: float, vel0: float) -> Figure:
 
     data_sorted = data.sort_index(ascending=False)
 
-    annot_data = data_sorted.replace(0, "")
+    data_with_na = data_sorted.replace(0, float("nan"))
 
     sns.heatmap(
-        data_sorted,
-        annot=annot_data,
+        data_with_na,
+        annot=True,
         fmt=".0f",
         cmap="YlOrRd",
         cbar_kws={"label": "Y", "shrink": 0.8},
