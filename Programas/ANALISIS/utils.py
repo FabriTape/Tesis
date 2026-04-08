@@ -22,7 +22,6 @@ COLORS: dict[str, str] = {
     "power_law": "#e74c3c",
     "truncated": "#2ecc71",
     "exponential": "#f39c12",
-    "lognormal": "#9b59b6",
     "secondary": "#3498db",
 }
 
