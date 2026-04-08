@@ -185,6 +185,9 @@ def _build_config(raw: dict) -> Config:
     )
 
 
+_EROSION_PREFIX: str = "erosion_bed_SI_"
+
+
 def discover_simulations(
     base_dir: Path, prefix: str = _SIM_PREFIX, type: str = "dir"
 ) -> list[Path]:
@@ -202,6 +205,13 @@ def discover_simulations(
         SystemExit: Si no se encuentra ninguna simulación válida.
     """
     if base_dir.name.startswith(prefix):
+        sims = sorted(
+            p for p in base_dir.iterdir()
+            if p.is_dir() and p.name.startswith(_EROSION_PREFIX)
+        )
+        if sims:
+            print(f"Encontradas {len(sims)} simulaciones en '{base_dir.name}'.")
+            return sims
         return [base_dir]
     if type == "dir":
         sims = sorted(
