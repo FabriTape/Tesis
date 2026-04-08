@@ -12,7 +12,6 @@ from data_loader import (
     filter_by_vel0,
     filter_by_i_value,
     filter_exclude_erosion,
-    filter_is_erosion,
     filter_penetration,
 )
 from constants import I_VALUE
@@ -120,14 +119,31 @@ def compute_penetration_depth(df: pd.DataFrame, ff: float) -> pd.DataFrame:
 
 GRID_POSITIONS = [-1.52, 0.0, 1.52, 3.04]
 
+GRID_PAIRS = [(x, y) for x in GRID_POSITIONS for y in GRID_POSITIONS]
 
-def compute_heatmap_data(df: pd.DataFrame, ff: float, vel0: float) -> pd.DataFrame:
+
+def get_grid_pairs(df: pd.DataFrame) -> list[tuple[float, float]]:
+    """Obtiene los pares únicos de posx/posy del dataframe completo.
+
+    Args:
+        df: DataFrame con todos los datos.
+
+    Returns:
+        Lista de tuplas (posx, posy) únicas.
+    """
+    return list(set(zip(df["posx"], df["posy"])))
+
+
+def compute_heatmap_data(
+    df: pd.DataFrame, ff: float, vel0: float, grid_pairs: list[tuple[float, float]] | None = None
+) -> pd.DataFrame:
     """Calcula partículas erosionadas por posición usando el último time step.
 
     Args:
         df: DataFrame con datos.
         ff: Factor de fricción.
         vel0: Velocidad inicial.
+        grid_pairs: Lista de pares (posx, posy) válidos. Si es None, usa GRID_PAIRS.
 
     Returns:
         DataFrame pivot con IDs por posición, índices y columnas normalizados por 1.52.
@@ -137,14 +153,24 @@ def compute_heatmap_data(df: pd.DataFrame, ff: float, vel0: float) -> pd.DataFra
     max_i = df_filt["i"].max()
     df_filt = filter_by_i_value(df_filt, max_i)
 
+    use_pairs = grid_pairs if grid_pairs is not None else GRID_PAIRS
+
     grouped = df_filt.groupby(["posx", "posy"]).size().reset_index(name="id")
+    grouped = grouped.set_index(["posx", "posy"])["id"]
 
-    pivot = grouped.pivot(index="posy", columns="posx", values="id")
+    result = {}
+    for posx, posy in use_pairs:
+        result[(posx, posy)] = grouped.get((posx, posy), 0)
 
-    full_index = pd.Index(GRID_POSITIONS, name="posy")
-    full_columns = pd.Index(GRID_POSITIONS, name="posx")
+    result.update({k: np.nan for k in GRID_PAIRS if k not in use_pairs})
 
-    pivot = pivot.reindex(index=full_index, columns=full_columns)
+    pivot = pd.DataFrame(
+        result.values(),
+        index=pd.MultiIndex.from_tuples(result.keys(), names=["posy", "posx"])
+    ).unstack(level="posx")
+
+    pivot = pivot.droplevel(0, axis=1)
+    pivot = pivot.reindex(index=GRID_POSITIONS, columns=GRID_POSITIONS)
 
     pivot.index = (pivot.index / 1.52).round(2)
     pivot.columns = (pivot.columns / 1.52).round(2)

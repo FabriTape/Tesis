@@ -60,18 +60,21 @@ def plot_erosion_boxplot(df: pd.DataFrame, ff: float) -> Figure:
     return fig
 
 
-def plot_erosion_heatmap(df: pd.DataFrame, ff: float, vel0: float) -> Figure:
+def plot_erosion_heatmap(
+    df: pd.DataFrame, ff: float, vel0: float, grid_pairs: list[tuple[float, float]] | None = None
+) -> Figure:
     """Genera heatmap de partículas por posición.
 
     Args:
         df: DataFrame con datos.
         ff: Factor de fricción.
         vel0: Velocidad inicial.
+        grid_pairs: Lista de pares (posx, posy) válidos.
 
     Returns:
         Figura matplotlib.
     """
-    data = compute_heatmap_data(df, ff, vel0)
+    data = compute_heatmap_data(df, ff, vel0, grid_pairs)
     if data.empty:
         return Figure()
 

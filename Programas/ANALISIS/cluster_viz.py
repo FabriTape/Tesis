@@ -1,37 +1,110 @@
 """Módulo de visualizaciones de distribución de clusters.
 
-Genera gráficos de frecuencia y CCDF usando solo MLE + estadístico KS.
+Genera gráficos de frecuencia y CCDF para análisis de distribución de tamaños.
 """
 
+from typing import Any
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import powerlaw
 from matplotlib.figure import Figure
 from scipy.optimize import curve_fit
+from uncertainties import ufloat
 
 from cluster_calc import compute_cluster_frequency, compute_cluster_sizes
 from constants import I_VALUE, COLORS
-from kinematics_calc import compute_cluster_km, compute_cluster_km_binned, compute_cluster_rg, compute_rg_binned
+from kinematics_calc import (
+    compute_cluster_km,
+    compute_cluster_km_binned,
+    compute_cluster_rg,
+    compute_rg_binned,
+)
 from utils import compute_alpha_mle, compute_ccdf_empirical, compute_ccdf_from_pdf
 
 
-def power_law(x: np.ndarray, C: float, beta: float) -> np.ndarray:
+def format_uncertainty(val: float, err: float) -> str:
+    """Formatea valor con incertidumbre usando 1 cifra significativa."""
+    if err <= 0 or np.isnan(err) or np.isinf(err):
+        return f"{val:.1f}"
+    
+    try:
+        uval = ufloat(val, err)
+        return f"{uval:.1u}"
+    except Exception:
+        return f"{val:.1f}±{err:.1f}"
+
+
+def power_law(s: np.ndarray, C: float, beta: float) -> np.ndarray:
     """Modelo Power Law: f(s) = C * s^(-beta)"""
-    return C * np.power(x, -beta)
+    return C * np.power(s, -beta)
 
 
-def exponential(x: np.ndarray, C: float, lam: float) -> np.ndarray:
+def exponential(s: np.ndarray, C: float, lam: float) -> np.ndarray:
     """Modelo Exponential: f(s) = C * exp(-lambda * s)"""
-    return C * np.exp(-lam * x)
+    return C * np.exp(-lam * s)
 
 
-def plot_cluster_frequency(df: pd.DataFrame, ff: float) -> Figure:
+def truncated_pl(s: np.ndarray, C: float, beta: float, lam: float) -> np.ndarray:
+    """Modelo Truncated Power Law: f(s) = C * s^(-beta) * exp(-lambda * s)"""
+    return C * np.power(s, -beta) * np.exp(-lam * s)
+
+
+def fit_km_curves(binned_df: pd.DataFrame) -> dict[str, Any]:
+    """Ajusta tres modelos a los datos binned."""
+    x = binned_df["s_center"].values
+    y = binned_df["km_mean"].values
+    sigma = binned_df["km_std"].values
+    sigma = np.where(sigma <= 0, 1e-10, sigma)
+
+    results = {}
+
+    try:
+        popt_pl, pcov_pl = curve_fit(power_law, x, y, sigma=sigma, absolute_sigma=True, maxfev=5000)
+        results["power_law"] = {
+            "C": popt_pl[0],
+            "C_err": np.sqrt(pcov_pl[0, 0]),
+            "beta": popt_pl[1],
+            "beta_err": np.sqrt(pcov_pl[1, 1]),
+        }
+    except Exception:
+        results["power_law"] = None
+
+    try:
+        popt_exp, pcov_exp = curve_fit(exponential, x, y, sigma=sigma, absolute_sigma=True, maxfev=5000)
+        results["exponential"] = {
+            "C": popt_exp[0],
+            "C_err": np.sqrt(pcov_exp[0, 0]),
+            "lam": popt_exp[1],
+            "lam_err": np.sqrt(pcov_exp[1, 1]),
+        }
+    except Exception:
+        results["exponential"] = None
+
+    try:
+        popt_tpl, pcov_tpl = curve_fit(truncated_pl, x, y, sigma=sigma, absolute_sigma=True, maxfev=5000, p0=[1, 1, 0.1])
+        results["truncated"] = {
+            "C": popt_tpl[0],
+            "C_err": np.sqrt(pcov_tpl[0, 0]),
+            "beta": popt_tpl[1],
+            "beta_err": np.sqrt(pcov_tpl[1, 1]),
+            "lam": popt_tpl[2],
+            "lam_err": np.sqrt(pcov_tpl[2, 2]),
+        }
+    except Exception:
+        results["truncated"] = None
+
+    return results
+
+
+def plot_cluster_frequency(df: Any, ff: float) -> Figure:
     """Genera gráfico de barras de frecuencia vs tamaño de cluster."""
     data = compute_cluster_frequency(df, ff)
     if data.empty:
         return Figure()
 
-    fs = 14
+    fs = 1.8 * 12
     sizes = data["cluster_size"].values
     freq = data["frecuencia"].values
 
@@ -44,35 +117,54 @@ def plot_cluster_frequency(df: pd.DataFrame, ff: float) -> Figure:
     ax.set_yscale("log")
     ax.set_xlabel("Tamaño de cluster", fontsize=fs)
     ax.set_ylabel("Frecuencia", fontsize=fs)
-    ax.set_title(f"Frecuencia vs Tamaño (ff={ff}, i={I_VALUE})", fontsize=fs * 0.8)
+    ax.set_title(f"Frecuencia vs Tamaño de cluster (ff={ff}, i={I_VALUE})", fontsize=fs * 0.8)
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
     return fig
 
 
-def _ks_statistic(data: np.ndarray, alpha: float, xmin: int) -> float:
-    """Calcula estadístico KS."""
-    sizes_sorted = np.sort(data)
-    n = len(sizes_sorted)
-
-    ccdf_emp = 1 - np.arange(1, n + 1) / n
-    ccdf_theory = (sizes_sorted / xmin) ** (-alpha + 1)
-    ccdf_theory = np.clip(ccdf_theory, 1e-15, 1.0)
-
-    return np.max(np.abs(ccdf_emp - ccdf_theory))
-
-
-def plot_cluster_ccdf(df: pd.DataFrame, ff: float, vel0: float) -> list[Figure]:
-    """Genera gráfico CCDF log-log usando solo MLE + KS."""
+def plot_cluster_ccdf(df: Any, ff: float, vel0: float) -> list[Figure]:
+    """Genera gráfico CCDF log-log de tamaños de cluster."""
     raw_sizes = compute_cluster_sizes(df, ff, vel0)
 
     if len(raw_sizes) < 2 or len(np.unique(raw_sizes)) < 2:
         return []
 
-    fs = 14
-    xm = int(raw_sizes.min())
-    alpha = compute_alpha_mle(raw_sizes, xm)
-    D = _ks_statistic(raw_sizes, alpha, xm)
+    fs = 1.8 * 12
+
+    try:
+        fit = powerlaw.Fit(
+            raw_sizes,
+            discrete=True,
+            verbose=False,
+            xmin=1,
+            parameter_ranges={
+                "power_law": {"alpha": (1, 10)},
+                "truncated_power_law": {"alpha": (1, 10), "Lambda": (1e-10, 10)},
+                "exponential": {"Lambda": (1e-10, 10)},
+            },
+        )
+    except Exception as e:
+        print(f"Error en ajuste powerlaw CCDF vel0={vel0}: {e}")
+        return []
+
+    xmin_options = [1, int(raw_sizes.min())]
+    best_alpha, best_xmin, best_D = None, None, float("inf")
+
+    for xm in xmin_options:
+        alpha = compute_alpha_mle(raw_sizes, xm)
+        try:
+            fit_test = powerlaw.Fit(raw_sizes, discrete=True, verbose=False, xmin=xm)
+            D = fit_test.power_law.D
+            if D < best_D:
+                best_D, best_alpha, best_xmin = D, alpha, xm
+        except Exception:
+            continue
+
+    if best_alpha is None:
+        return []
+
+    alpha_mle = best_alpha
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -81,32 +173,90 @@ def plot_cluster_ccdf(df: pd.DataFrame, ff: float, vel0: float) -> list[Figure]:
 
     x_int = np.arange(1, int(raw_sizes.max()) + 1)
 
-    pdf_pl = x_int ** (-alpha)
+    pdf_pl = x_int ** (-alpha_mle)
     pdf_pl = pdf_pl / np.sum(pdf_pl)
     ccdf_pl = compute_ccdf_from_pdf(pdf_pl)
     ax.step(x_int, ccdf_pl, where="post", color=COLORS["power_law"],
-            label=f"PL (α={alpha:.2f}, D={D:.3f})")
+            label=f"Power Law (α={alpha_mle:.2f})")
+
+    try:
+        tpl = fit.truncated_power_law
+        alpha_tpl, lam_tpl = tpl.alpha, tpl.Lambda
+        pdf_tpl = (x_int ** (-alpha_tpl)) * np.exp(-lam_tpl * (x_int - 1))
+        pdf_tpl = pdf_tpl / np.sum(pdf_tpl)
+        ccdf_tpl = compute_ccdf_from_pdf(pdf_tpl)
+        ax.step(x_int, ccdf_tpl, where="post", color=COLORS["truncated"],
+                label=f"Truncated PL (α={alpha_tpl:.2f}, λ={lam_tpl:.2e})")
+    except Exception:
+        pass
+
+    try:
+        exp_dist = fit.exponential
+        lam_exp = exp_dist.Lambda
+        pdf_exp = lam_exp * np.exp(-lam_exp * x_int)
+        pdf_exp = pdf_exp / np.sum(pdf_exp)
+        ccdf_exp = compute_ccdf_from_pdf(pdf_exp)
+        ax.step(x_int, ccdf_exp, where="post", color=COLORS["exponential"],
+                label=f"Exponential (λ={lam_exp:.2e})")
+    except Exception:
+        pass
 
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel("Tamaño de cluster", fontsize=fs)
     ax.set_ylabel("CCDF", fontsize=fs)
-    ax.set_title(f"CCDF (ff={ff}, v0={vel0})", fontsize=fs * 0.8)
+    ax.set_title(f"CCDF log-log (ff={ff}, v0={vel0}, i={I_VALUE})", fontsize=fs * 0.8)
     ax.legend(fontsize=fs * 0.6, loc="lower left")
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
 
-    return [fig]
+    figuras = [fig]
+
+    try:
+        comp_exp = fit.distribution_compare("power_law", "exponential")
+        comp_trunc = fit.distribution_compare("power_law", "truncated_power_law")
+
+        table_data = [
+            ["Modelo", "R (likelihood ratio)", "p-value"],
+            ["PL vs Trunc. PL", f"{comp_trunc[0]:.3f}", f"{comp_trunc[1]:.3f}"],
+            ["PL vs Exponential", f"{comp_exp[0]:.3f}", f"{comp_exp[1]:.3f}"],
+        ]
+        figuras.append(_create_table(table_data, "Comparación de distribuciones"))
+
+        param_data = [
+            ["Modelo", "Parámetros"],
+            ["Power Law", f"α={alpha_mle:.4f}, xmin={best_xmin:.0f}, D={fit.power_law.D:.4f}"],
+        ]
+        try:
+            param_data.append(["Truncated PL", f"α={fit.truncated_power_law.alpha:.4f}, "
+                              f"λ={fit.truncated_power_law.Lambda:.2e}, D={fit.truncated_power_law.D:.4f}"])
+        except Exception:
+            pass
+        try:
+            param_data.append(["Exponential", f"λ={fit.exponential.Lambda:.2e}, D={fit.exponential.D:.4f}"])
+        except Exception:
+            pass
+        figuras.append(_create_table(param_data, "Parámetros ajustados"))
+    except Exception:
+        pass
+
+    return figuras
 
 
 def _create_table(data: list[list[str]], titulo: str = "") -> Figure:
-    """Crea una tabla."""
+    """Crea una tabla con formato mejorado."""
     fs = 10
     num_cols = len(data[0]) if data else 2
     fig, ax = plt.subplots(figsize=(10, max(2, len(data) * 0.4)))
     ax.axis("off")
 
-    col_widths = [0.3, 0.6] if num_cols == 2 else [0.25, 0.35, 0.35]
+    if num_cols == 3:
+        col_widths = [0.25, 0.35, 0.35]
+    elif num_cols == 2:
+        col_widths = [0.3, 0.6]
+    else:
+        col_widths = [0.35, 0.35, 0.3]
+
     table = ax.table(cellText=data, loc="center", cellLoc="center", colWidths=col_widths)
     table.auto_set_font_size(False)
     table.set_fontsize(fs)
@@ -126,54 +276,29 @@ def _create_table(data: list[list[str]], titulo: str = "") -> Figure:
     return fig
 
 
-def fit_km_curves(binned_df: pd.DataFrame) -> dict:
-    """Ajusta modelos a datos binned."""
-    x = binned_df["s_center"].values
-    y = binned_df["km_mean"].values
-    sigma = binned_df["km_std"].values
-    sigma = np.where(sigma <= 0, 1e-10, sigma)
-
-    results = {}
-
-    try:
-        popt, _ = curve_fit(power_law, x, y, sigma=sigma, absolute_sigma=True, maxfev=5000)
-        results["power_law"] = {"C": popt[0], "beta": popt[1]}
-    except Exception:
-        results["power_law"] = None
-
-    try:
-        popt, _ = curve_fit(exponential, x, y, sigma=sigma, absolute_sigma=True, maxfev=5000)
-        results["exponential"] = {"C": popt[0], "lam": popt[1]}
-    except Exception:
-        results["exponential"] = None
-
-    return results
-
-
-def plot_cluster_km_scatter(df: pd.DataFrame, ff: float, vel0: float) -> Figure:
-    """Genera gráfico log-log de K/m vs tamaño."""
+def plot_cluster_km_scatter(df: Any, ff: float, vel0: float) -> Figure:
+    """Genera gráfico scatter de K/m vs tamaño."""
     data = compute_cluster_km(df, ff, vel0)
     if data.empty or len(data) < 2:
         return Figure()
 
-    fs = 14
+    fs = 1.8 * 12
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    ax.scatter(data["cluster_size"], data["km"], color=COLORS["primary"], alpha=0.5, s=30)
-
-    ax.set_xscale("log")
-    ax.set_yscale("log")
+    ax.scatter(data["cluster_size"], data["km"], color=COLORS["primary"], alpha=0.3, s=20)
 
     km = (vel0**2) / 2
+    ax.set_xscale("log")
+    ax.set_yscale("log")
     ax.set_xlabel("Tamaño de cluster", fontsize=fs)
-    ax.set_ylabel("K/m cluster", fontsize=fs)
-    ax.set_title(f"K/m vs Tamaño (ff={ff}, K/m={km:.1f})", fontsize=fs * 0.8)
+    ax.set_ylabel("K/m cluster [J/kg]", fontsize=fs)
+    ax.set_title(f"K/m vs Tamaño (ff={ff}, K/m={km:.1f} J/kg)", fontsize=fs * 0.8)
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
     return fig
 
 
-def plot_cluster_km_logfit(df: pd.DataFrame, ff: float, vel0: float) -> list[Figure]:
+def plot_cluster_km_logfit(df: Any, ff: float, vel0: float) -> list[Figure]:
     """Genera gráfico log-log de K/m con ajustes."""
     raw_data = compute_cluster_km(df, ff, vel0)
     binned_data = compute_cluster_km_binned(df, ff, vel0, n_bins=10)
@@ -181,44 +306,65 @@ def plot_cluster_km_logfit(df: pd.DataFrame, ff: float, vel0: float) -> list[Fig
     if raw_data.empty or binned_data.empty:
         return []
 
-    fs = 14
+    fs = 1.8 * 12
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    ax.scatter(raw_data["cluster_size"], raw_data["km"], color=COLORS["primary"],
-             alpha=0.3, s=20, label="Datos")
+    ax.scatter(raw_data["cluster_size"], raw_data["km"], color=COLORS["primary"], alpha=0.3, s=20, label="Datos crudos")
 
     ax.errorbar(binned_data["s_center"], binned_data["km_mean"], yerr=binned_data["km_std"],
-              fmt="o", color=COLORS["power_law"], markersize=8, capsize=4,
-              label="Binning")
+                fmt="o", color=COLORS["power_law"], markersize=8, capsize=4, label="Log-binning (10 bins)")
 
-    x_fit = np.logspace(np.log10(binned_data["s_center"].min()),
-                    np.log10(binned_data["s_center"].max()), 100)
+    x_fit = np.logspace(np.log10(binned_data["s_center"].min()), np.log10(binned_data["s_center"].max()), 100)
 
     fit_results = fit_km_curves(binned_data)
 
     if fit_results.get("power_law"):
         pl = fit_results["power_law"]
-        ax.plot(x_fit, power_law(x_fit, pl["C"], pl["beta"]), "-",
-               color=COLORS["power_law"], linewidth=2, label=f"PL: β={pl['beta']:.3f}")
+        y_pl = power_law(x_fit, pl["C"], pl["beta"])
+        ax.plot(x_fit, y_pl, "-", color=COLORS["power_law"], linewidth=2, label=f"Power Law: β={pl['beta']:.3f}")
+
+    if fit_results.get("exponential"):
+        exp = fit_results["exponential"]
+        y_exp = exponential(x_fit, exp["C"], exp["lam"])
+        ax.plot(x_fit, y_exp, "--", color=COLORS["exponential"], linewidth=2, label=f"Exponential: λ={exp['lam']:.3f}")
+
+    if fit_results.get("truncated"):
+        tpl = fit_results["truncated"]
+        y_tpl = truncated_pl(x_fit, tpl["C"], tpl["beta"], tpl["lam"])
+        ax.plot(x_fit, y_tpl, "-.", color=COLORS["truncated"], linewidth=2, label=f"Trunc. PL: β={tpl['beta']:.3f}, λ={tpl['lam']:.3f}")
 
     km = (vel0**2) / 2
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel("Tamaño de cluster", fontsize=fs)
-    ax.set_ylabel("K/m cluster", fontsize=fs)
-    ax.set_title(f"K/m vs Tamaño (ff={ff}, K/m={km:.1f})", fontsize=fs * 0.8)
+    ax.set_ylabel("K/m cluster [J/kg]", fontsize=fs)
+    ax.set_title(f"K/m vs Tamaño (ff={ff}, K/m={km:.1f} J/kg)", fontsize=fs * 0.8)
     ax.legend(fontsize=fs * 0.6, loc="upper right")
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
 
-    table_data = [["Modelo", "β"]]
+    figuras = [fig]
+
+    table_data = [["Modelo", "β", "λ"]]
+
     if fit_results.get("power_law"):
-        table_data.append(["PL", f"{fit_results['power_law']['beta']:.3f}"])
+        pl = fit_results["power_law"]
+        table_data.append(["Power Law", format_uncertainty(pl['beta'], pl['beta_err']), "-"])
 
-    return [fig, _create_table(table_data, "Parámetros")]
+    if fit_results.get("exponential"):
+        exp = fit_results["exponential"]
+        table_data.append(["Exponential", "-", format_uncertainty(exp['lam'], exp['lam_err'])])
+
+    if fit_results.get("truncated"):
+        tpl = fit_results["truncated"]
+        table_data.append(["Trunc. PL", format_uncertainty(tpl['beta'], tpl['beta_err']), format_uncertainty(tpl['lam'], tpl['lam_err'])])
+
+    figuras.append(_create_table(table_data, "Parámetros ajustados"))
+
+    return figuras
 
 
-def fit_rg_linear(binned_df: pd.DataFrame) -> dict:
+def fit_rg_linear(binned_df: pd.DataFrame) -> dict[str, Any]:
     """Ajusta regresión lineal a log10(Rg) vs log10(s)."""
     if binned_df.empty or len(binned_df) < 2:
         return {}
@@ -227,49 +373,58 @@ def fit_rg_linear(binned_df: pd.DataFrame) -> dict:
     y = binned_df["log_rg_mean"].values
 
     m, C = np.polyfit(x, y, 1)
+
     y_pred = m * x + C
     ss_res = np.sum((y - y_pred) ** 2)
     ss_tot = np.sum((y - np.mean(y)) ** 2)
     r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
 
-    return {"df": 1 / m if m != 0 else 0, "intercept": C, "r_squared": r_squared}
+    df = 1 / m if m != 0 else 0
+
+    return {"df": df, "intercept": C, "r_squared": r_squared, "slope": m}
 
 
-def plot_cluster_rg_logfit(df: pd.DataFrame, ff: float, vel0: float) -> list[Figure]:
-    """Genera gráfico log-log de Rg vs tamaño."""
+def plot_cluster_rg_logfit(df: Any, ff: float, vel0: float) -> list[Figure]:
+    """Genera gráfico log-log de Rg vs tamaño con ajuste lineal."""
     raw_data = compute_cluster_rg(df, ff, vel0)
     binned_data = compute_rg_binned(df, ff, vel0, n_bins=12)
 
     if raw_data.empty or binned_data.empty:
         return []
 
-    fs = 14
+    fs = 1.8 * 12
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    ax.scatter(raw_data["cluster_size"], raw_data["rg"], color=COLORS["primary"],
-             alpha=0.3, s=20, label="Datos")
+    ax.scatter(raw_data["cluster_size"], raw_data["rg"], color=COLORS["primary"], alpha=0.3, s=20, label="Datos crudos")
 
     ax.errorbar(binned_data["s_center"], 10 ** binned_data["log_rg_mean"],
-              yerr=10 ** binned_data["log_rg_std"], fmt="o", color=COLORS["power_law"],
-              markersize=8, capsize=4, label="Binning")
+                yerr=10 ** binned_data["log_rg_std"], fmt="o", color=COLORS["power_law"],
+                markersize=8, capsize=4, label="Log-binning (12 bins)")
 
     fit = fit_rg_linear(binned_data)
 
-    x_fit = np.logspace(np.log10(binned_data["s_center"].min()),
-                      np.log10(binned_data["s_center"].max()), 100)
-    y_fit = 10 ** (fit.get("slope", 1) * np.log10(x_fit) + fit.get("intercept", 0))
-    ax.plot(x_fit, y_fit, "-", color=COLORS["truncated"], linewidth=2,
-            label=f"df={fit.get('df', 0):.2f}")
+    x_fit = np.logspace(np.log10(binned_data["s_center"].min()), np.log10(binned_data["s_center"].max()), 100)
+    y_fit = 10 ** (fit["slope"] * np.log10(x_fit) + fit["intercept"])
+    ax.plot(x_fit, y_fit, "-", color=COLORS["truncated"], linewidth=2, label=f"Ajuste: d_f={fit['df']:.2f}")
 
     km = (vel0**2) / 2
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlabel("Tamaño de cluster", fontsize=fs)
-    ax.set_ylabel("Rg", fontsize=fs)
-    ax.set_title(f"Rg vs Tamaño (ff={ff}, K/m={km:.1f})", fontsize=fs * 0.8)
+    ax.set_xlabel("Tamaño de cluster (s)", fontsize=fs)
+    ax.set_ylabel("Radio de giro R_g", fontsize=fs)
+    ax.set_title(f"R_g vs Tamaño (ff={ff}, K/m={km:.1f} J/kg)", fontsize=fs * 0.8)
     ax.legend(fontsize=fs * 0.6, loc="lower right")
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
 
-    table_data = [["Parámetro", "Valor"], ["df", f"{fit.get('df', 0):.2f}"], ["R2", f"{fit.get('r_squared', 0):.3f}"]]
-    return [fig, _create_table(table_data, "Dimensión Fractal")]
+    figuras = [fig]
+
+    table_data = [["Parámetro", "Valor"]]
+    if fit:
+        table_data.append(["d_f", f"{fit['df']:.2f}"])
+        table_data.append(["C", f"{fit['intercept']:.3f}"])
+        table_data.append(["R²", f"{fit['r_squared']:.3f}"])
+
+    figuras.append(_create_table(table_data, "Dimensión Fractal"))
+
+    return figuras
