@@ -61,7 +61,7 @@ def plot_erosion_boxplot(df: pd.DataFrame, ff: float) -> Figure:
 
 
 def plot_erosion_heatmap(df: pd.DataFrame, ff: float, vel0: float) -> Figure:
-    """Genera heatmap square de erosión por posición.
+    """Genera heatmap de partículas por posición.
 
     Args:
         df: DataFrame con datos.
@@ -81,12 +81,14 @@ def plot_erosion_heatmap(df: pd.DataFrame, ff: float, vel0: float) -> Figure:
 
     data_sorted = data.sort_index(ascending=False)
 
+    annot_data = data_sorted.replace(0, "")
+
     sns.heatmap(
         data_sorted,
-        annot=True,
+        annot=annot_data,
         fmt=".0f",
         cmap="YlOrRd",
-        cbar_kws={"label": "Y promedio", "shrink": 0.8},
+        cbar_kws={"label": "Y", "shrink": 0.8},
         ax=ax,
         linewidths=0.5,
         linecolor="white",

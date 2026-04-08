@@ -136,7 +136,6 @@ def compute_heatmap_data(df: pd.DataFrame, ff: float, vel0: float) -> pd.DataFra
     df_filt = filter_by_vel0(df_filt, vel0)
     max_i = df_filt["i"].max()
     df_filt = filter_by_i_value(df_filt, max_i)
-    df_filt = filter_is_erosion(df_filt)
 
     grouped = df_filt.groupby(["posx", "posy"]).size().reset_index(name="id")
 
