@@ -117,6 +117,9 @@ def compute_penetration_depth(df: pd.DataFrame, ff: float) -> pd.DataFrame:
     return result.sort_values("vel0")
 
 
+GRID_POSITIONS = [0.0, 1.52, 3.04]
+
+
 def compute_heatmap_data(df: pd.DataFrame, ff: float, vel0: float) -> pd.DataFrame:
     """Calcula IDs únicos erosionadas por posición (posx, posy).
 
@@ -135,7 +138,12 @@ def compute_heatmap_data(df: pd.DataFrame, ff: float, vel0: float) -> pd.DataFra
 
     grouped = df_filt.groupby(["posx", "posy"])["id"].nunique().reset_index()
 
-    pivot = grouped.pivot(index="posy", columns="posx", values="id").fillna(0)
+    pivot = grouped.pivot(index="posy", columns="posx", values="id")
+
+    full_index = pd.Index(GRID_POSITIONS, name="posy")
+    full_columns = pd.Index(GRID_POSITIONS, name="posx")
+
+    pivot = pivot.reindex(index=full_index, columns=full_columns).fillna(0)
 
     pivot.index = (pivot.index / 1.52).round(2)
     pivot.columns = (pivot.columns / 1.52).round(2)
