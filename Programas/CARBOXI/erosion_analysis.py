@@ -25,7 +25,7 @@ from ovito.pipeline import Pipeline, StaticSource  # type: ignore[import-untyped
 from .config_and_discovery import extraer_metadatos, print_progress
 from .storage_and_viz import read_dump
 
-_ANALYSIS_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]
+_ANALYSIS_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 
 
 def build_ovito_pipeline(cutoff: float) -> Pipeline:
@@ -295,7 +295,6 @@ def _empty_result() -> pl.DataFrame:
             "vx": pl.Float64,
             "vy": pl.Float64,
             "vz": pl.Float64,
-            "fz": pl.Float64,
             "coordinacion": pl.Float64,
             "cluster": pl.UInt32,
             "proyectil_erosion": pl.Boolean,

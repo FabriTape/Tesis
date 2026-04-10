@@ -24,8 +24,8 @@ timestep        = 5e-11      # Paso temporal [s]
 [sweep]
 fills           = [0.35]
 vels            = [-25]
-angles          = [0]
-moves           = [-2, 0, 2]
+angles          = [90]
+moves           = [0]
 total_steps     = [2000000]   # Un valor por cada combinación fill×vel×angle
 grain_radius_um = 0.76        # Radio del grano [μm] (para cálculo de desplazamiento)
 xrotate         = 1

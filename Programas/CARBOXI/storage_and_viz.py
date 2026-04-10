@@ -19,7 +19,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import polars as pl
 
-_ALL_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz", "fz"]
+_ALL_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 _WAVE_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 
 _STEP_TO_US = 1.25

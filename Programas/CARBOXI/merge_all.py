@@ -6,7 +6,7 @@ from .config_and_discovery import discover_simulations, extraer_metadatos
 
 
 def merge_all_parquet(path_file: Path) -> pl.DataFrame:
-    datos = discover_simulations(path_file, "file")
+    datos = discover_simulations(path_file,"ff_", "file")
     temp = []
     for dato in datos:
         metadatos = extraer_metadatos(str(dato.name).replace(".parquet", ""))
