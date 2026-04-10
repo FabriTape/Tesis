@@ -99,7 +99,7 @@ def plot_erosion_heatmap(
     km = (vel0**2) / 2
     ax.set_xlabel("posx (σ)", fontsize=fs)
     ax.set_ylabel("posy (σ)", fontsize=fs)
-    ax.set_title(f"Erosión por posición (ff={ff}, K/m={km:.1f} J/kg, i={I_VALUE})",
+    ax.set_title(f"Erosión por posición (ff={ff}, K/m={km:.1f} J/kg)",
                  fontsize=fs * 0.8)
     ax.tick_params(labelsize=fs * 0.7)
     plt.tight_layout()

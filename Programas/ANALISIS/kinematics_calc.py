@@ -153,9 +153,13 @@ def compute_heatmap_data(
     max_i = df_filt["i"].max()
     df_filt = filter_by_i_value(df_filt, max_i)
 
+    # Filtrar partículas válidas: type=1 O (type=2 Y z>1e-4)
+    df_validas = df_filt[(df_filt["type"] == 1) | 
+                         ((df_filt["type"] == 2) & (df_filt["z"] > 1e-4))]
+
     use_pairs = grid_pairs if grid_pairs is not None else GRID_PAIRS
 
-    grouped = df_filt.groupby(["posx", "posy"]).size().reset_index(name="id")
+    grouped = df_validas.groupby(["posx", "posy"]).size().reset_index(name="id")
     grouped = grouped.set_index(["posx", "posy"])["id"]
 
     result = {}

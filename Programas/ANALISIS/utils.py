@@ -12,8 +12,8 @@ from scipy.optimize import brentq
 CONFIG: dict[str, Any] = {
     "i_value": 80,
     "threshold_z": 1e-4,
-    "csv_path": Path("/home/tutturuu/Documentos/merge_resultados.csv"),
-    "output_dir": Path("/home/tutturuu/Documentos/figuras"),
+    "csv_path": Path("/home/tutturuu/Documentos/resultados0r/merge_resultados.csv"),
+    "output_dir": Path("/home/tutturuu/Documentos/resultados0r/figuras"),
     "ff_values": [0.15, 0.35],
 }
 

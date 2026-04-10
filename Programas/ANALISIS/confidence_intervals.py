@@ -23,90 +23,156 @@ def filter_mad(data: np.ndarray) -> np.ndarray:
     """Filtra outliers mediante Median Absolute Deviation.
 
     Elimina datos donde |Xi - Mediana| > 3 * MAD.
+    Añade ceros para mantener 10 datos totales.
+    Si después de filtrar todo es 0, usa los datos originales.
 
     Args:
         data: Array de muestras de erosión.
 
     Returns:
-        Array sin outliers detectados por MAD.
+        Array con outliers eliminados y ceros añadidos para mantener n=10.
     """
     median = np.median(data)
     mad = np.median(np.abs(data - median))
-    return data[np.abs(data - median) <= 3 * mad]
+    filtered = data[np.abs(data - median) <= 3 * mad]
+
+    if np.sum(filtered) == 0:
+        filtered = data
+
+    n_zeros = 10 - len(filtered)
+    zeros = np.zeros(n_zeros)
+
+    return np.concatenate([filtered, zeros])
 
 
 def filter_tukey(data: np.ndarray) -> np.ndarray:
     """Filtra outliers mediante el rango intercuartílico (IQR).
 
     Elimina datos fuera de [Q1 - 1.5*IQR, Q3 + 1.5*IQR].
+    Añade ceros para mantener 10 datos totales.
+    Si después de filtrar todo es 0, usa los datos originales.
 
     Args:
         data: Array de muestras de erosión.
 
     Returns:
-        Array sin outliers detectados por Tukey.
+        Array con outliers eliminados y ceros añadidos para mantener n=10.
     """
     q1 = np.percentile(data, 25)
     q3 = np.percentile(data, 75)
     iqr = q3 - q1
     lower = q1 - 1.5 * iqr
     upper = q3 + 1.5 * iqr
-    return data[(data >= lower) & (data <= upper)]
+    filtered = data[(data >= lower) & (data <= upper)]
+
+    if np.sum(filtered) == 0:
+        filtered = data
+
+    n_zeros = 10 - len(filtered)
+    zeros = np.zeros(n_zeros)
+
+    return np.concatenate([filtered, zeros])
 
 
-def compute_student_ci(data: np.ndarray, alpha: float = 0.05) -> Tuple[float, float]:
-    """Calcula IC paramétrico con distribución t-Student.
+def compute_student_ci(
+    data: np.ndarray, alpha: float = 0.05
+) -> Tuple[float, float, float]:
+    """Calcula IC con distribución t-Student.
 
-    Fórmula: X̄ ± t_{n-1, α/2} * σ̂ / √n
+    Si mu > 0: err% = sigma/mu * 100
+    Si mu = 0: err% = sigma/rango * 100
 
     Args:
-        data: Array de muestras.
+        data: Array de muestras (ya incluye ceros).
         alpha: Nivel de significancia (default 0.05 para IC 95%).
 
     Returns:
-        Tupla (limite_inferior, limite_superior).
+        Tupla (lower, upper, err_porcentual).
     """
+    from scipy.stats import t
+
     n = len(data)
-    mean = np.mean(data)
+    mu = np.mean(data)
     std = np.std(data, ddof=1)
-    t_crit = t.ppf(1 - alpha / 2, df=n - 1)
-    margin = t_crit * std / np.sqrt(n)
-    return mean - margin, mean + margin
+
+    sigma = t.ppf(0.975, n - 1) * std / np.sqrt(n)
+
+    if mu == 0:
+        rango = np.max(data) - np.min(data)
+        err_pct = (sigma / rango) * 100 if rango > 0 else 0
+    else:
+        err_pct = (sigma / mu) * 100
+
+    return mu - sigma, mu + sigma, err_pct
 
 
-def compute_binomial_ci(sorted_data: np.ndarray) -> Tuple[float, float]:
-    """Calcula IC no paramétrico con estadísticos de orden.
+def compute_binomial_ci(data: np.ndarray) -> Tuple[float, float, float]:
+    """Calcula IC binomial usando estadísticos de orden.
 
-    Usa [X_(2), X_(n-1)] del arreglo ordenado.
+    Si mu > 0: err% = sigma/mu * 100
+    Si mu = 0: err% = sigma/rango * 100
 
     Args:
-        sorted_data: Array ordenado de menor a mayor.
+        data: Array de muestras (ya incluye ceros).
 
     Returns:
-        Tupla (limite_inferior, limite_superior).
+        Tupla (lower, upper, err_porcentual).
     """
-    return sorted_data[1], sorted_data[len(sorted_data) - 2]
+    sorted_data = np.sort(data)
+    n = len(sorted_data)
+
+    if n < 3:
+        return (0.0, 0.0, 0.0)
+
+    X_lo = sorted_data[1]
+    X_hi = sorted_data[-2]
+    mu = np.median(sorted_data)
+    sigma = (X_hi - X_lo) / 2
+
+    if mu == 0:
+        rango = np.max(data) - np.min(data)
+        err_pct = (sigma / rango) * 100 if rango > 0 else 0
+    else:
+        err_pct = (sigma / mu) * 100
+
+    return X_lo, X_hi, err_pct
 
 
-def compute_bootstrap_ci(data: np.ndarray, B: int = 100_000) -> Tuple[float, float]:
-    """Calcula IC por remuestreo empírico (bootstrap) vectorizado.
+def compute_bootstrap_ci(
+    data: np.ndarray, B: int = 200_000
+) -> Tuple[float, float, float]:
+    """Calcula IC por remuestreo empírico (bootstrap).
 
-    Genera B medias con reemplazo y toma percentiles 2.5 y 97.5.
+    Si mu > 0: err% = sigma/mu * 100
+    Si mu = 0: err% = sigma/rango * 100
 
     Args:
         data: Array de muestras.
         B: Número de remuestras bootstrap.
 
     Returns:
-        Tupla (limite_inferior, limite_superior).
+        Tupla (lower, upper, err_porcentual).
     """
     n = len(data)
+    mu = np.mean(data)
+
+    if n < 2:
+        return (0.0, 0.0, 0.0)
+
     indices = np.random.randint(0, n, size=(B, n))
     bootstrap_means = data[indices].mean(axis=1)
-    return (
-        float(np.percentile(bootstrap_means, 2.5)),
-        float(np.percentile(bootstrap_means, 97.5)),
-    )
+
+    lo = float(np.percentile(bootstrap_means, 2.5))
+    hi = float(np.percentile(bootstrap_means, 97.5))
+    sigma = (hi - lo) / 2
+
+    if mu == 0:
+        rango = np.max(data) - np.min(data)
+        err_pct = (sigma / rango) * 100 if rango > 0 else 0
+    else:
+        err_pct = ((hi - lo) / (2 * mu)) * 100
+
+    return lo, hi, err_pct
 
 
 def compute_error_pct(lower: float, upper: float, mean: float) -> float:
@@ -122,6 +188,8 @@ def compute_error_pct(lower: float, upper: float, mean: float) -> float:
     Returns:
         Error porcentual.
     """
+    if mean == 0:
+        return 0.0
     return ((upper - lower) / (2 * mean)) * 100
 
 
@@ -130,9 +198,9 @@ def build_table_row(
     mean: float,
     std: float,
     t_crit: float,
-    student_ci: Tuple[float, float],
-    binomial_ci: Tuple[float, float],
-    bootstrap_ci: Tuple[float, float],
+    student_ci: Tuple[float, float, float],
+    binomial_ci: Tuple[float, float, float],
+    bootstrap_ci: Tuple[float, float, float],
 ) -> dict:
     """Construye una fila de la tabla comparativa de ICs.
 
@@ -141,25 +209,32 @@ def build_table_row(
         mean: Media muestral.
         std: Desviación estándar muestral.
         t_crit: Valor crítico t-Student.
-        student_ci: Tupla (lower, upper) del IC t-Student.
-        binomial_ci: Tupla (lower, upper) del IC Binomial.
-        bootstrap_ci: Tupla (lower, upper) del IC Bootstrap.
+        student_ci: Tupla (lower, upper, err_pct) del IC t-Student.
+        binomial_ci: Tupla (lower, upper, err_pct) del IC Binomial.
+        bootstrap_ci: Tupla (lower, upper, err_pct) del IC Bootstrap.
 
     Returns:
         Diccionario con las columnas de la tabla.
     """
-    student_err = compute_error_pct(student_ci[0], student_ci[1], mean)
-    binomial_err = compute_error_pct(binomial_ci[0], binomial_ci[1], mean)
-    bootstrap_err = compute_error_pct(bootstrap_ci[0], bootstrap_ci[1], mean)
+    if mean == 0:
+        return {
+            "Tamaño n": n,
+            "Media ± t·σ/√n": "0.0000 ± 0.0000",
+            "err % Student": "—",
+            "IC Binomial": "[0.0000, 0.0000]",
+            "err % Binomial": "—",
+            "IC Bootstrap": "[0.0000, 0.0000]",
+            "err % Bootstrap": "—",
+        }
 
     return {
         "Tamaño n": n,
         "Media ± t·σ/√n": f"{mean:.4f} ± {t_crit * std / np.sqrt(n):.4f}",
-        "err % Student": f"{student_err:.2f}",
+        "err % Student": f"{student_ci[2]:.2f}",
         "IC Binomial": f"[{binomial_ci[0]:.4f}, {binomial_ci[1]:.4f}]",
-        "err % Binomial": f"{binomial_err:.2f}",
+        "err % Binomial": f"{binomial_ci[2]:.2f}",
         "IC Bootstrap": f"[{bootstrap_ci[0]:.4f}, {bootstrap_ci[1]:.4f}]",
-        "err % Bootstrap": f"{bootstrap_err:.2f}",
+        "err % Bootstrap": f"{bootstrap_ci[2]:.2f}",
     }
 
 
@@ -177,9 +252,8 @@ def compute_ics_for_sample(data: np.ndarray) -> dict:
     std = float(np.std(data, ddof=1))
     t_crit = float(t.ppf(0.975, df=n - 1))
 
-    sorted_data = np.sort(data)
     student_ci = compute_student_ci(data)
-    binomial_ci = compute_binomial_ci(sorted_data)
+    binomial_ci = compute_binomial_ci(data)
     bootstrap_ci = compute_bootstrap_ci(data)
 
     return build_table_row(n, mean, std, t_crit, student_ci, binomial_ci, bootstrap_ci)
@@ -198,22 +272,34 @@ def compute_ics_numeric(data: np.ndarray) -> dict:
     mean = float(np.mean(data))
     std = float(np.std(data, ddof=1))
 
-    sorted_data = np.sort(data)
-    student_ci = compute_student_ci(data)
-    binomial_ci = compute_binomial_ci(sorted_data)
-    bootstrap_ci = compute_bootstrap_ci(data)
+    unique_vals = len(set(data))
+    if mean == 0 or unique_vals < 2:
+        return {
+            "n": n,
+            "mean": mean,
+            "std": std,
+            "err_student": 0.0,
+            "err_binomial": 0.0,
+            "err_bootstrap": 0.0,
+            "student_lo": 0.0,
+            "student_hi": 0.0,
+            "binomial_lo": 0.0,
+            "binomial_hi": 0.0,
+            "bootstrap_lo": 0.0,
+            "bootstrap_hi": 0.0,
+        }
 
-    err_student = compute_error_pct(student_ci[0], student_ci[1], mean)
-    err_binomial = compute_error_pct(binomial_ci[0], binomial_ci[1], mean)
-    err_bootstrap = compute_error_pct(bootstrap_ci[0], bootstrap_ci[1], mean)
+    student_ci = compute_student_ci(data)
+    binomial_ci = compute_binomial_ci(data)
+    bootstrap_ci = compute_bootstrap_ci(data)
 
     return {
         "n": n,
         "mean": mean,
         "std": std,
-        "err_student": err_student,
-        "err_binomial": err_binomial,
-        "err_bootstrap": err_bootstrap,
+        "err_student": student_ci[2],
+        "err_binomial": binomial_ci[2],
+        "err_bootstrap": bootstrap_ci[2],
         "student_lo": student_ci[0],
         "student_hi": student_ci[1],
         "binomial_lo": binomial_ci[0],
@@ -232,8 +318,8 @@ def _round_1sf(val: float) -> str:
     Returns:
         String con 1 cifra significativa.
     """
-    if val == 0:
-        return "0"
+    if val == 0 or np.isnan(val):
+        return "—" if np.isnan(val) else "0"
     exp = int(np.floor(np.log10(abs(val))))
     rounded = round(val, -exp)
     if exp >= 0:
@@ -247,38 +333,58 @@ def create_per_ff_consolidated_figure(ff: float, results: list[dict]) -> Figure:
     sorted_results = sorted(results, key=lambda r: r["vel0"], reverse=True)
     vel_values = [str(int(r["vel0"])) for r in sorted_results]
 
-    # Mapeo de claves a etiquetas y bloques
-    metrics_map = {"S": "Student", "B": "Bootstrap", "Bin": "Binomial"}
     blocks = [("raw", "Crudos"), ("mad", "MAD"), ("tukey", "Tukey")]
 
-    def _get_val(res, block_key, metric_key):
+    def _get_intervals(res, block_key):
         m = res.get(block_key)
         if not m:
-            return "—"
+            return ["—", "—", "—"]
+        mean = m.get("mean", 0)
+        student = f"{mean:.2f} ± {(m['student_hi'] - m['student_lo']) / 2:.2f}"
+        bootstrap = f"{mean:.2f} ± {(m['bootstrap_hi'] - m['bootstrap_lo']) / 2:.2f}"
+        binomial = f"[{m['binomial_lo']:.2f}, {m['binomial_hi']:.2f}]"
+        return [student, bootstrap, binomial]
 
-        # Helper para formatear intervalos
-        f = lambda lo, hi: f"{_round_1sf((lo + hi) / 2)} ± {_round_1sf((hi - lo) / 2)}"
+    def _get_n(r, block_key):
+        if block_key == "raw":
+            return 10
+        elif block_key == "mad":
+            n_outliers = r.get("n_outliers_mad", 0)
+            return 10 - n_outliers
+        elif block_key == "tukey":
+            n_outliers = r.get("n_outliers_tukey", 0)
+            return 10 - n_outliers
+        return "—"
 
-        if metric_key == "S":
-            return f(m["student_lo"], m["student_hi"])
-        if metric_key == "B":
-            return f(m["bootstrap_lo"], m["bootstrap_hi"])
-        return f"[{_round_1sf(m['binomial_lo'])}, {_round_1sf(m['binomial_hi'])}]"
+    cell_text = []
+    for block_key, b_label in blocks:
+        for r in sorted_results:
+            m = r.get(block_key)
+            n = _get_n(r, block_key)
 
-    # Construcción dinámica de etiquetas y texto
-    row_labels = [
-        f"{b_label} {metrics_map[m]}"
-        for m in ["S", "B", "Bin"]
-        for _, b_label in blocks
-    ]
-    cell_text = [
-        [_get_val(r, b, m) for r in sorted_results]
-        for m in ["S", "B", "Bin"]
-        for b, _ in blocks
+            intervals = _get_intervals(r, block_key)
+            cell_text.append(
+                [
+                    ff,
+                    int(r["vel0"]),
+                    n,
+                    b_label,
+                ]
+                + intervals
+            )
+
+    col_labels = [
+        "ff",
+        "vel",
+        "N",
+        "método",
+        "IC Student",
+        "IC Bootstrap",
+        "IC Binomial",
     ]
 
     fig, ax = plt.subplots(
-        figsize=(4 + 2.5 * len(vel_values), 1.2 + 0.45 * len(row_labels))
+        figsize=(4 + 2.5 * len(vel_values) * len(blocks), 0.8 + 0.45 * len(cell_text))
     )
     ax.set_title(
         f"Intervalos de Confianza — ff = {ff}",
@@ -290,8 +396,7 @@ def create_per_ff_consolidated_figure(ff: float, results: list[dict]) -> Figure:
 
     table = ax.table(
         cellText=cell_text,
-        rowLabels=row_labels,
-        colLabels=vel_values,
+        colLabels=col_labels,
         loc="center",
         cellLoc="center",
     )
@@ -300,105 +405,107 @@ def create_per_ff_consolidated_figure(ff: float, results: list[dict]) -> Figure:
     table.scale(1.2, 1.5)
 
     for (r, c), cell in table.get_celld().items():
-        # 1. Estilo para el Encabezado de Columnas (vel0)
+        if c < 4:
+            cell.set_width(0.08)
         if r == 0:
-            cell.set_facecolor("#1e40af")  # Azul oscuro para jerarquía superior
+            cell.set_facecolor("#1e40af")
             cell.set_text_props(color="white", fontweight="bold")
-
-        # 2. Estilo para las etiquetas de fila (Crudos/MAD/Tukey + Método)
-        elif c == -1:
-            cell.set_facecolor("#3b82f6")  # Azul medio
-            cell.set_text_props(
-                color="white", fontweight="bold", ha="right", fontsize=fs - 2
-            )
-
-        # 3. Estilo para el cuerpo de la tabla (Bloques de datos)
         else:
-            # Agrupación por Filtro (Cada 3 filas cambia el bloque)
-            # Ajustamos los índices: r=1,2,3 -> Crudos; r=4,5,6 -> MAD; r=7,8,9 -> Tukey
-            if 1 <= r <= 3:
-                cell.set_facecolor("#ffffff")  # Blanco para Crudos
-            elif 4 <= r <= 6:
-                cell.set_facecolor("#f9fafb")  # Gris muy tenue para MAD
-            elif 7 <= r <= 9:
-                cell.set_facecolor("#f3f4f6")  # Gris tenue para Tukey
-
-        # 4. Líneas de división de bloques y bordes generales
+            if r % 2 == 1:
+                cell.set_facecolor("#ffffff")
+            else:
+                cell.set_facecolor("#f3f4f6")
         cell.set_edgecolor("#cccccc")
-        if r in (4, 7):
-            cell.set_linewidth(2.0)
-            cell.set_edgecolor("#4b5563")  # Separador de bloque más fuerte
 
     plt.tight_layout()
     return fig
 
 
 def build_master_table_figure(all_results: list[dict]) -> Figure:
-    # 1. Crear el DataFrame con MultiIndex en las columnas
-    columns = pd.MultiIndex.from_tuples(
-        [
-            ("Parámetros", "ff"),
-            ("Parámetros", "vel0"),
-            ("Crudos", "n"),
-            ("Crudos", "err% S"),
-            ("Crudos", "err% B"),
-            ("MAD", "n"),
-            ("MAD", "err% S"),
-            ("MAD", "err% B"),
-            ("Tukey", "n"),
-            ("Tukey", "err% S"),
-            ("Tukey", "err% B"),
+    col_labels = [
+        "ff",
+        "vel",
+        "N",
+        "método",
+        "err % Student",
+        "err % Bootstrap",
+        "err % Binomial",
+    ]
+
+    def _get_errors(m):
+        if not m or m.get("err_student", 0) == 0:
+            return ["—", "—", "—"]
+        return [
+            round(m.get("err_student", 0), 2),
+            round(m.get("err_bootstrap", 0), 2),
+            round(m.get("err_binomial", 0), 2),
         ]
-    )
+
+    def _get_n(r, block_key):
+        if block_key == "raw":
+            return 10
+        elif block_key == "mad":
+            n_outliers = r.get("n_outliers_mad", 0)
+            return 10 - n_outliers
+        elif block_key == "tukey":
+            n_outliers = r.get("n_outliers_tukey", 0)
+            return 10 - n_outliers
+        return "—"
 
     rows = []
     for r in all_results:
-        # Extraemos los datos puros (sin formatear a string todavía) [cite: 4, 6]
-        res = [r["ff"], int(r["vel0"])]
-        for b in ["raw", "mad", "tukey"]:
-            m = r.get(b)
+        ff = r["ff"]
+        vel0 = int(r["vel0"])
+        for block_key, b_label in [
+            ("raw", "Crudos"),
+            ("mad", "MAD"),
+            ("tukey", "Tukey"),
+        ]:
+            m = r.get(block_key)
             if m:
-                res.extend(
+                rows.append(
                     [
-                        int(m["n"]),
-                        round(m["err_student"], 2),
-                        round(m["err_bootstrap"], 2),
+                        ff,
+                        vel0,
+                        _get_n(r, block_key),
+                        b_label,
                     ]
+                    + _get_errors(m)
                 )
             else:
-                res.extend([None, None, None])
-        rows.append(res)
+                rows.append([ff, vel0, "—", b_label, "—", "—", "—"])
 
-    df = pd.DataFrame(rows, columns=columns).sort_values(
-        [("Parámetros", "ff"), ("Parámetros", "vel0")], ascending=[True, False]
-    )
+    df = pd.DataFrame(rows, columns=col_labels)
+    df = df.sort_values(["ff", "vel"], ascending=[True, False])
 
-    # 2. El truco de la doble fila de encabezado
-    # ax.table no soporta MultiIndex nativo, así que inyectamos los nombres de los filtros
-    # manualmente sobre la primera fila de la tabla de Matplotlib
-    fig, ax = plt.subplots(figsize=(20, 1 + 0.4 * len(df)))
+    fs = 10
+    fig, ax = plt.subplots(figsize=(4 + 1.2 * len(df.columns), 0.8 + 0.45 * len(df)))
+    ax.set_title("Errores Porcentuales", fontsize=fs + 3, fontweight="bold", pad=12)
     ax.axis("off")
 
-    # Combinamos los niveles del MultiIndex para las etiquetas de columna
-    col_labels = [f"{c[0]}\n{c[1]}" for c in df.columns]
-
-    # Formateamos los datos para la tabla (reemplazando None por '—') [cite: 4, 12]
-    cell_text = df.fillna("—").values
+    cell_text = df.values
 
     table = ax.table(
-        cellText=cell_text, colLabels=col_labels, loc="center", cellLoc="center"
+        cellText=cell_text,
+        colLabels=col_labels,
+        loc="center",
+        cellLoc="center",
     )
 
-    # Estilo: Resaltamos las columnas de los parámetros físicos [cite: 2, 10]
     for (r, c), cell in table.get_celld().items():
+        if c < 4:
+            cell.set_width(0.08)
         if r == 0:
-            cell.set_facecolor("#1e40af")  # Azul más oscuro para encabezados
+            cell.set_facecolor("#1e40af")
             cell.set_text_props(color="white", fontweight="bold")
-        elif c in [0, 1]:  # ff y vel0
-            cell.set_facecolor("#f8fafc")
-            cell.set_text_props(fontweight="bold")
+        else:
+            if r % 2 == 1:
+                cell.set_facecolor("#ffffff")
+            else:
+                cell.set_facecolor("#f3f4f6")
+        cell.set_edgecolor("#cccccc")
 
-    table.scale(1, 2)
+    table.scale(1.2, 1.5)
     return fig
 
 
@@ -436,6 +543,14 @@ def create_sensitivity_figure(all_results: list[dict]) -> Figure:
                 "err%": r["raw"]["err_bootstrap"],
             }
         )
+        records.append(
+            {
+                "ff": ff,
+                "vel0": vel0,
+                "Método": "Crudo Binomial",
+                "err%": r["raw"]["err_binomial"],
+            }
+        )
 
         if r["mad"]:
             records.append(
@@ -452,6 +567,14 @@ def create_sensitivity_figure(all_results: list[dict]) -> Figure:
                     "vel0": vel0,
                     "Método": "MAD Bootstrap",
                     "err%": r["mad"]["err_bootstrap"],
+                }
+            )
+            records.append(
+                {
+                    "ff": ff,
+                    "vel0": vel0,
+                    "Método": "MAD Binomial",
+                    "err%": r["mad"]["err_binomial"],
                 }
             )
 
@@ -472,6 +595,14 @@ def create_sensitivity_figure(all_results: list[dict]) -> Figure:
                     "err%": r["tukey"]["err_bootstrap"],
                 }
             )
+            records.append(
+                {
+                    "ff": ff,
+                    "vel0": vel0,
+                    "Método": "Tukey Binomial",
+                    "err%": r["tukey"]["err_binomial"],
+                }
+            )
 
     df = pd.DataFrame(records)
     df["vel0"] = df["vel0"].astype(int)
@@ -480,19 +611,25 @@ def create_sensitivity_figure(all_results: list[dict]) -> Figure:
     method_order = [
         "Crudo Student",
         "Crudo Bootstrap",
+        "Crudo Binomial",
         "MAD Student",
         "MAD Bootstrap",
+        "MAD Binomial",
         "Tukey Student",
         "Tukey Bootstrap",
+        "Tukey Binomial",
     ]
 
     palette = {
         "Crudo Student": "#e74c3c",
         "Crudo Bootstrap": "#c0392b",
+        "Crudo Binomial": "#8b0000",
         "MAD Student": "#2ecc71",
         "MAD Bootstrap": "#27ae60",
+        "MAD Binomial": "#006400",
         "Tukey Student": "#3498db",
         "Tukey Bootstrap": "#2980b9",
+        "Tukey Binomial": "#00008b",
     }
 
     g = sns.catplot(
@@ -569,21 +706,30 @@ def run_confidence_intervals(i_value: int) -> list[Figure]:
         for vel0 in sorted(erosion_data.keys()):
             sim_df = erosion_data[vel0]
             raw = sim_df["unique_ids"].values.astype(float)
+            n_original = len(raw)
+
+            # Añadir ceros justo antes de calcular ICs
+            n_zeros = 10 - n_original
+            if n_zeros > 0:
+                raw_with_zeros = np.concatenate([raw, np.zeros(n_zeros)])
+            else:
+                raw_with_zeros = raw
+
             km = (vel0**2) / 2
 
             print(f"{'─' * 100}")
-            print(f"K/m = {km:.1f} J/kg | vel0 = {vel0} | n_original = {len(raw)}")
+            print(f"K/m = {km:.1f} J/kg | vel0 = {vel0} | n_original = {n_original}")
             print(f"{'─' * 100}\n")
 
-            row_raw = compute_ics_for_sample(raw)
+            row_raw = compute_ics_for_sample(raw_with_zeros)
             df_crudos = pd.DataFrame([row_raw])
             print("TABLA 1: DATOS CRUDOS")
             print(df_crudos.to_string(index=False))
             print()
 
-            mad_filtered = filter_mad(raw)
+            mad_filtered = filter_mad(raw_with_zeros)
             df_mad = None
-            if len(mad_filtered) >= 3:
+            if len(mad_filtered) >= 2:
                 row_mad = compute_ics_for_sample(mad_filtered)
                 df_mad = pd.DataFrame([row_mad])
                 print(f"TABLA 2: FILTRO MAD (n={len(mad_filtered)})")
@@ -596,7 +742,7 @@ def run_confidence_intervals(i_value: int) -> list[Figure]:
 
             tukey_filtered = filter_tukey(raw)
             df_tukey = None
-            if len(tukey_filtered) >= 3:
+            if len(tukey_filtered) >= 2:
                 row_tukey = compute_ics_for_sample(tukey_filtered)
                 df_tukey = pd.DataFrame([row_tukey])
                 print(f"TABLA 3: FILTRO TUKEY (n={len(tukey_filtered)})")
@@ -607,13 +753,31 @@ def run_confidence_intervals(i_value: int) -> list[Figure]:
                 )
             print()
 
-            raw_metrics = compute_ics_numeric(raw)
+            # Calcular outliers filtrados para cada método (sobre datos ORIGINALES)
+            n_ceros_crudos = 10 - n_original
+
+            # Para MAD: calcular cuántos datos filtró (sobre datos originales)
+            median_raw = np.median(raw)
+            mad_raw = np.median(np.abs(raw - median_raw))
+            filtered_raw_mad = raw[np.abs(raw - median_raw) <= 3 * mad_raw]
+            n_outliers_mad = n_original - len(filtered_raw_mad)
+
+            # Para Tukey (sobre datos originales)
+            q1_raw = np.percentile(raw, 25)
+            q3_raw = np.percentile(raw, 75)
+            iqr_raw = q3_raw - q1_raw
+            tukey_filtered_raw = raw[
+                (raw >= q1_raw - 1.5 * iqr_raw) & (raw <= q3_raw + 1.5 * iqr_raw)
+            ]
+            n_outliers_tukey = n_original - len(tukey_filtered_raw)
+
+            raw_metrics = compute_ics_numeric(raw_with_zeros)
             mad_metrics = (
-                compute_ics_numeric(mad_filtered) if len(mad_filtered) >= 3 else None
+                compute_ics_numeric(mad_filtered) if len(mad_filtered) >= 2 else None
             )
             tukey_metrics = (
                 compute_ics_numeric(tukey_filtered)
-                if len(tukey_filtered) >= 3
+                if len(tukey_filtered) >= 2
                 else None
             )
 
@@ -621,6 +785,9 @@ def run_confidence_intervals(i_value: int) -> list[Figure]:
                 {
                     "ff": ff,
                     "vel0": vel0,
+                    "n_ceros": n_ceros_crudos,
+                    "n_outliers_mad": n_outliers_mad,
+                    "n_outliers_tukey": n_outliers_tukey,
                     "raw": raw_metrics,
                     "mad": mad_metrics,
                     "tukey": tukey_metrics,
@@ -630,6 +797,9 @@ def run_confidence_intervals(i_value: int) -> list[Figure]:
             ff_results.append(
                 {
                     "vel0": vel0,
+                    "n_ceros": n_ceros_crudos,
+                    "n_outliers_mad": n_outliers_mad,
+                    "n_outliers_tukey": n_outliers_tukey,
                     "raw": raw_metrics,
                     "mad": mad_metrics,
                     "tukey": tukey_metrics,

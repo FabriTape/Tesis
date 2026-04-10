@@ -81,6 +81,50 @@ def compute_unique_ids_raw_with_positions(
     return result
 
 
+def compute_erosion_counts_with_zeros(
+    df: pd.DataFrame,
+    ff: float,
+    i_value: int,
+    grid_pairs: list[tuple[float, float]],
+) -> dict[float, np.ndarray]:
+    """Calcula conteos de erosión por posición, incluyendo ceros.
+
+    Args:
+        df: DataFrame completo.
+        ff: Factor de fricción.
+        i_value: Paso temporal.
+        grid_pairs: Lista de posiciones válidas (posx, posy).
+
+    Returns:
+        dict[vel0] = array numpy con conteos (algunos pueden ser 0).
+    """
+    from data_loader import filter_by_ff, filter_by_i_value, filter_is_erosion
+
+    df_filt = filter_by_ff(df, ff)
+    df_filt = filter_by_i_value(df_filt, i_value)
+    df_filt = filter_is_erosion(df_filt)
+
+    existing_pairs = set(zip(df_filt["posx"], df_filt["posy"]))
+
+    result = {}
+    for vel0 in df_filt["vel0"].unique():
+        df_vel = df_filt[df_filt["vel0"] == vel0]
+
+        counts = []
+        for posx, posy in grid_pairs:
+            if (posx, posy) in existing_pairs:
+                count = df_vel[(df_vel["posx"] == posx) & (df_vel["posy"] == posy)][
+                    "id"
+                ].nunique()
+                counts.append(count)
+            else:
+                counts.append(0)
+
+        result[vel0] = np.array(counts, dtype=float)
+
+    return result
+
+
 def compute_unique_ids_raw(df: pd.DataFrame, ff: float) -> dict[float, list[int]]:
     """Calcula IDs únicos por cada simulación individual.
 

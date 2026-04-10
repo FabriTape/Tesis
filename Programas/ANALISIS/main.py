@@ -5,18 +5,21 @@ en simulaciones de impacto proyectil-cama.
 """
 
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-
+from cluster_viz import (
+    plot_cluster_ccdf,
+    plot_cluster_frequency,
+    plot_cluster_km_logfit,
+    plot_cluster_km_scatter,
+    plot_cluster_rg_logfit,
+)
+from confidence_intervals import run_confidence_intervals
+from constants import FF_VALUES, SALIDA_DIR
 from data_loader import load_data
-from constants import SALIDA_DIR, FF_VALUES
-from cluster_viz import (plot_cluster_frequency, plot_cluster_ccdf, 
-                         plot_cluster_km_scatter, plot_cluster_km_logfit,
-                         plot_cluster_rg_logfit)
 from erosion_viz import plot_erosion_boxplot, plot_erosion_heatmap
 from kinematics_calc import get_grid_pairs
-from kinematics_viz import plot_velocity_angle, plot_kinetic_energy, plot_penetration
+from kinematics_viz import plot_kinetic_energy, plot_penetration, plot_velocity_angle
+from matplotlib.backends.backend_pdf import PdfPages
 from params_viz import plot_params_vs_energy
-from confidence_intervals import run_confidence_intervals
 
 
 def save_figure(fig: plt.Figure, path: str) -> None:
@@ -38,7 +41,7 @@ def run_analysis() -> None:
     print(f"Datos cargados: {len(df)} filas")
 
     # I_VALUE dinámico: usar el paso temporal máximo del dataset
-    I_VALUE = int(df["i"].max())
+    I_VALUE = 80
     print(f"I_VALUE dinámico: {I_VALUE}\n")
 
     # Grid de posiciones (calculado una vez para todas las simulaciones)
