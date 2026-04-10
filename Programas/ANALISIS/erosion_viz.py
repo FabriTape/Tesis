@@ -60,18 +60,21 @@ def plot_erosion_boxplot(df: pd.DataFrame, ff: float) -> Figure:
     return fig
 
 
-def plot_erosion_heatmap(df: pd.DataFrame, ff: float, vel0: float) -> Figure:
-    """Genera heatmap square de erosión por posición.
+def plot_erosion_heatmap(
+    df: pd.DataFrame, ff: float, vel0: float, grid_pairs: list[tuple[float, float]] | None = None
+) -> Figure:
+    """Genera heatmap de partículas por posición.
 
     Args:
         df: DataFrame con datos.
         ff: Factor de fricción.
         vel0: Velocidad inicial.
+        grid_pairs: Lista de pares (posx, posy) válidos.
 
     Returns:
         Figura matplotlib.
     """
-    data = compute_heatmap_data(df, ff, vel0)
+    data = compute_heatmap_data(df, ff, vel0, grid_pairs)
     if data.empty:
         return Figure()
 
@@ -86,7 +89,7 @@ def plot_erosion_heatmap(df: pd.DataFrame, ff: float, vel0: float) -> Figure:
         annot=True,
         fmt=".0f",
         cmap="YlOrRd",
-        cbar_kws={"label": "Y promedio", "shrink": 0.8},
+        cbar_kws={"label": "Y", "shrink": 0.8},
         ax=ax,
         linewidths=0.5,
         linecolor="white",
@@ -96,7 +99,7 @@ def plot_erosion_heatmap(df: pd.DataFrame, ff: float, vel0: float) -> Figure:
     km = (vel0**2) / 2
     ax.set_xlabel("posx (σ)", fontsize=fs)
     ax.set_ylabel("posy (σ)", fontsize=fs)
-    ax.set_title(f"Erosión por posición (ff={ff}, K/m={km:.1f} J/kg, i={I_VALUE})",
+    ax.set_title(f"Erosión por posición (ff={ff}, K/m={km:.1f} J/kg)",
                  fontsize=fs * 0.8)
     ax.tick_params(labelsize=fs * 0.7)
     plt.tight_layout()

@@ -60,7 +60,6 @@ def compute_params_vs_energy(df: pd.DataFrame, ff: float) -> pd.DataFrame:
 
         km = (vel0**2) / 2
 
-        # MLE para alpha
         xmin_options = [1, int(raw_sizes.min())]
         best_alpha, best_xmin, best_D = None, None, float("inf")
 
@@ -84,7 +83,6 @@ def compute_params_vs_energy(df: pd.DataFrame, ff: float) -> pd.DataFrame:
                     "power_law": {"alpha": (1, 10)},
                     "truncated_power_law": {"alpha": (1, 10), "Lambda": (1e-10, 10)},
                     "exponential": {"Lambda": (1e-10, 10)},
-                    "lognormal": {"mu": (-1, 10), "sigma": (1e-10, 10)},
                 },
             )
 
@@ -96,8 +94,6 @@ def compute_params_vs_energy(df: pd.DataFrame, ff: float) -> pd.DataFrame:
                 "alpha_tpl": fit.truncated_power_law.alpha,
                 "lambda_tpl": fit.truncated_power_law.Lambda,
                 "lambda_exp": fit.exponential.Lambda,
-                "mu_ln": fit.lognormal.mu,
-                "sigma_ln": fit.lognormal.sigma,
             })
         except Exception:
             continue
@@ -124,50 +120,37 @@ def plot_params_vs_energy(df: pd.DataFrame, ff: float) -> Figure:
 
     fig, axes = plt.subplots(2, 3, figsize=(15, 10))
 
-    # α PL
     axes[0, 0].plot(res_df["km"], res_df["alpha_pl"], "o-", color=COLORS["power_law"], markersize=8)
     axes[0, 0].set_xlabel("K/m", fontsize=fs)
     axes[0, 0].set_ylabel(r"$\alpha$", fontsize=fs)
     axes[0, 0].set_title("Power Law: α", fontsize=fs * 0.9)
     axes[0, 0].grid(True, alpha=0.3)
 
-    # xmin PL
     axes[0, 1].plot(res_df["km"], res_df["xmin_pl"], "o-", color=COLORS["power_law"], markersize=8)
     axes[0, 1].set_xlabel("K/m", fontsize=fs)
     axes[0, 1].set_ylabel(r"$x_{min}$", fontsize=fs)
     axes[0, 1].set_title("Power Law: xmin", fontsize=fs * 0.9)
     axes[0, 1].grid(True, alpha=0.3)
 
-    # α TPL
     axes[0, 2].plot(res_df["km"], res_df["alpha_tpl"], "o-", color=COLORS["truncated"], markersize=8)
     axes[0, 2].set_xlabel("K/m", fontsize=fs)
     axes[0, 2].set_ylabel(r"$\alpha$", fontsize=fs)
     axes[0, 2].set_title("Truncated PL: α", fontsize=fs * 0.9)
     axes[0, 2].grid(True, alpha=0.3)
 
-    # λ TPL
     axes[1, 0].plot(res_df["km"], res_df["lambda_tpl"], "o-", color=COLORS["truncated"], markersize=8)
     axes[1, 0].set_xlabel("K/m", fontsize=fs)
     axes[1, 0].set_ylabel(r"$\lambda$", fontsize=fs)
     axes[1, 0].set_title("Truncated PL: λ", fontsize=fs * 0.9)
     axes[1, 0].grid(True, alpha=0.3)
 
-    # λ Exponential
     axes[1, 1].plot(res_df["km"], res_df["lambda_exp"], "o-", color=COLORS["exponential"], markersize=8)
     axes[1, 1].set_xlabel("K/m", fontsize=fs)
     axes[1, 1].set_ylabel(r"$\lambda$", fontsize=fs)
     axes[1, 1].set_title("Exponential: λ", fontsize=fs * 0.9)
     axes[1, 1].grid(True, alpha=0.3)
 
-    # Lognormal
-    valid_ln = res_df[res_df["mu_ln"] >= -1]
-    axes[1, 2].plot(valid_ln["km"], valid_ln["mu_ln"], "o-", color=COLORS["lognormal"], markersize=8, label="μ")
-    axes[1, 2].plot(valid_ln["km"], valid_ln["sigma_ln"], "s-", color=COLORS["secondary"], markersize=8, label="σ")
-    axes[1, 2].set_xlabel("K/m", fontsize=fs)
-    axes[1, 2].set_ylabel("Valor", fontsize=fs)
-    axes[1, 2].set_title("Lognormal (μ ≥ -1)", fontsize=fs * 0.9)
-    axes[1, 2].legend(fontsize=fs * 0.6)
-    axes[1, 2].grid(True, alpha=0.3)
+    axes[1, 2].axis("off")
 
     fig.suptitle(f"Parámetros vs K/m (ff={ff}, i={I_VALUE})", fontsize=fs)
     plt.tight_layout()

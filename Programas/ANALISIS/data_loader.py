@@ -78,3 +78,15 @@ def filter_penetration(df: pd.DataFrame) -> pd.DataFrame:
         DataFrame con solo partículas penetradas.
     """
     return df[(df["type"] == 2) & ((df["z"] < 1e-4) | (df["vz"] < 0))]
+
+
+def filter_is_erosion(df: pd.DataFrame) -> pd.DataFrame:
+    """Filtra partículas erosionadas: type 2 con z > threshold.
+
+    Args:
+        df: DataFrame de datos.
+
+    Returns:
+        DataFrame con solo partículas erosionadas.
+    """
+    return df[(df["type"] == 2) & (df["z"] > 1e-4)]

@@ -5,17 +5,21 @@ en simulaciones de impacto proyectil-cama.
 """
 
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-
-from data_loader import load_data
-from constants import SALIDA_DIR, FF_VALUES
-from cluster_viz import (plot_cluster_frequency, plot_cluster_ccdf, 
-                         plot_cluster_km_scatter, plot_cluster_km_logfit,
-                         plot_cluster_rg_logfit)
-from erosion_viz import plot_erosion_boxplot, plot_erosion_heatmap
-from kinematics_viz import plot_velocity_angle, plot_kinetic_energy, plot_penetration
-from params_viz import plot_params_vs_energy
+from cluster_viz import (
+    plot_cluster_ccdf,
+    plot_cluster_frequency,
+    plot_cluster_km_logfit,
+    plot_cluster_km_scatter,
+    plot_cluster_rg_logfit,
+)
 from confidence_intervals import run_confidence_intervals
+from constants import FF_VALUES, SALIDA_DIR
+from data_loader import load_data
+from erosion_viz import plot_erosion_boxplot, plot_erosion_heatmap
+from kinematics_calc import get_grid_pairs
+from kinematics_viz import plot_kinetic_energy, plot_penetration, plot_velocity_angle
+from matplotlib.backends.backend_pdf import PdfPages
+from params_viz import plot_params_vs_energy
 
 
 def save_figure(fig: plt.Figure, path: str) -> None:
@@ -37,8 +41,12 @@ def run_analysis() -> None:
     print(f"Datos cargados: {len(df)} filas")
 
     # I_VALUE dinámico: usar el paso temporal máximo del dataset
-    I_VALUE = int(df["i"].max())
+    I_VALUE = 80
     print(f"I_VALUE dinámico: {I_VALUE}\n")
+
+    # Grid de posiciones (calculado una vez para todas las simulaciones)
+    grid_pairs = get_grid_pairs(df)
+    print(f"Grid de posiciones: {len(grid_pairs)} pares\n")
 
     SALIDA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -88,7 +96,7 @@ def run_analysis() -> None:
                 save_figure(fig_ang, dir_ff / f"angulo_vel_cm_{vel0}.png")
 
             # Heatmap de erosión
-            fig_heat = plot_erosion_heatmap(df, ff, vel0)
+            fig_heat = plot_erosion_heatmap(df, ff, vel0, grid_pairs)
             if fig_heat and fig_heat.get_axes():
                 figuras.append(fig_heat)
                 save_figure(fig_heat, dir_ff / f"heatmap_erosion_{vel0}.png")
@@ -106,6 +114,8 @@ def run_analysis() -> None:
                     figuras.append(fig_kmf)
                     if i == 0:
                         save_figure(fig_kmf, dir_ff / f"cluster_km_fit_{vel0}.png")
+                    else:
+                        save_figure(fig_kmf, dir_ff / f"cluster_km_params_{vel0}.png")
                     plt.close(fig_kmf)
 
             # Rg vs tamaño (dimensión fractal)
@@ -115,6 +125,8 @@ def run_analysis() -> None:
                     figuras.append(fig_rg)
                     if i == 0:
                         save_figure(fig_rg, dir_ff / f"cluster_rg_fit_{vel0}.png")
+                    else:
+                        save_figure(fig_rg, dir_ff / f"cluster_rg_params_{vel0}.png")
                     plt.close(fig_rg)
 
         # Energía cinética
