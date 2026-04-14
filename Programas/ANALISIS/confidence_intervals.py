@@ -357,10 +357,11 @@ def create_per_ff_consolidated_figure(ff: float, results: list[dict]) -> Figure:
 
     def _get_n(r, block_key):
         if block_key == "raw":
-            return 10
+            return r.get("n_original", 10)
         elif block_key == "mad":
+            n_original = r.get("n_original", 10)
             n_outliers = r.get("n_outliers_mad", 0)
-            return 10 - n_outliers
+            return n_original - n_outliers
         return "—"
 
     cell_text = []
@@ -441,10 +442,11 @@ def build_master_table_figure(all_results: list[dict]) -> Figure:
 
     def _get_n(r, block_key):
         if block_key == "raw":
-            return 10
+            return r.get("n_original", 10)
         elif block_key == "mad":
+            n_original = r.get("n_original", 10)
             n_outliers = r.get("n_outliers_mad", 0)
-            return 10 - n_outliers
+            return n_original - n_outliers
         return "—"
 
     rows = []
@@ -636,7 +638,14 @@ def run_confidence_intervals(i_value: int) -> list[Figure]:
             print(f"K/m = {km:.1f} J/kg | vel0 = {vel0} | n_original = {n_original}")
             print(f"{'─' * 100}\n")
 
+            # Calcular outliers filtrados para MAD (sobre datos ORIGINALES)
+            median_raw = np.median(raw)
+            mad_raw = np.median(np.abs(raw - median_raw))
+            filtered_raw_mad = raw[np.abs(raw - median_raw) <= 3 * mad_raw]
+            n_outliers_mad = n_original - len(filtered_raw_mad)
+
             row_raw = compute_ics_for_sample(raw_with_zeros)
+            row_raw["Tamaño n"] = n_original
             df_crudos = pd.DataFrame([row_raw])
             print("TABLA 1: DATOS CRUDOS")
             print(df_crudos.to_string(index=False))
@@ -646,8 +655,9 @@ def run_confidence_intervals(i_value: int) -> list[Figure]:
             df_mad = None
             if len(mad_filtered) >= 2:
                 row_mad = compute_ics_for_sample(mad_filtered)
+                row_mad["Tamaño n"] = n_original - n_outliers_mad
                 df_mad = pd.DataFrame([row_mad])
-                print(f"TABLA 2: FILTRO MAD (n={len(mad_filtered)})")
+                print(f"TABLA 2: FILTRO MAD (n={n_original - n_outliers_mad})")
                 print(df_mad.to_string(index=False))
             else:
                 print(
@@ -655,13 +665,7 @@ def run_confidence_intervals(i_value: int) -> list[Figure]:
                 )
             print()
 
-            # Calcular outliers filtrados para MAD (sobre datos ORIGINALES)
-            n_ceros_crudos = 10 - n_original
-
-            median_raw = np.median(raw)
-            mad_raw = np.median(np.abs(raw - median_raw))
-            filtered_raw_mad = raw[np.abs(raw - median_raw) <= 3 * mad_raw]
-            n_outliers_mad = n_original - len(filtered_raw_mad)
+            # (n_outliers_mad ya calculado arriba)
 
             raw_metrics = compute_ics_numeric(raw_with_zeros)
             mad_metrics = (
@@ -672,7 +676,7 @@ def run_confidence_intervals(i_value: int) -> list[Figure]:
                 {
                     "ff": ff,
                     "vel0": vel0,
-                    "n_ceros": n_ceros_crudos,
+                    "n_original": n_original,
                     "n_outliers_mad": n_outliers_mad,
                     "raw": raw_metrics,
                     "mad": mad_metrics,
@@ -682,7 +686,7 @@ def run_confidence_intervals(i_value: int) -> list[Figure]:
             ff_results.append(
                 {
                     "vel0": vel0,
-                    "n_ceros": n_ceros_crudos,
+                    "n_original": n_original,
                     "n_outliers_mad": n_outliers_mad,
                     "raw": raw_metrics,
                     "mad": mad_metrics,
