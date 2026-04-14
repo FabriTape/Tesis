@@ -1,13 +1,13 @@
 #!/bin/bash
 ### Reserve time in slurm queue manager.
 
-#SBATCH -J N3v25a0ff0.35
+#SBATCH -J N3v5a*ff*
 #SBATCH -n 32
 #SBATCH --nodes 1
 #SBATCH --ntasks-per-node=32
 #SBATCH -o ./logs/job_exec_%j.out
 ##SBATCH --gres=gpu:1
-#SBATCH --nodelist=toko04
+#SBATCH --nodelist=toko06
 #SBATCH --partition=XL
 
 ## Espacio añadido para ejecutar en gpu2
