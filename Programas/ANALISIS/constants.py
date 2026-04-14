@@ -7,7 +7,7 @@ from pathlib import Path
 
 # Rutas
 CARBOXI_DIR = Path("/home/tutturuu/Documentos/Universidad/Tesis/Programas/CARBOXI")
-RESULTADOS_DIR = Path("/home/tutturuu/Documentos/resultados0r")
+RESULTADOS_DIR = Path("/home/tutturuu/Documentos/Universidad/Tesis/Documentos/Archive/Resultados NP 1/Resultados 0r v1")
 CSV_PATH = RESULTADOS_DIR / "merge_resultados.csv"
 SALIDA_DIR = RESULTADOS_DIR / "figuras"
 
