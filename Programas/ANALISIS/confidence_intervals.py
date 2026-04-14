@@ -46,35 +46,6 @@ def filter_mad(data: np.ndarray) -> np.ndarray:
     return np.concatenate([filtered, zeros])
 
 
-def filter_tukey(data: np.ndarray) -> np.ndarray:
-    """Filtra outliers mediante el rango intercuartílico (IQR).
-
-    Elimina datos fuera de [Q1 - 1.5*IQR, Q3 + 1.5*IQR].
-    Añade ceros para mantener 10 datos totales.
-    Si después de filtrar todo es 0, usa los datos originales.
-
-    Args:
-        data: Array de muestras de erosión.
-
-    Returns:
-        Array con outliers eliminados y ceros añadidos para mantener n=10.
-    """
-    q1 = np.percentile(data, 25)
-    q3 = np.percentile(data, 75)
-    iqr = q3 - q1
-    lower = q1 - 1.5 * iqr
-    upper = q3 + 1.5 * iqr
-    filtered = data[(data >= lower) & (data <= upper)]
-
-    if np.sum(filtered) == 0:
-        filtered = data
-
-    n_zeros = 10 - len(filtered)
-    zeros = np.zeros(n_zeros)
-
-    return np.concatenate([filtered, zeros])
-
-
 def compute_student_ci(
     data: np.ndarray, alpha: float = 0.05
 ) -> Tuple[float, float, float]:
@@ -107,75 +78,6 @@ def compute_student_ci(
     return mu - sigma, mu + sigma, err_pct
 
 
-def compute_binomial_ci(data: np.ndarray) -> Tuple[float, float, float]:
-    """Calcula IC binomial usando estadísticos de orden.
-
-    Si mu > 0: err% = sigma/mu * 100
-    Si mu = 0: err% = sigma/rango * 100
-
-    Args:
-        data: Array de muestras (ya incluye ceros).
-
-    Returns:
-        Tupla (lower, upper, err_porcentual).
-    """
-    sorted_data = np.sort(data)
-    n = len(sorted_data)
-
-    if n < 3:
-        return (0.0, 0.0, 0.0)
-
-    X_lo = sorted_data[1]
-    X_hi = sorted_data[-2]
-    mu = np.median(sorted_data)
-    sigma = (X_hi - X_lo) / 2
-
-    if mu == 0:
-        rango = np.max(data) - np.min(data)
-        err_pct = (sigma / rango) * 100 if rango > 0 else 0
-    else:
-        err_pct = (sigma / mu) * 100
-
-    return X_lo, X_hi, err_pct
-
-
-def compute_bootstrap_ci(
-    data: np.ndarray, B: int = 200_000
-) -> Tuple[float, float, float]:
-    """Calcula IC por remuestreo empírico (bootstrap).
-
-    Si mu > 0: err% = sigma/mu * 100
-    Si mu = 0: err% = sigma/rango * 100
-
-    Args:
-        data: Array de muestras.
-        B: Número de remuestras bootstrap.
-
-    Returns:
-        Tupla (lower, upper, err_porcentual).
-    """
-    n = len(data)
-    mu = np.mean(data)
-
-    if n < 2:
-        return (0.0, 0.0, 0.0)
-
-    indices = np.random.randint(0, n, size=(B, n))
-    bootstrap_means = data[indices].mean(axis=1)
-
-    lo = float(np.percentile(bootstrap_means, 2.5))
-    hi = float(np.percentile(bootstrap_means, 97.5))
-    sigma = (hi - lo) / 2
-
-    if mu == 0:
-        rango = np.max(data) - np.min(data)
-        err_pct = (sigma / rango) * 100 if rango > 0 else 0
-    else:
-        err_pct = ((hi - lo) / (2 * mu)) * 100
-
-    return lo, hi, err_pct
-
-
 def compute_standard_error(data: np.ndarray) -> Tuple[float, float, float]:
     """Calcula error estándar (SE = s/√n) y err%.
 
@@ -197,24 +99,6 @@ def compute_standard_error(data: np.ndarray) -> Tuple[float, float, float]:
         err_pct = (se / mu) * 100
 
     return mu - se, mu + se, err_pct
-
-
-def compute_error_pct(lower: float, upper: float, mean: float) -> float:
-    """Calcula el error porcentual de la semiamplitud.
-
-    err % = ((LimSup - LimInf) / (2 * Media)) * 100
-
-    Args:
-        lower: Límite inferior del IC.
-        upper: Límite superior del IC.
-        mean: Media de la muestra.
-
-    Returns:
-        Error porcentual.
-    """
-    if mean == 0:
-        return 0.0
-    return ((upper - lower) / (2 * mean)) * 100
 
 
 def build_table_row(
@@ -367,7 +251,6 @@ def create_per_ff_consolidated_figure(ff: float, results: list[dict]) -> Figure:
     cell_text = []
     for block_key, b_label in blocks:
         for r in sorted_results:
-            m = r.get(block_key)
             n = _get_n(r, block_key)
             interval = _get_intervals(r, block_key)
             cell_text.append(
