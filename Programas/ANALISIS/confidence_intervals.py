@@ -225,7 +225,11 @@ def create_per_ff_consolidated_figure(ff: float, results: list[dict]) -> Figure:
             return "—"
         mean = m.get("mean", 0)
         margin = (m["ci_hi"] - m["ci_lo"]) / 2
-        return f"{mean:.2f} ± {margin:.2f}"
+        try:
+            value = ufloat(mean, margin)
+            return f"{value:.1u}"
+        except Exception:
+            return f"{mean:.1f} ± {margin:.1f}"
 
     def _get_n(r, block_key):
         if block_key == "raw":
