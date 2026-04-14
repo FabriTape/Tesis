@@ -15,6 +15,7 @@ from constants import FF_VALUES
 from data_loader import load_data
 from matplotlib.figure import Figure
 from scipy.stats import t
+from uncertainties import ufloat
 
 # Configuración: True = IC Student, False = Error Estándar (default)
 USE_STUDENT_IC = False
@@ -126,7 +127,7 @@ def build_table_row(
     if mean == 0:
         return {
             "Tamaño n": n,
-            label: "0.0000 ± 0.0000",
+            label: "0.0 ± 0.0",
             "err %": "—",
         }
 
@@ -135,10 +136,16 @@ def build_table_row(
     else:
         margin = se
 
+    try:
+        value = ufloat(mean, margin)
+        formatted = f"{value:.1u}"
+    except Exception:
+        formatted = f"{mean:.1f} ± {margin:.1f}"
+
     return {
         "Tamaño n": n,
-        label: f"{mean:.4f} ± {margin:.4f}",
-        "err %": f"{main_ci[2]:.2f}",
+        label: formatted,
+        "err %": f"{main_ci[2]:.1f}",
     }
 
 
@@ -203,25 +210,6 @@ def compute_ics_numeric(data: np.ndarray) -> dict:
     }
 
 
-def _round_1sf(val: float) -> str:
-    """Redondea un valor a 1 cifra significativa.
-
-    Args:
-        val: Número a redondear.
-
-    Returns:
-        String con 1 cifra significativa.
-    """
-    if val == 0 or np.isnan(val):
-        return "—" if np.isnan(val) else "0"
-    exp = int(np.floor(np.log10(abs(val))))
-    rounded = round(val, -exp)
-    if exp >= 0:
-        return str(int(rounded))
-    decimals = max(0, -exp)
-    return f"{rounded:.{decimals}f}"
-
-
 def create_per_ff_consolidated_figure(ff: float, results: list[dict]) -> Figure:
     fs = 9
     sorted_results = sorted(results, key=lambda r: r["vel0"], reverse=True)
@@ -236,7 +224,7 @@ def create_per_ff_consolidated_figure(ff: float, results: list[dict]) -> Figure:
         if not m:
             return "—"
         mean = m.get("mean", 0)
-        margin = (m['ci_hi'] - m['ci_lo']) / 2
+        margin = (m["ci_hi"] - m["ci_lo"]) / 2
         return f"{mean:.2f} ± {margin:.2f}"
 
     def _get_n(r, block_key):
