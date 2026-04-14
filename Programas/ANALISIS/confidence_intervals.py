@@ -18,32 +18,41 @@ from scipy.stats import t
 from uncertainties import ufloat
 
 # Configuración: True = IC Student, False = Error Estándar (default)
-USE_STUDENT_IC = False
+USE_STUDENT_IC = True
 
 
 def filter_mad(data: np.ndarray) -> np.ndarray:
     """Filtra outliers mediante Median Absolute Deviation.
 
-    Elimina datos donde |Xi - Mediana| > 3 * MAD.
+    Aplica MAD solo sobre los datos originales (sin ceros).
     Añade ceros para mantener 10 datos totales.
     Si después de filtrar todo es 0, usa los datos originales.
 
     Args:
-        data: Array de muestras de erosión.
+        data: Array de muestras de erosión (puede incluir ceros al final).
 
     Returns:
         Array con outliers eliminados y ceros añadidos para mantener n=10.
     """
-    median = np.median(data)
-    mad = np.median(np.abs(data - median))
-    filtered = data[np.abs(data - median) <= 3 * mad]
-
-    if np.sum(filtered) == 0:
-        filtered = data
-
+    # Separate original data from zeros (find where data > 0)
+    non_zero = data[data > 0]
+    
+    if len(non_zero) == 0:
+        return data
+    
+    # Apply MAD filter to non-zero data only
+    median = np.median(non_zero)
+    mad = np.median(np.abs(non_zero - median))
+    filtered = non_zero[np.abs(non_zero - median) <= 3 * mad]
+    
+    # Fallback: if filter removes everything, use original non-zero data
+    if len(filtered) == 0:
+        filtered = non_zero
+    
+    # Add zeros to reach 10
     n_zeros = 10 - len(filtered)
     zeros = np.zeros(n_zeros)
-
+    
     return np.concatenate([filtered, zeros])
 
 
@@ -237,7 +246,8 @@ def create_per_ff_consolidated_figure(ff: float, results: list[dict]) -> Figure:
         elif block_key == "mad":
             n_original = r.get("n_original", 10)
             n_outliers = r.get("n_outliers_mad", 0)
-            return n_original - n_outliers
+            # If no outliers filtered, N should be 10 (the padded array size)
+            return n_original if n_outliers > 0 else 10
         return "—"
 
     cell_text = []
@@ -321,7 +331,7 @@ def build_master_table_figure(all_results: list[dict]) -> Figure:
         elif block_key == "mad":
             n_original = r.get("n_original", 10)
             n_outliers = r.get("n_outliers_mad", 0)
-            return n_original - n_outliers
+            return n_original if n_outliers > 0 else 10
         return "—"
 
     rows = []
@@ -530,9 +540,11 @@ def run_confidence_intervals(i_value: int) -> list[Figure]:
             df_mad = None
             if len(mad_filtered) >= 2:
                 row_mad = compute_ics_for_sample(mad_filtered)
-                row_mad["Tamaño n"] = n_original - n_outliers_mad
+                # N after MAD = original array length (10) since no outliers were filtered
+                n_mad = n_original if n_outliers_mad > 0 else 10
+                row_mad["Tamaño n"] = n_mad
                 df_mad = pd.DataFrame([row_mad])
-                print(f"TABLA 2: FILTRO MAD (n={n_original - n_outliers_mad})")
+                print(f"TABLA 2: FILTRO MAD (n={n_mad})")
                 print(df_mad.to_string(index=False))
             else:
                 print(

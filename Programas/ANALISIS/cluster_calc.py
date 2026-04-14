@@ -64,7 +64,8 @@ def compute_unique_ids_raw_with_positions(
     """
     df_filt = filter_by_ff(df, ff)
     df_filt = filter_by_i_value(df_filt, i_value)
-    df_filt = filter_exclude_erosion(df_filt)
+    # Keep eroded particles: type=1 OR (type=2 AND z>1e-4)
+    df_filt = df_filt[(df_filt["type"] == 1) | ((df_filt["type"] == 2) & (df_filt["z"] > 1e-4))]
 
     grouped = (
         df_filt.groupby(["vel0", "angulo", "posx", "posy"])["id"]
