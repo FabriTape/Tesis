@@ -3,21 +3,26 @@
 Contiene funciones para calcular tamaños de clusters, distribuciones y estadísticas.
 """
 
-import pandas as pd
 import numpy as np
-
-from data_loader import (
-    filter_by_ff,
-    filter_by_vel0,
-    filter_by_i_value,
-    filter_exclude_erosion,
-)
+import pandas as pd
 from constants import I_VALUE
 
 
-def compute_unique_ids_by_velocity(
-    df: pd.DataFrame, ff: float
-) -> pd.DataFrame:
+def filter_erosion(df: pd.DataFrame, ff: float) -> pd.DataFrame:
+    """Filtra exclusión de erosión: partículas tipo 1 con z > threshold o vz > 0.
+
+    Args:
+        df: DataFrame de datos.
+        ff: Factor de llenado.
+
+    Returns:
+        DataFrame con partículas erosionadas.
+    """
+    df = df[(df["ff"] == ff) & (df["i"] == I_VALUE)]
+    return df[((df["type"] == 1) & ((df["z"] > 1e-4) | (df["vz"] > 0)))]
+
+
+def compute_unique_ids_by_velocity(df: pd.DataFrame, ff: float) -> pd.DataFrame:
     """Calcula promedio de IDs únicos por velocidad.
 
     Args:
@@ -27,9 +32,7 @@ def compute_unique_ids_by_velocity(
     Returns:
         DataFrame con estadísticas por vel0.
     """
-    df_filt = filter_by_ff(df, ff)
-    df_filt = filter_by_i_value(df_filt, I_VALUE)
-    df_filt = filter_exclude_erosion(df_filt)
+    df_filt = filter_erosion(df, ff)
 
     grouped = (
         df_filt.groupby(["vel0", "angulo", "posx", "posy"])["id"]
@@ -50,22 +53,18 @@ def compute_unique_ids_by_velocity(
 
 
 def compute_unique_ids_raw_with_positions(
-    df: pd.DataFrame, ff: float, i_value: int
+    df: pd.DataFrame, ff: float
 ) -> dict[float, pd.DataFrame]:
     """Calcula IDs únicos por cada simulación individual con posiciones.
 
     Args:
         df: DataFrame con datos.
         ff: Factor de fricción.
-        i_value: Paso temporal a filtrar.
 
     Returns:
         Dict con vel0 -> DataFrame con columnas [vel0, angulo, posx, posy, unique_ids].
     """
-    df_filt = filter_by_ff(df, ff)
-    df_filt = filter_by_i_value(df_filt, i_value)
-    # Keep eroded particles: type=1 OR (type=2 AND z>1e-4)
-    df_filt = df_filt[(df_filt["type"] == 1) | ((df_filt["type"] == 2) & (df_filt["z"] > 1e-4))]
+    df_filt = filter_erosion(df, ff)
 
     grouped = (
         df_filt.groupby(["vel0", "angulo", "posx", "posy"])["id"]
@@ -85,7 +84,6 @@ def compute_unique_ids_raw_with_positions(
 def compute_erosion_counts_with_zeros(
     df: pd.DataFrame,
     ff: float,
-    i_value: int,
     grid_pairs: list[tuple[float, float]],
 ) -> dict[float, np.ndarray]:
     """Calcula conteos de erosión por posición, incluyendo ceros.
@@ -93,17 +91,13 @@ def compute_erosion_counts_with_zeros(
     Args:
         df: DataFrame completo.
         ff: Factor de fricción.
-        i_value: Paso temporal.
         grid_pairs: Lista de posiciones válidas (posx, posy).
 
     Returns:
         dict[vel0] = array numpy con conteos (algunos pueden ser 0).
     """
-    from data_loader import filter_by_ff, filter_by_i_value, filter_is_erosion
 
-    df_filt = filter_by_ff(df, ff)
-    df_filt = filter_by_i_value(df_filt, i_value)
-    df_filt = filter_is_erosion(df_filt)
+    df_filt = filter_erosion(df, ff)
 
     existing_pairs = set(zip(df_filt["posx"], df_filt["posy"]))
 
@@ -136,9 +130,7 @@ def compute_unique_ids_raw(df: pd.DataFrame, ff: float) -> dict[float, list[int]
     Returns:
         Dict con vel0 -> lista de IDs únicos por movimiento.
     """
-    df_filt = filter_by_ff(df, ff)
-    df_filt = filter_by_i_value(df_filt, I_VALUE)
-    df_filt = filter_exclude_erosion(df_filt)
+    df_filt = filter_erosion(df, ff)
 
     grouped = (
         df_filt.groupby(["vel0", "angulo", "posx", "posy"])["id"]
@@ -163,14 +155,10 @@ def compute_cluster_frequency(df: pd.DataFrame, ff: float) -> pd.DataFrame:
     Returns:
         DataFrame con frecuencia por tamaño de cluster.
     """
-    df_filt = filter_by_ff(df, ff)
-    df_filt = filter_by_i_value(df_filt, I_VALUE)
-    df_filt = filter_exclude_erosion(df_filt)
+    df_filt = filter_erosion(df, ff)
 
     sizes_per_sim = []
-    for (_, _, _, _), group in df_filt.groupby(
-        ["vel0", "angulo", "posx", "posy"]
-    ):
+    for (_, _, _, _), group in df_filt.groupby(["vel0", "angulo", "posx", "posy"]):
         cluster_sizes = group.groupby("cluster")["id"].nunique()
         for size in cluster_sizes:
             sizes_per_sim.append({"cluster_size": size})
@@ -180,9 +168,7 @@ def compute_cluster_frequency(df: pd.DataFrame, ff: float) -> pd.DataFrame:
 
     df_sizes = pd.DataFrame(sizes_per_sim)
 
-    result = (
-        df_sizes.groupby("cluster_size").size().reset_index(name="frecuencia")
-    )
+    result = df_sizes.groupby("cluster_size").size().reset_index(name="frecuencia")
     return result.sort_values("cluster_size")
 
 
@@ -197,16 +183,10 @@ def compute_cluster_sizes(df: pd.DataFrame, ff: float, vel0: float) -> np.ndarra
     Returns:
         Array de tamaños de cluster.
     """
-    df_filt = filter_by_ff(df, ff)
-    df_filt = filter_by_vel0(df_filt, vel0)
-    df_filt = filter_by_i_value(df_filt, I_VALUE)
-    df_filt = filter_exclude_erosion(df_filt)
+    df_filt = df[df["vel0"] == vel0]
+    df_filt = filter_erosion(df_filt, ff)
 
-    return (
-        df_filt.groupby(["angulo", "posx", "posy", "cluster"])["id"]
-        .nunique()
-        .values
-    )
+    return df_filt.groupby(["angulo", "posx", "posy", "cluster"])["id"].nunique().values
 
 
 def compute_cluster_size_stats(

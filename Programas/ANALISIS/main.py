@@ -6,11 +6,11 @@ en simulaciones de impacto proyectil-cama.
 
 import matplotlib.pyplot as plt
 from confidence_intervals import run_confidence_intervals
-from constants import FF_VALUES, SALIDA_DIR
-from data_loader import load_data
+from constants import CSV_PATH, FF_VALUES, SALIDA_DIR
 from erosion_viz import plot_erosion_boxplot, plot_erosion_heatmap
 from kinematics_calc import get_grid_pairs
 from matplotlib.backends.backend_pdf import PdfPages
+from pandas import read_csv
 
 
 def save_figure(fig: plt.Figure, path: str) -> None:
@@ -28,12 +28,8 @@ def save_figure(fig: plt.Figure, path: str) -> None:
 def run_analysis() -> None:
     """Ejecuta el pipeline completo de análisis."""
     print("Cargando datos...")
-    df = load_data()
+    df = read_csv(CSV_PATH)
     print(f"Datos cargados: {len(df)} filas")
-
-    # I_VALUE dinámico: usar el paso temporal máximo del dataset
-    I_VALUE = 80
-    print(f"I_VALUE dinámico: {I_VALUE}\n")
 
     # Grid de posiciones (calculado una vez para todas las simulaciones)
     grid_pairs = get_grid_pairs(df)
@@ -43,7 +39,7 @@ def run_analysis() -> None:
 
     # Tablas de intervalos de confianza (van primero en el PDF)
     print("Generando tablas de intervalos de confianza...")
-    figuras = run_confidence_intervals(I_VALUE)
+    figuras = run_confidence_intervals()
     print(f"Tablas de IC generadas: {len(figuras)}\n")
 
     valores_vel0 = sorted(df["vel0"].unique())
@@ -65,7 +61,7 @@ def run_analysis() -> None:
             print(f"  vel0={vel0}...")
 
             # Heatmap de erosión
-            fig_heat = plot_erosion_heatmap(df, ff, vel0, grid_pairs)
+            fig_heat = plot_erosion_heatmap(df, ff, vel0)
             if fig_heat and fig_heat.get_axes():
                 figuras.append(fig_heat)
                 save_figure(fig_heat, dir_ff / f"heatmap_erosion_{vel0}.png")
