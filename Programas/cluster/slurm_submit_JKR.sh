@@ -1,13 +1,12 @@
 #!/bin/bash
 ### Reserve time in slurm queue manager.
 
-#SBATCH -J N3v5a*ff*
+#SBATCH -J N1v25ff0.35mov7x7
 #SBATCH -n 32
 #SBATCH --nodes 1
 #SBATCH --ntasks-per-node=32
 #SBATCH -o ./logs/job_exec_%j.out
-##SBATCH --gres=gpu:1
-#SBATCH --nodelist=toko06
+#SBATCH --nodelist=toko07
 #SBATCH --partition=XL
 
 ## Espacio añadido para ejecutar en gpu2
@@ -23,4 +22,3 @@ module load openmpi-4.0.2
 ./run_erosion_bed_sims_lammps_move_np3.sh
 ##Limpieza del codigo añadido (ya se dije que habia terminado pero la parte 2 en esta ocasión si es buena)
 rm -rf $CARPETA_TMP
-##mpirun -np 32 /home/fbazzoni/lmp_g++_openmpi-4.0.2_stableSep2021 -in in.granular2_JKR -v input ./box_fill_0.15_SI.data     > salida_jkr_erosion.log

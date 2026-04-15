@@ -10,7 +10,7 @@
 # SIMULACIÓN LAMMPS
 # -----------------------------------------------------------------------------
 [simulation]
-np              = 3          # Número de partículas del proyectil
+np              = 1          # Número de partículas del proyectil
 ndumps          = 25000      # Frecuencia de dump [timesteps]
 nthermo         = 5000       # Frecuencia de thermo [timesteps]
 cores           = 32         # Núcleos MPI
@@ -22,10 +22,10 @@ timestep        = 5e-11      # Paso temporal [s]
 # BARRIDO DE PARÁMETROS
 # -----------------------------------------------------------------------------
 [sweep]
-fills           = [0.35, 0.15]
-vels            = [-5]
-angles          = [0, 90]
-moves           = [-2, 0, 2]
+fills           = [0.35]
+vels            = [-25]
+angles          = [0]
+moves           = [-3, -2, -1, 0, 1, 2, 3]
 total_steps     = [2000000]   # Un valor por cada combinación fill×vel×angle
 grain_radius_um = 0.76        # Radio del grano [μm] (para cálculo de desplazamiento)
 xrotate         = 1
