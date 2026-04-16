@@ -8,13 +8,11 @@
 
 INPUT="collision_erosion_bed.input"
 BASE_DIR=$(pwd)
-#source ~/.venv/bin/activate
 PY311="python3"
 # Cargar configuración centralizada
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 $PY311 ${SCRIPT_DIR}/read_config.py ${SCRIPT_DIR}/configs/config_$1.toml
-#$PY311 ${BASE_DIR}/read_config.py ${BASE_DIR}/config.toml
-source config_vars.sh
+source ${SCRIPT_DIR}/configs/config_vars_$1.sh
 
 # Variables derivadas
 #NP=$NP  # viene de config_vars.sh

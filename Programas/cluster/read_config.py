@@ -94,17 +94,16 @@ def _format_value(value: object) -> str:
 
 def main() -> None:
     """Punto de entrada CLI."""
-    if len(sys.argv) > 1:
-        config_path = Path(sys.argv[1])
-    else:
-        config_path = Path("config.toml")
+    ID = sys.argv[2]
+    config_path = Path(sys.argv[1])
 
     if not config_path.exists():
         print(f"Error: {config_path} no encontrado.", file=sys.stderr)
         sys.exit(1)
 
     raw = read_config(config_path)
-    output_path = Path("config_vars.sh")
+    output_path = Path(f"config_vars_{ID}.sh")
+    output_path = "configs" / output_path
     generate_shell_vars(raw, output_path)
     print(f"Configuración cargada: {config_path} → {output_path}")
 

@@ -8,10 +8,6 @@
 # Use a safe name for current working directory
 CWD="$(pwd)"
 
-# Copy config using SLURM_JOB_ID (available inside the job)
-mkdir -p "${CWD}/configs"
-cp "config.toml" "${CWD}/configs/config_${SLURM_JOB_ID}.toml"
-
 ## Espacio añadido para ejecutar en gpu2
 CARPETA_TMP="/dev/shm/fbazzoni_tmp_${SLURM_JOB_ID}"
 mkdir -p "$CARPETA_TMP"
