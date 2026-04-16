@@ -12,7 +12,7 @@ BASE_DIR=$(pwd)
 PY311="python3"
 # Cargar configuración centralizada
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-$PY311 ${SCRIPT_DIR}/read_config.py ${SCRIPT_DIR}/config.toml
+$PY311 ${SCRIPT_DIR}/read_config.py ${SCRIPT_DIR}/configs/config_$1.toml
 #$PY311 ${BASE_DIR}/read_config.py ${BASE_DIR}/config.toml
 source config_vars.sh
 
@@ -43,7 +43,7 @@ COUNTER=0
 mkdir -p "$OUTDIR"
 cd "$OUTDIR"
 cp "${BASE_DIR}/$0" ./
-cp "${SCRIPT_DIR}/config.toml" ./
+cp "${SCRIPT_DIR}/configs/config_$1.toml" ./
 
 for fill in "${FILLS[@]}"
 do
