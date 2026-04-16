@@ -11,7 +11,7 @@ BASE_DIR=$(pwd)
 PY311="python3"
 # Cargar configuración centralizada
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-$PY311 ${SCRIPT_DIR}/read_config.py ${SCRIPT_DIR}/configs/config_$1.toml
+$PY311 ${SCRIPT_DIR}/read_config.py ${SCRIPT_DIR}/configs/config_$1.toml $1
 source ${SCRIPT_DIR}/configs/config_vars_$1.sh
 
 # Variables derivadas
