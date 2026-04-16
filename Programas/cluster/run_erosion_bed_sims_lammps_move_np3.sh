@@ -1,10 +1,4 @@
 #!/bin/bash
-# =============================================================================
-# Script de simulaciones LAMMPS — erosión de cama granular
-# =============================================================================
-# Lee parámetros de config.toml via read_config.py
-# Uso: ./run_erosion_bed_sims_lammps_move_np3.sh
-# =============================================================================
 
 INPUT="collision_erosion_bed.input"
 BASE_DIR=$(pwd)
@@ -13,6 +7,7 @@ PY311="python3"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 $PY311 ${SCRIPT_DIR}/read_config.py ${SCRIPT_DIR}/configs/config_$1.toml $1
 source ${SCRIPT_DIR}/configs/config_vars_$1.sh
+rm -f ${SCRIPT_DIR}/configs/config_vars_$1.sh
 
 # Variables derivadas
 #NP=$NP  # viene de config_vars.sh

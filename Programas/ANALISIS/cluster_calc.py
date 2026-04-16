@@ -82,39 +82,18 @@ def compute_unique_ids_raw_with_positions(
 
 
 def compute_erosion_counts_with_zeros(
-    df: pd.DataFrame,
-    ff: float,
-    grid_pairs: list[tuple[float, float]],
+    df: pd.DataFrame, ff: float, grid_pairs: list[tuple[float, float]]
 ) -> dict[float, np.ndarray]:
-    """Calcula conteos de erosión por posición, incluyendo ceros.
-
-    Args:
-        df: DataFrame completo.
-        ff: Factor de fricción.
-        grid_pairs: Lista de posiciones válidas (posx, posy).
-
-    Returns:
-        dict[vel0] = array numpy con conteos (algunos pueden ser 0).
-    """
-
+    """Calcula conteos de erosión por posición de forma optimizada."""
     df_filt = filter_erosion(df, ff)
 
-    existing_pairs = set(zip(df_filt["posx"], df_filt["posy"]))
+    # Pre-calcular conteos por (vel0, posx, posy) en un diccionario rápido
+    grouped = df_filt.groupby(["vel0", "posx", "posy"])["id"].nunique().to_dict()
 
     result = {}
     for vel0 in df_filt["vel0"].unique():
-        df_vel = df_filt[df_filt["vel0"] == vel0]
-
-        counts = []
-        for posx, posy in grid_pairs:
-            if (posx, posy) in existing_pairs:
-                count = df_vel[(df_vel["posx"] == posx) & (df_vel["posy"] == posy)][
-                    "id"
-                ].nunique()
-                counts.append(count)
-            else:
-                counts.append(0)
-
+        # Busca en el diccionario en O(1), si no existe pone 0
+        counts = [grouped.get((vel0, px, py), 0) for px, py in grid_pairs]
         result[vel0] = np.array(counts, dtype=float)
 
     return result

@@ -21,7 +21,6 @@ except ModuleNotFoundError:
     import tomli as tomllib
 
 
-
 def read_config(config_path: Path) -> dict:
     """Lee el archivo TOML y retorna el diccionario crudo.
 
@@ -102,8 +101,7 @@ def main() -> None:
         sys.exit(1)
 
     raw = read_config(config_path)
-    output_path = Path(f"config_vars_{ID}.sh")
-    output_path = "configs" / output_path
+    output_path = Path(f"configs/config_vars_{ID}.sh")
     generate_shell_vars(raw, output_path)
     print(f"Configuración cargada: {config_path} → {output_path}")
 

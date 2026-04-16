@@ -1,9 +1,3 @@
-"""Script principal de análisis de datos LAMMPS.
-
-Orquesta la generación de visualizaciones para el análisis de erosión
-en simulaciones de impacto proyectil-cama.
-"""
-
 import matplotlib.pyplot as plt
 from confidence_intervals import run_confidence_intervals
 from constants import CSV_PATH, FF_VALUES, SALIDA_DIR
@@ -14,66 +8,39 @@ from pandas import read_csv
 
 
 def save_figure(fig: plt.Figure, path: str) -> None:
-    """Guarda una figura en archivo PNG.
-
-    Args:
-        fig: Figura de matplotlib.
-        path: Ruta del archivo de salida.
-    """
     if fig and fig.get_axes():
         plt.savefig(path, bbox_inches="tight")
         plt.close(fig)
 
 
 def run_analysis() -> None:
-    """Ejecuta el pipeline completo de análisis."""
     print("Cargando datos...")
     df = read_csv(CSV_PATH)
-    print(f"Datos cargados: {len(df)} filas")
 
-    # Grid de posiciones (calculado una vez para todas las simulaciones)
     grid_pairs = get_grid_pairs(df)
-    print(f"Grid de posiciones: {len(grid_pairs)} pares\n")
+    print(f"Datos: {len(df)} filas. Grid: {len(grid_pairs)} pares\n")
 
     SALIDA_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Tablas de intervalos de confianza (van primero en el PDF)
-    print("Generando tablas de intervalos de confianza...")
     figuras = run_confidence_intervals()
-    print(f"Tablas de IC generadas: {len(figuras)}\n")
-
     valores_vel0 = sorted(df["vel0"].unique())
 
     for ff in FF_VALUES:
         dir_ff = SALIDA_DIR / f"ff_{ff}"
         dir_ff.mkdir(parents=True, exist_ok=True)
 
-        print(f"Procesando ff={ff}...")
-
-        # Boxplot de erosión
-        fig_box = plot_erosion_boxplot(df, ff)
-        if fig_box and fig_box.get_axes():
+        if fig_box := plot_erosion_boxplot(df, ff):
             figuras.append(fig_box)
             save_figure(fig_box, dir_ff / "ids_boxplot.png")
 
-        # Por cada vel0
         for vel0 in valores_vel0:
-            print(f"  vel0={vel0}...")
-
-            # Heatmap de erosión
-            fig_heat = plot_erosion_heatmap(df, ff, vel0)
-            if fig_heat and fig_heat.get_axes():
+            if fig_heat := plot_erosion_heatmap(df, ff, vel0):
                 figuras.append(fig_heat)
                 save_figure(fig_heat, dir_ff / f"heatmap_erosion_{vel0}.png")
 
-    # PDF final
-    pdf_final = SALIDA_DIR / "resultado_final.pdf"
-    print(f"Generando PDF final: {pdf_final}")
-    with PdfPages(pdf_final) as pdf:
+    with PdfPages(SALIDA_DIR / "resultado_final.pdf") as pdf:
         for fig in figuras:
             if fig and fig.get_axes():
                 pdf.savefig(fig)
-
     print(f"¡Listo! Figuras en {SALIDA_DIR}")
 
 
