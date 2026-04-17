@@ -2,17 +2,14 @@
 
 variable data index 1
 
-
 variable xrotate index 1
 variable yrotate index 1
 variable zrotate index 1
 variable angle index 1
 
-
 variable xmove index 1
 variable ymove index 1
 variable zmove index 1
-
 
 variable velocity index 1
 variable nsteps index 1
@@ -30,20 +27,16 @@ variable poisson index 1
 variable surface_energy index 1
 variable density_proj index 1
 
-
 newton off
-
 
 units       si
 dimension   3
 boundary    p p f
 atom_style  sphere
 neighbor  100e-9 bin
-comm_modify mode single vel yes cutoff 5e-6
+neigh_modify delay 0 every 1 check yes
+comm_modify mode single vel yes cutoff 1.8e-6
 processors ${proc_x} ${proc_y} ${proc_z}
-
-
-
 
 # Atom definition
 read_data ${data}
@@ -98,20 +91,26 @@ velocity sphere set 0.0 0.0 ${velocity} units box
 thermo ${nthermo}
 thermo_modify lost warn
 
-dump 1 all custom ${ndumps} output.*.gz id type x y z vx vy vz fz
-
+#dump 1 all custom ${ndumps} output.*.gz id type x y z vx vy vz fz
+dump 1 all custom ${ndumps} output_trayectoria.dump id type x y z vx vy vz fz
 # ==========================================================
-# TRAMPA: congela partículas que escapan de la cama
+# TRAMPA: Congela partículas sin borrarlas y sin frenar el run
 # ==========================================================
 
+# 1. Definir la región a partir de los 250 um (2.5e-4 m)
 region r_trampa block INF INF INF INF 2.5e-4 INF
-group gr_trampa dynamic all region r_trampa every 10000
 
-# ==========================================================
-# EJECUCIÓN
-# ==========================================================
+# 2. Grupo dinámico: LAMMPS revisa cada 100 pasos quién entró a la región.
+# (Hacerlo cada 10000 era peligroso, alguna podía rebotar y caer antes de ser detectada)
+group gr_trampa dynamic all region r_trampa every 1000
 
-run ${nsteps} every 10000 "velocity gr_trampa set 0.0 0.0 0.0"
+# 3. Anular todas las fuerzas para que dejen de sentir gravedad o colisiones
+fix freno_fuerza gr_trampa setforce 0.0 0.0 0.0
 
+# 4. Drenar la velocidad instantáneamente
+fix freno_vel gr_trampa viscous 1.0
+fix balanceo all balance 1000 1.05 shift xy 10 1.05
+restart 50000 res_A.rst res_B.rst
+run ${nsteps}
 # Guardado final de seguridad
 write_data post-run_final.data

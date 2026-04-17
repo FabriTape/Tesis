@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Atlas - ANALISIS</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.17.1/flowchart.min.js"></script>
+    <style>
+        :root { --primary: #2563eb; --sidebar: #1e293b; --bg: #f8fafc; --text: #0f172a; --card: #ffffff; }
+        body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 280px; background: var(--sidebar); color: #f1f5f9; display: flex; flex-direction: column; flex-shrink: 0; }
+        .sidebar-header { padding: 24px; font-weight: 700; font-size: 1.25rem; border-bottom: 1px solid #334155; text-align: center; }
+        .nav-list { list-style: none; padding: 12px; margin: 0; overflow-y: auto; flex: 1; }
+        .nav-item { padding: 12px 16px; border-radius: 8px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; transition: 0.2s; }
+        .nav-item:hover, .nav-item.active { background: var(--primary); color: white; }
+        .nav-item i { margin-right: 12px; font-style: normal; }
+
+        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+        .header { padding: 20px 40px; background: white; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .tabs { display: flex; gap: 8px; background: #f1f5f9; padding: 4px; border-radius: 8px; }
+        .tab-btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; background: transparent; color: #64748b; transition: 0.2s; }
+        .tab-btn.active { background: white; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+        .content { flex: 1; padding: 40px; overflow-y: auto; display: none; }
+        .content.active { display: block; }
+
+        #arch-graph { width: 100%; height: 600px; background: white; border-radius: 12px; border: 1px solid #e2e8f0; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+        .card { background: white; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .card h3 { margin: 0 0 16px; font-size: 1.1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; color: var(--sidebar); }
+        ul.feature-list { list-style: none; padding: 0; margin: 0; }
+        ul.feature-list li { margin-bottom: 8px; }
+        code { background: #eff6ff; color: #1e40af; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.95rem; }
+
+        /* Contenedor del flujo optimizado para diagramas grandes */
+        #flow-canvas {
+            background: #fafafa;
+            border-radius: 12px;
+            padding: 40px;
+            border: 1px dashed #cbd5e1;
+            min-height: 500px;
+            overflow: auto; /* Permite scroll horizontal y vertical */
+            text-align: center;
+        }
+        #flow-canvas svg { max-width: none; } /* Evita que el SVG se encoja a la fuerza */
+        .empty-flow { color: #64748b; margin-top: 100px; }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">Atlas: ANALISIS</div>
+        <ul class="nav-list" id="nav-list"></ul>
+    </aside>
+
+    <main class="main">
+        <header class="header">
+            <div>
+                <h1 id="active-title" style="margin:0; font-size: 1.5rem;">Cargando...</h1>
+            </div>
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('tab-general')">Vista General</button>
+                <button class="tab-btn" onclick="switchTab('tab-explorer')">Explorador</button>
+                <button class="tab-btn" onclick="switchTab('tab-flow')">Flujo Lógico</button>
+            </div>
+        </header>
+
+        <div id="tab-general" class="content active"><div id="arch-graph"></div></div>
+
+        <div id="tab-explorer" class="content">
+            <p id="mod-desc" style="color: #64748b; font-size: 1.1rem; margin-bottom: 24px;"></p>
+            <div class="grid" id="explorer-grid"></div>
+        </div>
+
+        <div id="tab-flow" class="content"><div id="flow-canvas"></div></div>
+    </main>
+
+    <script>
+        const projectData = {"wave_analysis": {"name": "wave_analysis.py", "desc": "Análisis de onda de choque en simulaciones LAMMPS.<br><br>Detecta el instante en que se propaga una onda macroscópica en la cama<br>de partículas usando criterios cinéticos y espaciales.<br><br>Física: La onda de choque se manifiesta cuando un gran número de partículas<br>de la cama adquieren velocidad simultáneamente cerca de las paredes laterales,<br>indicando que el impulso del proyectil se propagó a través del lecho.", "functions": ["is_critical_simulation()", "_safe_float()", "run_wave_scan()", "_wave_threshold_reached()", "_has_nonzero_displacement()", "_safe_int()", "detect_wave_particles()"], "variables": [], "depends": ["storage_and_viz", "config_and_discovery"], "importsExt": ["__future__", "math", "pathlib", "polars"], "dsl": "op2=>operation: '\\nAnálisis de onda de choque en simulaciones LAMMPS.\\n\\nDetecta el instante en que se propaga una onda macroscópica en la cama\\nde partículas usando criterios cinéticos y espaciales.\\n\\nFísica: La onda de choque se manifiesta cuando un gran número de partículas\\nde la cama adquieren velocidad simultáneamente cerca de las paredes laterales,\\nindicando que el impulso del proyectil se propagó a través del lecho.\\n'\nop4=>operation: from __future__ import annotations\nop6=>operation: import math\nop8=>operation: from pathlib import Path\nop10=>operation: import polars as pl\nop12=>operation: from .config_and_discovery import Config, WaveConfig, print_progress\nop14=>operation: from .storage_and_viz import read_dump, save_wave_data\nop16=>operation: _WAVE_COLUMNS: list[str] = ['id', 'type', 'x', 'y', 'z', 'vx', 'vy', 'vz']\nst19=>start: start is_critical_simulation\nio21=>inputoutput: input: metadata, config\nop24=>operation: 'Determina si una simulación requiere análisis de onda de choque.\\n\\n    Evalúa tres condiciones físicas en orden de prioridad:\\n    1. Número de partículas del proyectil en np_criticos.\\n    2. Velocidad de impacto dentro de tolerancia.\\n    3. Desplazamiento lateral no nulo del proyectil.\\n\\n    Args:\\n        metadata: Diccionario con np, vel0, posx, posy, posz.\\n        config: Configuración con umbrales de onda.\\n\\n    Returns:\\n        True si la simulación requiere análisis de onda.\\n    '\nop26=>operation: wave_cfg = config.wave\nop28=>operation: np_val = _safe_int(metadata.get('np', '0'))\ncond31=>condition: if np_val is None\nio38=>inputoutput: output: False\ne36=>end: end function return\ncond45=>condition: if np_val in wave_cfg.np_criticos\nio52=>inputoutput: output: _has_nonzero_displacement(metadata, wave_cfg)\ne50=>end: end function return\nop58=>operation: vel0 = _safe_float(metadata.get('vel0', '0'))\ncond61=>condition: if vel0 is None\nio68=>inputoutput: output: False\ne66=>end: end function return\ncond75=>condition: if abs(vel0) >= abs(wave_cfg.v_objetivo) - wave_cfg.tolerancia_v\nio82=>inputoutput: output: False\ne80=>end: end function return\nio91=>inputoutput: output: _has_nonzero_displacement(metadata, wave_cfg)\ne89=>end: end function return\n\nop2->op4\nop4->op6\nop6->op8\nop8->op10\nop10->op12\nop12->op14\nop14->op16\nop16->st19\nst19->io21\nio21->op24\nop24->op26\nop26->op28\nop28->cond31\ncond31(yes)->io38\nio38->e36\ncond31(no)->cond45\ncond45(yes)->io52\nio52->e50\ncond45(no)->op58\nop58->cond61\ncond61(yes)->io68\nio68->e66\ncond61(no)->cond75\ncond75(yes)->io82\nio82->e80\ncond75(no)->io91\nio91->e89\n"}, "main_pipeline": {"name": "main_pipeline.py", "desc": "Pipeline principal y punto de entrada de CARBOXI.<br><br>Orquesta el flujo completo de procesamiento de simulaciones LAMMPS:<br>- Análisis de onda de choque (Fase 1)<br>- Análisis topológico con OVITO (Fase 2)<br>- Exportación de resultados y gráficos SVG<br><br>Física: Cada simulación representa un experimento de impacto de un<br>proyectil sobre una cama de partículas de sílice.", "functions": ["run_all()", "run_simulation()", "_metadata_valid()", "_select_bed_height()", "main()", "_plot_empty()"], "variables": ["_TZ_ARG"], "depends": ["erosion_analysis", "storage_and_viz", "config_and_discovery", "wave_analysis"], "importsExt": ["sys", "__future__", "datetime", "pathlib", "polars"], "dsl": "op300=>operation: '\\nPipeline principal y punto de entrada de CARBOXI.\\n\\nOrquesta el flujo completo de procesamiento de simulaciones LAMMPS:\\n- Análisis de onda de choque (Fase 1)\\n- Análisis topológico con OVITO (Fase 2)\\n- Exportación de resultados y gráficos SVG\\n\\nFísica: Cada simulación representa un experimento de impacto de un\\nproyectil sobre una cama de partículas de sílice.\\n'\nop302=>operation: from __future__ import annotations\nop304=>operation: import sys\nop306=>operation: from datetime import datetime, timedelta, timezone\nop308=>operation: from pathlib import Path\nop310=>operation: import polars as pl\nop312=>operation: from .config_and_discovery import Config, browse_for_simulation, discover_simulations, extraer_metadatos, load_config\nop314=>operation: from .erosion_analysis import build_ovito_pipeline, run_topology_analysis\nop316=>operation: from .storage_and_viz import get_timestep_interval, list_dump_files, plot_erosion, save_erosion_results, save_no_erosion_flag\nop318=>operation: from .wave_analysis import is_critical_simulation, run_wave_scan\nop320=>operation: _SIM_PREFIX: str = 'erosion_bed_SI_'\nop322=>operation: _TZ_ARG = timezone(timedelta(hours=-3))\nst325=>start: start main\nio327=>inputoutput: input: \nop330=>operation: 'Punto de entrada principal de CARBOXI.'\ncond333=>condition: if len(sys.argv) > 1\nop337=>operation: base_dir = Path(sys.argv[1]).resolve()\nop360=>operation: config = load_config()\nsub362=>subroutine: run_all(base_dir, config)\ne364=>end: end main\nst368=>start: start run_simulation\nio370=>inputoutput: input: sim_dir, config\nop373=>operation: 'Ejecuta el pipeline completo para una simulación individual.\\n\\n    Flujo:\\n    1. Preparación: listar dumps, extraer metadatos, calcular alturas.\\n    2. Decisión de onda: determinar si aplicar Fase 1.\\n    3. Fase 1 (opcional): escaneo de onda de choque.\\n    4. Fase 2: análisis topológico con OVITO.\\n    5. Exportación: guarda resultados Parquet y gráfico SVG.\\n    '\nop375=>operation: sim_id = sim_dir.name.removeprefix(_SIM_PREFIX)\nop377=>operation: timestamp = datetime.now(_TZ_ARG).strftime('%Y-%m-%d_%H-%M-%S')\nop379=>operation: filter_name = config.filters.filtro_activo\nsub381=>subroutine: print(f\"\\n{'=' * 55}\")\nsub383=>subroutine: print(f'  Procesando: {sim_dir.name}')\nsub385=>subroutine: print(f'  Filtro activo: {filter_name}')\nsub387=>subroutine: print(f\"{'=' * 55}\")\nop389=>operation: dump_files = list_dump_files(sim_dir, recursive=True)\ncond392=>condition: if not dump_files\nsub396=>subroutine: print(f\"  Sin archivos output.*.gz en '{sim_dir.name}' (o subdirectorios). Saltando...\")\ne399=>end: end function return\nop405=>operation: timestep_interval = get_timestep_interval(dump_files)\nop407=>operation: metadata = extraer_metadatos(sim_id)\ncond410=>condition: if not _metadata_valid(metadata)\nsub414=>subroutine: print('  No se pudieron extraer metadatos del nombre de carpeta. Saltando...')\ne417=>end: end function return\nop423=>operation: bed_height = _select_bed_height(metadata, config)\nop425=>operation: umbral_radios = config.filters.umbral_techo_radios\ncond428=>condition: if umbral_radios < 0\nop432=>operation: max_height = bed_height - abs(umbral_radios) * config.radio_m\nop434=>operation: bed_height = max_height\nop441=>operation: box_limits = {'x': [0.0, config.caja_x], 'y': [0.0, config.caja_y]}\nop443=>operation: run_wave = is_critical_simulation(metadata, config)\ncond446=>operation: print(f\"  [!] Simulación crítica — análisis de onda ACTIVADO\\n      np={metadata.get('np')}, vel={metadata.get('vel0')} m/s, pos=({metadata.get('posx')}, {metadata.get('posy')}, {metadata.get('posz')})\") if  run_wave\nop456=>operation: cutoff = config.radio_m * config.factor_cutoff\nop458=>operation: pipeline = build_ovito_pipeline(cutoff=cutoff)\ncond461=>condition: if run_wave\nop465=>operation: _, cut_index = run_wave_scan(dump_files=dump_files, radius=config.radio_m, max_height=max_height, box_limits=box_limits, use_static_box=True, sim_id=sim_id, timestamp=timestamp, output_dir=config.dir_resultados, config=config)\nop472=>operation: files_fase2 = dump_files[:cut_index]\nop474=>operation: results = run_topology_analysis(dump_files=files_fase2, pipeline=pipeline, bed_height=bed_height, max_height=max_height, sim_id=sim_id, timestep_interval=timestep_interval, tolerancia_v_cm=config.filters.tolerancia_v_cm, freeze_height=config.freeze_height)\nop476=>operation: filter_thresholds = {'umbral_vz_min': config.filters.umbral_vz_min, 'umbral_techo_radios': config.filters.umbral_techo_radios, 'tolerancia_v_cm': config.filters.tolerancia_v_cm}\ncond479=>condition: if not results\nop483=>operation: path = save_no_erosion_flag(sim_id, timestamp, config.dir_resultados, filter_name)\nsub485=>subroutine: print(f'  Sin erosión significativa. Marcador guardado en: {path}')\ne488=>end: end function return\nop494=>operation: result_path = save_erosion_results(results, sim_id, timestamp, config.dir_resultados, filter_thresholds, filter_name=filter_name)\nsub496=>subroutine: print(f'\\n  Resultados guardados en: {result_path}')\nop498=>operation: df_total = pl.concat(results, how='vertical_relaxed')\ncond501=>condition: if df_total.is_empty() or df_total.height == 0\nsub505=>subroutine: print('  Sin datos para graficar. Generando gráfico vacío...')\nsub507=>subroutine: _plot_empty(sim_id, timestamp, config.dir_imagenes, filter_name)\ne510=>end: end function return\nop516=>operation: total_timesteps = df_total['i'].max()\nsub521=>subroutine: plot_erosion(df_total, sim_id, timestamp, config.dir_imagenes, filter_name, total_timesteps=total_timesteps)\ncond518=>condition: exception raised?\ncond523=>condition: except Exception as exc\nsub527=>subroutine: print(f'  Advertencia: no se pudo generar el gráfico: {exc}')\ne532=>end: end run_simulation\nst536=>start: start run_all\nio538=>inputoutput: input: base_dir, config\nop541=>operation: 'Procesa todas las simulaciones encontradas en el directorio base.'\nsub543=>subroutine: config.dir_resultados.mkdir(parents=True, exist_ok=True)\nsub545=>subroutine: config.dir_imagenes.mkdir(parents=True, exist_ok=True)\nop547=>operation: simulations = discover_simulations(base_dir)\ncond550=>operation: run_simulation(sim_dir, config) while  sim_dir in simulations\nsub559=>subroutine: print(f\"\\n{'=' * 55}\")\nsub561=>subroutine: print('  ANÁLISIS COMPLETADO')\nsub563=>subroutine: print(f'  Resultados en: {config.dir_resultados.resolve()}')\nsub565=>subroutine: print(f\"{'=' * 55}\\n\")\ne567=>end: end run_all\nst571=>start: start _metadata_valid\nio573=>inputoutput: input: metadata\nop576=>operation: 'Verifica que los metadatos esenciales estén presentes.'\nio581=>inputoutput: output: metadata.get('ff') != 'N/A' and metadata.get('np') != 'N/A' and (metadata.get('vel0') != 'N/A')\ne579=>end: end function return\nop469=>operation: cut_index = len(dump_files)\nop438=>operation: max_height = bed_height + umbral_radios * config.radio_m\nop341=>operation: selected = browse_for_simulation()\ncond344=>condition: if not selected\nsub348=>subroutine: print('No se seleccionó ninguna carpeta. Saliendo.')\ne351=>end: end function return\nop357=>operation: base_dir = selected[0].parent if len(selected) == 1 else selected[0].parent\n\nop300->op302\nop302->op304\nop304->op306\nop306->op308\nop308->op310\nop310->op312\nop312->op314\nop314->op316\nop316->op318\nop318->op320\nop320->op322\nop322->st325\nst325->io327\nio327->op330\nop330->cond333\ncond333(yes)->op337\nop337->op360\nop360->sub362\nsub362->e364\ne364->st368\nst368->io370\nio370->op373\nop373->op375\nop375->op377\nop377->op379\nop379->sub381\nsub381->sub383\nsub383->sub385\nsub385->sub387\nsub387->op389\nop389->cond392\ncond392(yes)->sub396\nsub396->e399\ncond392(no)->op405\nop405->op407\nop407->cond410\ncond410(yes)->sub414\nsub414->e417\ncond410(no)->op423\nop423->op425\nop425->cond428\ncond428(yes)->op432\nop432->op434\nop434->op441\nop441->op443\nop443->cond446\ncond446->op456\nop456->op458\nop458->cond461\ncond461(yes)->op465\nop465->op472\nop472->op474\nop474->op476\nop476->cond479\ncond479(yes)->op483\nop483->sub485\nsub485->e488\ncond479(no)->op494\nop494->sub496\nsub496->op498\nop498->cond501\ncond501(yes)->sub505\nsub505->sub507\nsub507->e510\ncond501(no)->op516\nop516->sub521\nsub521->cond518\ncond518(yes)->cond523\ncond523(yes)->sub527\nsub527->e532\ne532->st536\nst536->io538\nio538->op541\nop541->sub543\nsub543->sub545\nsub545->op547\nop547->cond550\ncond550->sub559\nsub559->sub561\nsub561->sub563\nsub563->sub565\nsub565->e567\ne567->st571\nst571->io573\nio573->op576\nop576->io581\nio581->e579\ncond523(no)->e532\ncond518(no)->e532\ncond461(no)->op469\nop469->op472\ncond428(no)->op438\nop438->op441\ncond333(no)->op341\nop341->cond344\ncond344(yes)->sub348\nsub348->e351\ncond344(no)->op357\nop357->op360\n"}, "merge_all": {"name": "merge_all.py", "desc": "Sin descripción detallada.", "functions": ["merge_with_no_erosion()", "merge_all_parquet()", "main()"], "variables": [], "depends": ["config_and_discovery"], "importsExt": ["argparse", "sys", "pathlib", "polars"], "dsl": "op664=>operation: from pathlib import Path\nop666=>operation: import polars as pl\nop668=>operation: from .config_and_discovery import discover_simulations, extraer_metadatos\nst671=>start: start merge_all_parquet\nio673=>inputoutput: input: path_file\nop676=>operation: datos = discover_simulations(path_file, 'ff_', 'file')\nop678=>operation: temp = []\ncond681=>condition: for dato in datos\nop685=>operation: metadatos = extraer_metadatos(str(dato.name).replace('.parquet', ''))\nop687=>operation: df = pl.read_parquet(dato)\nop689=>operation: df = df.with_columns([pl.lit(metadatos[k]).alias(k) for k in metadatos.keys()])\nsub691=>subroutine: temp.append(df)\nop695=>operation: casted = []\ncond698=>condition: for df in temp\nop702=>operation: cast_expr = [pl.col(c).cast(pl.Int64) if df[c].dtype in [pl.UInt8, pl.UInt16, pl.UInt32] else pl.col(c) for c in df.columns]\nsub704=>subroutine: casted.append(df.with_columns(cast_expr))\nio711=>inputoutput: output: pl.concat(casted)\ne709=>end: end function return\n\nop664->op666\nop666->op668\nop668->st671\nst671->io673\nio673->op676\nop676->op678\nop678->cond681\ncond681(yes)->op685\nop685->op687\nop687->op689\nop689->sub691\nsub691(left)->cond681\ncond681(no)->op695\nop695->cond698\ncond698(yes)->op702\nop702->sub704\nsub704(left)->cond698\ncond698(no)->io711\nio711->e709\n"}, "trajectory_converter": {"name": "trajectory_converter.py", "desc": "Conversor de resultados CARBOXI a formato compatible con OVITO.<br><br>Convierte archivos .parquet con trayectorias de partículas a formatos<br>que OVITO puede leer y visualizr:<br>- LAMMPS dump (.dump)<br>- XYZ (.xyz)<br><br>Uso:<br>    python3 -m CARBOXI.trajectory_converter <archivo.parquet> [--format dump|xyz]<br>    python3 -m CARBOXI.trajectory_converter <directorio> [--format dump|xyz]", "functions": ["main()", "get_timesteps()", "read_parquet()", "export_to_xyz()", "convert_directory()", "convert_file()", "export_to_dump()"], "variables": [], "depends": [], "importsExt": ["argparse", "sys", "__future__", "pathlib", "polars"], "dsl": "op867=>operation: '\\nConversor de resultados CARBOXI a formato compatible con OVITO.\\n\\nConvierte archivos .parquet con trayectorias de partículas a formatos\\nque OVITO puede leer y visualizr:\\n- LAMMPS dump (.dump)\\n- XYZ (.xyz)\\n\\nUso:\\n    python3 -m CARBOXI.trajectory_converter <archivo.parquet> [--format dump|xyz]\\n    python3 -m CARBOXI.trajectory_converter <directorio> [--format dump|xyz]\\n'\nop869=>operation: from __future__ import annotations\nop871=>operation: import sys\nop873=>operation: from pathlib import Path\nop875=>operation: import polars as pl\nst878=>start: start read_parquet\nio880=>inputoutput: input: path\nop883=>operation: 'Lee archivo parquet de resultados CARBOXI.'\nio888=>inputoutput: output: pl.read_parquet(path)\ne886=>end: end function return\n\nop867->op869\nop869->op871\nop871->op873\nop873->op875\nop875->st878\nst878->io880\nio880->op883\nop883->io888\nio888->e886\n"}, "__main__": {"name": "__main__.py", "desc": "Punto de entrada para ejecutar CARBOXI como módulo.<br><br>Uso:<br>    python3.11 -m CARBOXI [ruta_a_carpeta_de_simulaciones]<br><br>Si no se proporciona ruta, se abre el navegador interactivo de carpetas.", "functions": [], "variables": [], "depends": ["main_pipeline"], "importsExt": [], "dsl": "op1188=>operation: 'Punto de entrada para ejecutar CARBOXI como módulo.\\n\\nUso:\\n    python3.11 -m CARBOXI [ruta_a_carpeta_de_simulaciones]\\n\\nSi no se proporciona ruta, se abre el navegador interactivo de carpetas.\\n'\nop1190=>operation: from .main_pipeline import main\ncond1193=>operation: main() if  __name__ == '__main__'\n\nop1188->op1190\nop1190->cond1193\n"}, "config_and_discovery": {"name": "config_and_discovery.py", "desc": "Carga de configuración y descubrimiento de simulaciones LAMMPS.<br><br>Este módulo combina:<br>- Carga de parámetros desde config.toml<br>- Descubrimiento de carpetas de simulación<br>- Extracción de metadatos desde nombres de carpeta<br>- Navegación interactiva de carpetas (opcional)<br><br>Física: Los parámetros definen umbrales para detección de onda de choque,<br>criterios de erosión de la cama, propiedades del material sílice y<br>configuración del modelo JKR.", "functions": ["_build_config()", "print_progress()", "_clear()", "_list_subdirs()", "load_config()", "browse_for_simulation()", "discover_simulations()", "_print_browser_header()", "extraer_metadatos()", "_select_current()", "_resolve_config_path()"], "variables": [], "depends": [], "importsExt": ["sys", "os", "__future__", "dataclasses", "tomllib", "re", "pathlib"], "dsl": "op1205=>operation: '\\nCarga de configuración y descubrimiento de simulaciones LAMMPS.\\n\\nEste módulo combina:\\n- Carga de parámetros desde config.toml\\n- Descubrimiento de carpetas de simulación\\n- Extracción de metadatos desde nombres de carpeta\\n- Navegación interactiva de carpetas (opcional)\\n\\nFísica: Los parámetros definen umbrales para detección de onda de choque,\\ncriterios de erosión de la cama, propiedades del material sílice y\\nconfiguración del modelo JKR.\\n'\nop1207=>operation: from __future__ import annotations\nop1209=>operation: import re\nop1211=>operation: import sys\nop1213=>operation: import tomllib\nop1215=>operation: from dataclasses import dataclass\nop1217=>operation: from pathlib import Path\nop1219=>operation: _SIM_PREFIX: str = 'sims_SI_'\nop1221=>operation: _PATRONES: dict[str, str] = {'ff': 'ff_([^_]+)', 'np': 'np_([^_]+)', 'vel0': 'vel_([^_]+)', 'angulo': 'angle_([^_]+)', 'move': 'move_([^_]+)_([^_]+)_([^_]+)'}\nop1223=>operation: @dataclass(frozen=True)\nclass WaveConfig:\n    \"\"\"Parámetros para la detección automática de onda de choque.\n\n    Attributes:\n        v_objetivo: Velocidad de impacto objetivo [m/s].\n        tolerancia_v: Margen de error para comparar velocidades [m/s].\n        np_criticos: Cantidades de partículas proyectil que activan el análisis\n            automáticamente (sin verificar velocidad).\n        move_referencia: Vector de posición de reposo del proyectil [m, m, m].\n        tolerancia_move: Tolerancia para considerar desplazamiento no nulo [m].\n        umbral_v2_min: Energía cinética mínima para partícula activa [m²/s²].\n        umbral_v2_max: Energía cinética máxima para impacto crítico [m²/s²].\n        particulas_criticas: Cantidad de partículas para onda macroscópica.\n        umbral_techo: Margen vertical en número de radios respecto a la altura.\n        umbral_pared: Radios de proximidad requerida a las paredes laterales.\n    \"\"\"\n    v_objetivo: float\n    tolerancia_v: float\n    np_criticos: tuple[int, ...]\n    move_referencia: tuple[float, ...]\n    tolerancia_move: float\n    umbral_v2_min: float\n    umbral_v2_max: float\n    particulas_criticas: int\n    umbral_techo: int\n    umbral_pared: int\nop1225=>operation: @dataclass(frozen=True)\nclass FilterConfig:\n    \"\"\"Umbrales de filtrado para el criterio de erosión de partículas.\n\n    Attributes:\n        umbral_vz_min: Velocidad vertical mínima para considerar eyección [m/s].\n        umbral_techo_radios: Margen de seguridad vertical en número de radios.\n        tolerancia_v_cm: Tolerancia de |Δv_cm| entre dumps consecutivos [m/s].\n        filtro_activo: Nombre del filtro de erosión (F3C).\n    \"\"\"\n    umbral_vz_min: float\n    umbral_techo_radios: float\n    tolerancia_v_cm: float\n    filtro_activo: str = 'F3C'\nop1227=>operation: @dataclass(frozen=True)\nclass Config:\n    \"\"\"Configuración completa del programa CARBOXI.\n\n    Attributes:\n        radio_m: Radio de las partículas en metros [m].\n        usar_caja: Si True, usa los límites fijos de la caja.\n        bed_height_ff_015: Altura de la cama para ff=0.15 [m].\n        bed_height_ff_035: Altura de la cama para ff=0.35 [m].\n        caja_x: Dimensión de la caja en X [m].\n        caja_y: Dimensión de la caja en Y [m].\n        freeze_height: Altura de congelamiento para filtro F3C [m].\n        wave: Parámetros de detección de onda de choque.\n        filters: Umbrales de filtrado para criterio de erosión.\n        factor_cutoff: Factor multiplicador sobre el radio para cutoff de OVITO.\n        dir_resultados: Directorio raíz de salida de resultados.\n        dir_imagenes: Subdirectorio de salida para gráficos SVG.\n    \"\"\"\n    radio_m: float\n    usar_caja: bool\n    bed_height_ff_015: float\n    bed_height_ff_035: float\n    caja_x: float\n    caja_y: float\n    freeze_height: float\n    wave: WaveConfig\n    filters: FilterConfig\n    factor_cutoff: float\n    dir_resultados: Path\n    dir_imagenes: Path\nst1230=>start: start load_config\nio1232=>inputoutput: input: path\nop1235=>operation: 'Carga y parsea el archivo de configuración TOML embebido.\\n\\n    Args:\\n        path: Ruta al archivo config.toml (ignorada, se usa el embebido).\\n\\n    Returns:\\n        Config: Instancia inmutable con todos los parámetros de análisis.\\n\\n    Raises:\\n        FileNotFoundError: Si el config.toml embebido no se encuentra.\\n        KeyError: Si faltan secciones obligatorias en el TOML.\\n    '\nop1237=>operation: resolved = _resolve_config_path(path)\nop1239=>operation: with resolved.open('rb') as f:\n    raw: dict = tomllib.load(f)\nio1244=>inputoutput: output: _build_config(raw)\ne1242=>end: end function return\n\nop1205->op1207\nop1207->op1209\nop1209->op1211\nop1211->op1213\nop1213->op1215\nop1215->op1217\nop1217->op1219\nop1219->op1221\nop1221->op1223\nop1223->op1225\nop1225->op1227\nop1227->st1230\nst1230->io1232\nio1232->op1235\nop1235->op1237\nop1237->op1239\nop1239->io1244\nio1244->e1242\n"}, "erosion_analysis": {"name": "erosion_analysis.py", "desc": "Análisis de erosión de partículas usando OVITO.<br><br>Calcula el número de coordinación y el índice de cluster para las partículas<br>que fueron eyectadas de la cama de sílice durante el impacto.<br><br>Física: La coordinación mide cuántos vecinos tiene cada partícula dentro del<br>radio de corte (cutoff = radio * factor_cutoff). El análisis de clusters agrupa<br>partículas eyectadas que forman agregados.", "functions": ["build_ovito_pipeline()", "_add_result_columns()", "analyze_erosion()", "_apply_tracking()", "_filter_F3C()", "_apply_cluster_filter()", "_run_ovito()", "run_topology_analysis()", "_empty_result()"], "variables": [], "depends": ["storage_and_viz", "config_and_discovery"], "importsExt": ["ovito", "__future__", "pathlib", "numpy", "polars"], "dsl": "op1748=>operation: '\\nAnálisis de erosión de partículas usando OVITO.\\n\\nCalcula el número de coordinación y el índice de cluster para las partículas\\nque fueron eyectadas de la cama de sílice durante el impacto.\\n\\nFísica: La coordinación mide cuántos vecinos tiene cada partícula dentro del\\nradio de corte (cutoff = radio * factor_cutoff). El análisis de clusters agrupa\\npartículas eyectadas que forman agregados.\\n'\nop1750=>operation: from __future__ import annotations\nop1752=>operation: from pathlib import Path\nop1754=>operation: import polars as pl\nop1756=>operation: from numpy import empty as np_empty\nop1758=>operation: from ovito.data import DataCollection, SimulationCell\nop1760=>operation: from ovito.modifiers import ClusterAnalysisModifier, CoordinationAnalysisModifier\nop1762=>operation: from ovito.pipeline import Pipeline, StaticSource\nop1764=>operation: from .config_and_discovery import extraer_metadatos, print_progress\nop1766=>operation: from .storage_and_viz import read_dump\nop1768=>operation: _ANALYSIS_COLUMNS: list[str] = ['id', 'type', 'x', 'y', 'z', 'vx', 'vy', 'vz']\nst1771=>start: start build_ovito_pipeline\nio1773=>inputoutput: input: cutoff\nop1776=>operation: 'Inicializa el pipeline de OVITO con los modificadores de coordinación y clusters.\\n\\n    Args:\\n        cutoff: Distancia de corte para los modificadores [m].\\n\\n    Returns:\\n        Pipeline de OVITO configurado.\\n    '\nop1778=>operation: data = DataCollection()\nop1780=>operation: particles = data.create_particles()\nsub1782=>subroutine: particles.create_property('Position', data=np_empty((0, 3)))\nop1784=>operation: cell = SimulationCell()\nop1786=>operation: cell[:, :] = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]\nsub1788=>subroutine: data.objects.append(cell)\nop1790=>operation: pipeline = Pipeline(source=StaticSource(data=data))\nsub1792=>subroutine: pipeline.modifiers.append(CoordinationAnalysisModifier(cutoff=cutoff))\nsub1794=>subroutine: pipeline.modifiers.append(ClusterAnalysisModifier(cutoff=cutoff))\nio1799=>inputoutput: output: pipeline\ne1797=>end: end function return\n\nop1748->op1750\nop1750->op1752\nop1752->op1754\nop1754->op1756\nop1756->op1758\nop1758->op1760\nop1760->op1762\nop1762->op1764\nop1764->op1766\nop1766->op1768\nop1768->st1771\nst1771->io1773\nio1773->op1776\nop1776->op1778\nop1778->op1780\nop1780->sub1782\nsub1782->op1784\nop1784->op1786\nop1786->sub1788\nsub1788->op1790\nop1790->sub1792\nsub1792->sub1794\nsub1794->io1799\nio1799->e1797\n"}, "storage_and_viz": {"name": "storage_and_viz.py", "desc": "Almacenamiento de datos y visualización de resultados.<br><br>Este módulo combina:<br>- Lectura de archivos dump de LAMMPS<br>- Escritura de resultados (Parquet, marcadores)<br>- Generación de gráficos SVG<br><br>Física: Los archivos dump contienen posiciones y velocidades de partículas.<br>Los resultados almacenan el estado cinemático y topológico de las partículas<br>eyectadas de la cama de sílice.", "functions": ["list_dump_files()", "_aggregate_ejected()", "_draw_ejected()", "_compute_gaps_per_step_raw()", "_extract_timestep()", "_draw_gaps_per_step()", "save_no_erosion_flag()", "_get_all_timesteps()", "read_dump()", "_draw_clusters()", "save_erosion_results()", "_compute_gaps_per_step()", "save_wave_data()", "plot_erosion()", "_aggregate_clusters()", "_extract_plot_metadata()", "get_timestep_interval()", "_draw_gaps_cumulative()", "_plot_empty()"], "variables": ["_AXIS_FONTSIZE", "_STEP_TO_US"], "depends": [], "importsExt": ["matplotlib", "__future__", "re", "pathlib", "polars"], "dsl": "op2171=>operation: '\\nAlmacenamiento de datos y visualización de resultados.\\n\\nEste módulo combina:\\n- Lectura de archivos dump de LAMMPS\\n- Escritura de resultados (Parquet, marcadores)\\n- Generación de gráficos SVG\\n\\nFísica: Los archivos dump contienen posiciones y velocidades de partículas.\\nLos resultados almacenan el estado cinemático y topológico de las partículas\\neyectadas de la cama de sílice.\\n'\nop2173=>operation: from __future__ import annotations\nop2175=>operation: import re\nop2177=>operation: from pathlib import Path\nop2179=>operation: import matplotlib.pyplot as plt\nop2181=>operation: import polars as pl\nop2183=>operation: _ALL_COLUMNS: list[str] = ['id', 'type', 'x', 'y', 'z', 'vx', 'vy', 'vz']\nop2185=>operation: _WAVE_COLUMNS: list[str] = ['id', 'type', 'x', 'y', 'z', 'vx', 'vy', 'vz']\nop2187=>operation: _STEP_TO_US = 1.25\nop2189=>operation: _AXIS_FONTSIZE = 14\nst2192=>start: start read_dump\nio2194=>inputoutput: input: path, columns\nop2197=>operation: 'Lee un archivo dump comprimido de LAMMPS como LazyFrame de Polars.\\n\\n    Args:\\n        path: Ruta al archivo ``.gz`` a leer.\\n        columns: Lista de columnas a seleccionar.\\n\\n    Returns:\\n        LazyFrame con las columnas solicitadas.\\n    '\nop2199=>operation: lf = pl.scan_csv(path, skip_rows=9, has_header=False, separator=' ', truncate_ragged_lines=True, new_columns=_ALL_COLUMNS, infer_schema_length=10000, schema_overrides={'type': pl.UInt8})\nio2204=>inputoutput: output: lf.select(columns or _ALL_COLUMNS)\ne2202=>end: end function return\n\nop2171->op2173\nop2173->op2175\nop2175->op2177\nop2177->op2179\nop2179->op2181\nop2181->op2183\nop2183->op2185\nop2185->op2187\nop2187->op2189\nop2189->st2192\nst2192->io2194\nio2194->op2197\nop2197->op2199\nop2199->io2204\nio2204->e2202\n"}};
+        let activeMod = Object.keys(projectData)[0] || null;
+
+        const navList = document.getElementById('nav-list');
+        Object.keys(projectData).forEach(key => {
+            const li = document.createElement('li');
+            li.className = `nav-item ${key === activeMod ? 'active' : ''}`;
+            li.innerHTML = `<i>📄</i> ${projectData[key].name}`;
+            li.onclick = () => selectModule(key);
+            navList.appendChild(li);
+        });
+
+        function selectModule(key) {
+            activeMod = key;
+            document.querySelectorAll('.nav-item').forEach((el, i) => {
+                el.classList.toggle('active', Object.keys(projectData)[i] === key);
+            });
+            renderActiveContent();
+            if(document.getElementById('tab-general').classList.contains('active')) renderArchitecture();
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`[onclick="switchTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+            if(tabId === 'tab-general') renderArchitecture();
+        }
+
+        function renderActiveContent() {
+            if(!activeMod) return;
+            const mod = projectData[activeMod];
+            document.getElementById('active-title').innerText = mod.name;
+            document.getElementById('mod-desc').innerHTML = mod.desc;
+
+            const grid = document.getElementById('explorer-grid');
+            grid.innerHTML = `
+                <div class="card">
+                    <h3>ƒ Funciones Exportadas</h3>
+                    <ul class="feature-list">${mod.functions.map(f => `<li><code>${f}</code></li>`).join('')}</ul>
+                </div>
+                <div class="card">
+                    <h3>⚙️ Variables Globales</h3>
+                    <ul class="feature-list">${mod.variables.map(v => `<li><code>${v}</code></li>`).join('')}</ul>
+                </div>
+                <div class="card">
+                    <h3>📥 Dependencias</h3>
+                    <div style="margin-bottom:10px;"><strong>Locales:</strong></div>
+                    <ul class="feature-list">${mod.depends.map(d => `<li><code>${d}.py</code></li>`).join('')}</ul>
+                    <div style="margin:15px 0 10px;"><strong>Externas:</strong></div>
+                    <ul class="feature-list">${mod.importsExt.map(d => `<li><code>${d}</code></li>`).join('')}</ul>
+                </div>
+            `;
+
+            const canvas = document.getElementById('flow-canvas');
+            canvas.innerHTML = '';
+            if(mod.dsl && mod.dsl.trim() !== '') {
+                try {
+                    const chart = flowchart.parse(mod.dsl);
+
+                    // Configuraciones actualizadas para mejor legibilidad
+                    chart.drawSVG('flow-canvas', {
+                        'x': 0,
+                        'y': 0,
+                        'line-width': 2,
+                        'line-length': 50,    // Más separación entre cajas
+                        'text-margin': 15,    // Cajas más amplias
+                        'font-size': 14,      // Letra más grande y legible
+                        'font-family': 'Segoe UI, Helvetica, sans-serif',
+                        'font-color': '#1e293b',
+                        'line-color': '#94a3b8',
+                        'element-color': '#475569',
+                        'fill': 'white',
+                        'yes-text': 'SÍ',
+                        'no-text': 'NO',
+                        'arrow-end': 'block',
+                        'scale': 1,
+                        'symbols': {
+                            'start': { 'fill': '#22c55e', 'font-color': 'white', 'element-color': '#16a34a' },
+                            'end': { 'fill': '#ef4444', 'font-color': 'white', 'element-color': '#dc2626' },
+                            'condition': { 'fill': '#fef08a', 'font-color': '#854d0e', 'element-color': '#eab308' }
+                        }
+                    });
+                } catch(e) {
+                    canvas.innerHTML = '<div class="empty-flow">Error dibujando diagrama. Revisa la complejidad del código.</div>';
+                }
+            } else {
+                canvas.innerHTML = '<div class="empty-flow">Este módulo es puramente procedural o no tiene lógica diagramable.</div>';
+            }
+        }
+
+        function renderArchitecture() {
+            const container = document.getElementById('arch-graph');
+            container.innerHTML = '';
+            const width = container.offsetWidth || 800;
+            const height = container.offsetHeight || 600;
+
+            const nodes = Object.keys(projectData).map(k => ({ id: k, name: projectData[k].name }));
+            const links = [];
+            Object.keys(projectData).forEach(u => {
+                projectData[u].depends.forEach(v => {
+                    if(projectData[v]) links.push({ source: u, target: v });
+                });
+            });
+
+            const svg = d3.select("#arch-graph").append("svg").attr("width", width).attr("height", height);
+
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id).distance(150))
+                .force("charge", d3.forceManyBody().strength(-400))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            const link = svg.append("g").selectAll("line").data(links).enter().append("line")
+                .attr("stroke", "#cbd5e1").attr("stroke-width", 2)
+                .attr("marker-end", "url(#arrow)");
+
+            svg.append("defs").append("marker").attr("id", "arrow")
+                .attr("viewBox", "0 -5 10 10").attr("refX", 20).attr("refY", 0)
+                .attr("markerWidth", 6).attr("markerHeight", 6).attr("orient", "auto")
+                .append("path").attr("d", "M0,-5L10,0L0,5").attr("fill", "#cbd5e1");
+
+            const node = svg.append("g").selectAll("circle").data(nodes).enter().append("circle")
+                .attr("r", d => d.id === activeMod ? 14 : 10)
+                .attr("fill", d => d.id === activeMod ? "#2563eb" : "#64748b")
+                .attr("stroke", "white").attr("stroke-width", 2)
+                .call(d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended));
+
+            const text = svg.append("g").selectAll("text").data(nodes).enter().append("text")
+                .text(d => d.name).attr("font-size", "13px").attr("dx", 18).attr("dy", 4).attr("fill", "#1e293b");
+
+            simulation.on("tick", () => {
+                link.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+                node.attr("cx", d => d.x).attr("cy", d => d.y);
+                text.attr("x", d => d.x).attr("y", d => d.y);
+            });
+
+            function dragstarted(event, d) { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
+            function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
+            function dragended(event, d) { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }
+        }
+
+        window.onload = () => {
+            renderActiveContent();
+            renderArchitecture();
+        };
+    </script>
+</body>
+</html>
