@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
+#SBATCH --job-name=N1v25ff0.35mov7x7
 #SBATCH --nodes 1
 #SBATCH --ntasks-per-node=32
 #SBATCH -o ./logs/job_exec_%j.out
-#SBATCH --nodelist=toko02
+#SBATCH --nodelist=toko04
 #SBATCH --partition=XL
 
 # Use a safe name for current working directory
