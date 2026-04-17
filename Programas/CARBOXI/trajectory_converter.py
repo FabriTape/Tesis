@@ -70,7 +70,7 @@ def export_to_xyz(df: pl.DataFrame, timestep: int, output_path: Path) -> None:
     ]
     
     for row in df_step.iter_rows():
-        id, type_, x, y, z, coord, cluster = row[0], row[1], row[2], row[3], row[4], row[9], row[10]
+        _, type_, x, y, z, coord, cluster = row[0], row[1], row[2], row[3], row[4], row[9], row[10]
         element = "Si" if type_ == 1 else "C"  # Si = sílice (cama), C = proyectil
         coord_val = coord if coord is not None else 0
         cluster_val = cluster if cluster is not None else 0

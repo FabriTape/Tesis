@@ -39,7 +39,7 @@ def merge_with_no_erosion(path_dir: Path) -> pl.DataFrame:
         temp.append(df)
 
     for marker in nada:
-        contenido = marker.read_text()
+        marker.read_text()  # noqa: F841
         sim_id = marker.stem.replace("_NADA_F3C_", "")
         metadatos = extraer_metadatos(sim_id)
         metadatos["proyectil_erosion"] = "false"

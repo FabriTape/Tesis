@@ -11,8 +11,6 @@ partículas eyectadas que forman agregados.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import polars as pl
 from numpy import empty as np_empty
 from ovito.data import DataCollection, SimulationCell  # type: ignore[import-untyped]
@@ -23,9 +21,7 @@ from ovito.modifiers import (  # type: ignore[import-untyped]
 from ovito.pipeline import Pipeline, StaticSource  # type: ignore[import-untyped]
 
 from .config_and_discovery import extraer_metadatos, print_progress
-from .storage_and_viz import read_dump
-
-_ANALYSIS_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
+from .storage_and_viz import LammpsTrajectoryReader
 
 
 def build_ovito_pipeline(cutoff: float) -> Pipeline:
@@ -144,7 +140,8 @@ def analyze_erosion(
 
 
 def run_topology_analysis(
-    dump_files: list[Path],
+    reader: LammpsTrajectoryReader,
+    cut_index: int,
     pipeline: Pipeline,
     bed_height: float,
     max_height: float,
@@ -153,27 +150,35 @@ def run_topology_analysis(
     tolerancia_v_cm: float,
     freeze_height: float,
 ) -> list[pl.DataFrame]:
-    """Ejecuta el análisis topológico completo sobre una lista de archivos dump.
+    """Ejecuta el análisis topológico completo sobre los frames del reader.
 
     Flujo de 2 fases:
     1. Filtrado: aplica el filtro F3C a cada frame independientemente.
     2. Tracking: filtra todos los frames por IDs del último frame.
 
-    Returns:
-        Lista de DataFrames, uno por cada archivo procesado.
-    """
-    if not dump_files:
-        return []
+    Args:
+        reader: LammpsTrajectoryReader con los frames de la simulación.
+        cut_index: Índice del frame donde cortar el análisis (para wave detection).
+        pipeline: Pipeline de OVITO configurado.
+        bed_height: Altura de la cama de partículas [m].
+        max_height: Altura máxima de análisis [m].
+        sim_id: Identificador de la simulación.
+        timestep_interval: Intervalo de timesteps entre frames.
+        tolerancia_v_cm: Tolerancia de |Δv_cm| [m/s].
+        freeze_height: Altura de congelamiento [m].
 
+    Returns:
+        Lista de DataFrames, uno por cada frame procesado.
+    """
     metadata = extraer_metadatos(sim_id)
     results: list[pl.DataFrame] = []
     prev_dump: pl.DataFrame | None = None
-    total = len(dump_files)
+    total = cut_index
 
-    for i, file_path in enumerate(dump_files):
+    for i in range(total):
         print_progress(i, total, label="erosión")
 
-        lf = read_dump(file_path, _ANALYSIS_COLUMNS)
+        lf = reader.get_frame_lazy(i)
         df_raw = lf.collect()
 
         df = analyze_erosion(

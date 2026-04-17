@@ -17,7 +17,7 @@ from pathlib import Path
 import polars as pl
 
 from .config_and_discovery import Config, WaveConfig, print_progress
-from .storage_and_viz import read_dump, save_wave_data
+from .storage_and_viz import LammpsTrajectoryReader, save_wave_data
 
 _WAVE_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 
@@ -101,7 +101,7 @@ def detect_wave_particles(
 
 
 def run_wave_scan(
-    dump_files: list[Path],
+    reader: LammpsTrajectoryReader,
     radius: float,
     max_height: float,
     box_limits: dict[str, list[float]],
@@ -111,27 +111,35 @@ def run_wave_scan(
     output_dir: Path,
     config: Config,
 ) -> tuple[bool, int]:
-    """Escanea archivos dump secuencialmente buscando la onda de choque.
+    """Escanea frames secuencialmente buscando la onda de choque.
+
+    Args:
+        reader: LammpsTrajectoryReader con los frames de la simulación.
+        radius: Radio de las partículas [m].
+        max_height: Altura máxima para filtrado [m].
+        box_limits: Límites de la caja en X e Y.
+        use_static_box: Si True, usa los límites fijos de la caja.
+        sim_id: Identificador de la simulación.
+        timestamp: Marca temporal para archivos de salida.
+        output_dir: Directorio de resultados.
+        config: Configuración completa.
 
     Returns:
-        Tuple (wave_detected, cut_index)
+        Tuple (wave_detected, cut_index).
     """
     wave_cfg = config.wave
-    total = len(dump_files)
+    total = reader.num_frames
 
-    for i, file_path in enumerate(dump_files):
+    for i in range(total):
         print_progress(i, total, label="onda")
 
-        lf = read_dump(file_path, _WAVE_COLUMNS)
+        lf = reader.get_frame_lazy(i)
         lf_wave, count, max_v2 = detect_wave_particles(
             lf, radius, max_height, box_limits, use_static_box, wave_cfg
         )
 
         if _wave_threshold_reached(count, max_v2, wave_cfg):
-            print(
-                f"\n[ONDA] Detectada en '{file_path.name}' (paso {i}): "
-                f"{count} partículas, v²_max={max_v2:.4e}"
-            )
+            print(f"\n[ONDA] Detectada en frame {i}: {count} partículas, v²_max={max_v2:.4e}")
             save_wave_data(lf_wave, sim_id, i, timestamp, output_dir, "F3C")
             print_progress(total, total, label="onda")
             print()

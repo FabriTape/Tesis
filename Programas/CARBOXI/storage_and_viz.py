@@ -18,12 +18,95 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import polars as pl
+from ovito.io import import_file  # type: ignore[import-untyped]
 
 _ALL_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 _WAVE_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 
 _STEP_TO_US = 1.25
 _AXIS_FONTSIZE = 14
+
+
+class LammpsTrajectoryReader:
+    """Lector de trayectorias LAMMPS usando el motor C++ de OVITO.
+
+    Soporta tanto archivos individuales (.dump) como secuencias legacy (.gz).
+    El lector abstrae el formato subyacente, permitiendo que el código de
+    análisis trabaje con frames sin conocer la estructura de archivos.
+
+    Attributes:
+        num_frames: Número de frames en la trayectoria.
+        timestep_interval: Intervalo de timesteps entre frames consecutivos.
+    """
+
+    def __init__(self, pattern: str) -> None:
+        """Inicializa el lector con un patrón de archivo.
+
+        Args:
+            pattern: Ruta a archivo único ('output.dump') o comodín ('output.*.gz').
+        """
+        self.pipeline = import_file(pattern)
+        self.num_frames = self.pipeline.source.num_frames
+
+        t0 = self.pipeline.compute(0).attributes.get("Timestep", 0)
+        if self.num_frames > 1:
+            t1 = self.pipeline.compute(1).attributes.get("Timestep", 0)
+            self.timestep_interval = t1 - t0
+        else:
+            self.timestep_interval = 0
+
+    def get_frame_lazy(self, frame_index: int) -> pl.LazyFrame:
+        """Lee un frame específico hacia un LazyFrame de Polars.
+
+        Args:
+            frame_index: Índice del frame a leer (0 a num_frames-1).
+
+        Returns:
+            LazyFrame con columnas: id, type, x, y, z, vx, vy, vz.
+        """
+        data = self.pipeline.compute(frame_index)
+
+        return pl.DataFrame(
+            {
+                "id": data.particles["Particle Identifier"][:],
+                "type": data.particles["Particle Type"][:],
+                "x": data.particles.positions[:, 0],
+                "y": data.particles.positions[:, 1],
+                "z": data.particles.positions[:, 2],
+                "vx": data.particles.velocities[:, 0],
+                "vy": data.particles.velocities[:, 1],
+                "vz": data.particles.velocities[:, 2],
+            }
+        ).lazy()
+
+
+def detect_and_create_reader(sim_dir: Path) -> LammpsTrajectoryReader | None:
+    """Detecta automáticamente el formato de los datos de trayectoria.
+
+    Busca primero el archivo unificado (metodología nueva), luego la secuencia
+    legacy de archivos .gz. Cada carpeta contiene un solo tipo de formato.
+
+    Args:
+        sim_dir: Directorio de la simulación a procesar.
+
+    Returns:
+        LammpsTrajectoryReader configurado, o None si no se encuentran datos.
+    """
+    single_dump = sim_dir / "output_trayectoria.dump"
+    if single_dump.exists():
+        print(
+            f"  [Auto-detect] Archivo unificado: {single_dump.name} "
+            f"({single_dump.stat().st_size / 1024**2:.1f} MB)"
+        )
+        return LammpsTrajectoryReader(str(single_dump))
+
+    gz_files = list(sim_dir.glob("output.*.gz"))
+    if gz_files:
+        wildcard = str(sim_dir / "output.*.gz")
+        print(f"  [Auto-detect] Secuencia legacy: {len(gz_files)} archivos .gz")
+        return LammpsTrajectoryReader(wildcard)
+
+    return None
 
 
 def read_dump(path: Path, columns: list[str] | None = None) -> pl.LazyFrame:
@@ -297,13 +380,15 @@ def _extract_plot_metadata(df: pl.DataFrame) -> dict:
     """Extrae metadatos del DataFrame para usar en los gráficos."""
     if df.is_empty():
         return {"ff": "N/A", "np": "N/A", "vel0": "N/A"}
-    
-    cols = df.columns
-    get_first = lambda c: df[c][0] if c in cols else "N/A"
+
+    def _get_first(col: str) -> str:
+        """Obtiene el primer valor de una columna o 'N/A' si no existe."""
+        return df[col][0] if col in df.columns else "N/A"
+
     return {
-        "ff": get_first("ff"),
-        "np": get_first("np"),
-        "vel0": get_first("vel0"),
+        "ff": _get_first("ff"),
+        "np": _get_first("np"),
+        "vel0": _get_first("vel0"),
     }
 
 

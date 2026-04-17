@@ -27,8 +27,7 @@ from .config_and_discovery import (
 )
 from .erosion_analysis import build_ovito_pipeline, run_topology_analysis
 from .storage_and_viz import (
-    get_timestep_interval,
-    list_dump_files,
+    detect_and_create_reader,
     plot_erosion,
     save_erosion_results,
     save_no_erosion_flag,
@@ -73,12 +72,16 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
     print(f"  Filtro activo: {filter_name}")
     print(f"{'=' * 55}")
 
-    dump_files = list_dump_files(sim_dir, recursive=True)
-    if not dump_files:
-        print(f"  Sin archivos output.*.gz en '{sim_dir.name}' (o subdirectorios). Saltando...")
+    reader = detect_and_create_reader(sim_dir)
+    if not reader:
+        print(
+            f"  Sin datos de trayectoria (.dump o .gz) en '{sim_dir.name}'. "
+            "Saltando..."
+        )
         return
 
-    timestep_interval = get_timestep_interval(dump_files)
+    timestep_interval = reader.timestep_interval
+    num_frames = reader.num_frames
     metadata = extraer_metadatos(sim_id)
 
     if not _metadata_valid(metadata):
@@ -110,7 +113,7 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
 
     if run_wave:
         _, cut_index = run_wave_scan(
-            dump_files=dump_files,
+            reader=reader,
             radius=config.radio_m,
             max_height=max_height,
             box_limits=box_limits,
@@ -121,11 +124,11 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
             config=config,
         )
     else:
-        cut_index = len(dump_files)
+        cut_index = num_frames
 
-    files_fase2 = dump_files[:cut_index]
     results = run_topology_analysis(
-        dump_files=files_fase2,
+        reader=reader,
+        cut_index=cut_index,
         pipeline=pipeline,
         bed_height=bed_height,
         max_height=max_height,
