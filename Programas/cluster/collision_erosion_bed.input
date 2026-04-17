@@ -53,7 +53,7 @@ change_box all z final -1e-5 0.000410
 
 ##### crea granos del proyectil
 #NP1
-create_atoms 2 single 50e-5 50e-5 105e-6
+create_atoms 2 single 50e-6 50e-6 105e-6
 
 #NP3
 #create_atoms 2 single 50.76e-6 50e-6 152e-6
