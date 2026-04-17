@@ -1,7 +1,11 @@
 import matplotlib.pyplot as plt
 from confidence_intervals import run_confidence_intervals
 from constants import CSV_PATH, FF_VALUES, SALIDA_DIR
-from erosion_viz import plot_erosion_boxplot, plot_erosion_heatmap
+from erosion_viz import (
+    plot_erosion_boxplot,
+    plot_erosion_heatmap,
+    plot_erosion_vs_energia,
+)
 from kinematics_calc import get_grid_pairs
 from matplotlib.backends.backend_pdf import PdfPages
 from pandas import read_csv
@@ -21,7 +25,8 @@ def run_analysis() -> None:
     print(f"Datos: {len(df)} filas. Grid: {len(grid_pairs)} pares\n")
 
     SALIDA_DIR.mkdir(parents=True, exist_ok=True)
-    figuras = run_confidence_intervals()
+    ## Generar tablas
+    figuras, datos_filtrados = run_confidence_intervals(df)
     valores_vel0 = sorted(df["vel0"].unique())
 
     for ff in FF_VALUES:
@@ -36,6 +41,10 @@ def run_analysis() -> None:
             if fig_heat := plot_erosion_heatmap(df, ff, vel0):
                 figuras.append(fig_heat)
                 save_figure(fig_heat, dir_ff / f"heatmap_erosion_{vel0}.png")
+        for metodo in ["Crudos", "MAD"]:
+            df_ff = datos_filtrados[datos_filtrados["ff"] == ff]
+            if fig_ero := plot_erosion_vs_energia(df_ff, ff, vel0, metodo):
+                figuras.append(fig_ero)
 
     with PdfPages(SALIDA_DIR / "resultado_final.pdf") as pdf:
         for fig in figuras:

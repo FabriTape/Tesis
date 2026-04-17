@@ -5,7 +5,6 @@ Contiene funciones para calcular tamaños de clusters, distribuciones y estadís
 
 import numpy as np
 import pandas as pd
-from constants import I_VALUE
 
 
 def filter_erosion(df: pd.DataFrame, ff: float) -> pd.DataFrame:
@@ -18,7 +17,7 @@ def filter_erosion(df: pd.DataFrame, ff: float) -> pd.DataFrame:
     Returns:
         DataFrame con partículas erosionadas.
     """
-    df = df[(df["ff"] == ff) & (df["i"] == I_VALUE)]
+    df = df[(df["ff"] == ff) & (df["i"] == df["i"].max())]
     return df[((df["type"] == 1) & ((df["z"] > 1e-4) | (df["vz"] > 0)))]
 
 

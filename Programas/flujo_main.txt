@@ -1,0 +1,88 @@
+op2=>operation: import matplotlib.pyplot as plt
+op4=>operation: from matplotlib.backends.backend_pdf import PdfPages
+op6=>operation: from pandas import read_csv
+op8=>operation: from ANALISIS.confidence_intervals import run_confidence_intervals
+op10=>operation: from ANALISIS.constants import CSV_PATH, FF_VALUES, SALIDA_DIR
+op12=>operation: from ANALISIS.erosion_viz import plot_erosion_boxplot, plot_erosion_heatmap, plot_erosion_vs_energia
+op14=>operation: from ANALISIS.kinematics_calc import get_grid_pairs
+st17=>start: start save_figure
+io19=>inputoutput: input: fig, path
+cond23=>condition: if fig and fig.get_axes()
+sub27=>subroutine: plt.savefig(path, bbox_inches='tight')
+sub29=>subroutine: plt.close(fig)
+e34=>end: end save_figure
+st38=>start: start run_analysis
+io40=>inputoutput: input: 
+sub43=>subroutine: print('Cargando datos...')
+op45=>operation: df = read_csv(CSV_PATH)
+op47=>operation: grid_pairs = get_grid_pairs(df)
+sub49=>subroutine: print(f'Datos: {len(df)} filas. Grid: {len(grid_pairs)} pares\n')
+sub51=>subroutine: SALIDA_DIR.mkdir(parents=True, exist_ok=True)
+op53=>operation: figuras, datos_filtrados = run_confidence_intervals(df)
+op55=>operation: valores_vel0 = sorted(df['vel0'].unique())
+cond58=>condition: for ff in FF_VALUES
+op62=>operation: dir_ff = SALIDA_DIR / f'ff_{ff}'
+sub64=>subroutine: dir_ff.mkdir(parents=True, exist_ok=True)
+cond67=>condition: if (fig_box := plot_erosion_boxplot(df, ff))
+sub71=>subroutine: figuras.append(fig_box)
+sub73=>subroutine: save_figure(fig_box, dir_ff / 'ids_boxplot.png')
+cond79=>condition: for vel0 in valores_vel0
+cond84=>condition: if (fig_heat := plot_erosion_heatmap(df, ff, vel0))
+sub88=>subroutine: figuras.append(fig_heat)
+sub90=>subroutine: save_figure(fig_heat, dir_ff / f'heatmap_erosion_{vel0}.png')
+cond98=>condition: for metodo in ['Crudos', 'MAD']
+op102=>operation: df_ff = datos_filtrados[datos_filtrados['ff'] == ff]
+cond105=>operation: figuras.append(fig_ero) if  (fig_ero := plot_erosion_vs_energia(df_ff, ff, vel0, metodo))
+op119=>operation: with PdfPages(SALIDA_DIR / 'resultado_final.pdf') as pdf:
+    for fig in figuras:
+        if fig and fig.get_axes():
+            pdf.savefig(fig)
+sub121=>subroutine: print(f'¡Listo! Figuras en {SALIDA_DIR}')
+e123=>end: end run_analysis
+cond127=>operation: run_analysis() if  __name__ == '__main__'
+
+op2->op4
+op4->op6
+op6->op8
+op8->op10
+op10->op12
+op12->op14
+op14->st17
+st17->io19
+io19->cond23
+cond23(yes)->sub27
+sub27->sub29
+sub29->e34
+e34->st38
+st38->io40
+io40->sub43
+sub43->op45
+op45->op47
+op47->sub49
+sub49->sub51
+sub51->op53
+op53->op55
+op55->cond58
+cond58(yes)->op62
+op62->sub64
+sub64->cond67
+cond67(yes)->sub71
+sub71->sub73
+sub73->cond79
+cond79(yes)->cond84
+cond84(yes)->sub88
+sub88->sub90
+sub90->cond79
+cond84(no)->cond79
+cond79(no)->cond98
+cond98(yes)->op102
+op102->cond105
+cond105->cond98
+cond98(no)->cond58
+cond67(no)->cond79
+cond58(no)->op119
+op119->sub121
+sub121->e123
+e123->cond127
+cond23(no)->e34
+

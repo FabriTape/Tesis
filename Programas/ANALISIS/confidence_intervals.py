@@ -8,13 +8,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from cluster_calc import compute_unique_ids_raw_with_positions
-from constants import CSV_PATH, FF_VALUES
+from cluster_calc import compute_unique_ids_raw
+from constants import FF_VALUES
 from scipy.stats import t
 from uncertainties import ufloat, ufloat_fromstr
 
 # Configuración
-USE_STUDENT_IC, N_MOV, P_MAD = False, 9, 2
+USE_STUDENT_IC, N_MOV, P_MAD = False, 9, 2.5
 
 
 def calc_ic(data: np.ndarray) -> dict:
@@ -25,7 +25,9 @@ def calc_ic(data: np.ndarray) -> dict:
     mu, se = np.mean(data), np.std(data, ddof=1) / np.sqrt(n)
     margin = t.ppf(0.975, n - 1) * se if USE_STUDENT_IC else se
     valor = ufloat_fromstr(f"{ufloat(mu, margin):.1u}")
-    err = valor.std_dev / valor.nominal_value * 100
+    err = (
+        (valor.std_dev / valor.nominal_value * 100) if valor.nominal_value != 0 else 0.0
+    )
     return {"n": n, "v": valor, "err": float(err)}
 
 
@@ -43,20 +45,36 @@ def _style(ax, table, title):
     table.scale(1.2, 1.5)
 
 
-def run_confidence_intervals():
-    df_raw, records = pd.read_csv(CSV_PATH), []
-
+def run_confidence_intervals(df_raw):
+    records = []
+    guardado_de_erosion_crudo = pd.DataFrame()
     # 1. Extracción y cálculos vectorizados
     for ff in FF_VALUES:
-        erosions = compute_unique_ids_raw_with_positions(df_raw, ff)
+        erosions = compute_unique_ids_raw(df_raw, ff)
         for vel0, sim_df in erosions.items():
-            raw = sim_df["unique_ids"].values.astype(float)
+            raw = np.array(sim_df).astype(float)
             data = np.concatenate([raw, np.zeros(max(0, N_MOV - len(raw)))])
 
             med = np.median(data)
             mad = np.median(np.abs(data - med))
             filt = data if mad == 0 else data[np.abs(data - med) <= P_MAD * mad]
 
+            print(f"\n--- DEBUG: ff={ff}, vel0={vel0} ---")
+            print(f"Valores Crudos (N={len(data)}): {np.sort(data)}")
+            print(f"Mediana: {med:.1f}")
+            print(f"MAD: {mad:.1f}")
+            print(
+                f"Ventana de aceptación: [{med - P_MAD * mad:.1f}, {med + P_MAD * mad:.1f}]"
+            )
+            print(f"Se filtraron {len(data) - len(filt)} datos.")
+            datos_totales = {"Posición " + str(i): data[i] for i in range(len(data))}
+            datos_totales.update({"ff": ff, "vel0": int(vel0)})
+            guardado_de_erosion_crudo = pd.concat(
+                [
+                    guardado_de_erosion_crudo,
+                    pd.DataFrame([datos_totales]),
+                ]
+            )
             for label, arr in [("Crudos", data), ("MAD", filt)]:
                 m = calc_ic(arr)
                 records.append(
@@ -69,7 +87,7 @@ def run_confidence_intervals():
                         "v": f"{m['v']:.1u}",
                     }
                 )
-
+    guardado_de_erosion_crudo.to_csv("guardado_de_erosion_crudo.csv", index=False)
     df = pd.DataFrame(records)
     figs = []
 
@@ -117,7 +135,7 @@ def run_confidence_intervals():
         )
         figs.append(fig)
 
-    return figs
+    return figs, df
 
 
 if __name__ == "__main__":
