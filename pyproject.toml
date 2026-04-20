@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bpm_toolkit"
+version = "0.1.0"
+description = "BPM Toolkit - Análisis de simulaciones LAMMPS"
+requires-python = ">=3.11"
+dependencies = [
+    "polars",
+    "matplotlib",
+    "numpy",
+    "ovito",
+    "seaborn",
+    "scipy",
+    "uncertainties",
+]
+
+[tool.setuptools.packages.find]
+include = ["BPM_toolkit*", "BPM_toolkit.execution*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E402", "E501", "W292"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["BPM_toolkit"]

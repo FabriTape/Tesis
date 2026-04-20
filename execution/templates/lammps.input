@@ -1,0 +1,84 @@
+# Init
+
+variable data index 1
+
+variable xrotate index 1
+variable yrotate index 1
+variable zrotate index 1
+
+variable angle index 1
+
+variable xmove index 1
+variable ymove index 1
+variable zmove index 1
+
+variable velocity index 1
+variable nsteps index 1
+variable ndumps index 1
+variable nthermo index 1
+
+variable proc_x index 1
+variable proc_y index 1
+variable proc_z index 1
+
+variable timestep index 1
+
+variable young_modulus index 1
+variable poisson index 1
+variable surface_energy index 1
+variable density_proj index 1
+
+newton off
+
+units si
+dimension 3
+boundary p p f
+atom_style sphere
+neighbor 100e-9 bin
+neigh_modify delay 0 every 1 check yes
+comm_modify mode single vel yes cutoff 1.8e-6
+processors ${proc_x} ${proc_y} ${proc_z}
+
+read_data ${data}
+
+change_box all z final -1e-5 0.000410
+
+create_atoms 2 single 50e-6 50e-6 152e-6
+
+set type 2 diameter 1.52e-6
+set type 2 density ${density_proj}
+
+group bloque type 1
+group sphere type 2
+
+displace_atoms sphere move ${xmove} ${ymove} ${zmove}
+
+write_data pre-run_with_projectile.data
+
+pair_style granular
+pair_coeff * * jkr ${young_modulus} 1.0e16 ${poisson} ${surface_energy} tangential mindlin NULL 1 0.5 rolling sds 5e09 9.895e-09 0.1 twisting marshall
+
+timestep ${timestep}
+
+fix 1 bloque nve/sphere
+fix 2 sphere nve/sphere
+
+compute 1 all ke/atom
+
+velocity bloque create 10.0 83921
+velocity sphere set 0.0 0.0 ${velocity} units box
+
+thermo ${nthermo}
+thermo_modify lost warn
+
+dump 1 all custom ${ndumps} output_trayectoria.dump id type x y z vx vy vz fz
+
+region r_trampa block INF INF INF INF 2.5e-4 INF
+group gr_trampa dynamic all region r_trampa every 1000
+fix freno_fuerza gr_trampa setforce 0.0 0.0 0.0
+fix freno_vel gr_trampa viscous 1.0
+fix balanceo all balance 1000 1.05 shift xy 10 1.05
+
+restart 50000 res_A.rst res_B.rst
+run ${nsteps}
+write_data post-run_final.data
