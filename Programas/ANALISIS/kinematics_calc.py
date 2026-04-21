@@ -7,7 +7,7 @@ import itertools
 
 import numpy as np
 import pandas as pd
-
+import numpy as np
 
 def get_grid_pairs(df: pd.DataFrame) -> list[tuple[float, float]]:
     """Obtiene la grilla global (producto cartesiano de todos los posx y posy únicos)."""

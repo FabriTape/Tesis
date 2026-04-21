@@ -6,10 +6,10 @@ Define los parámetros globales y rutas utilizadas en el análisis.
 from pathlib import Path
 
 # Rutas
-CARBOXI_DIR = Path("/home/tutturuu/Documentos/Universidad/Tesis/Programas/CARBOXI")
-RESULTADOS_DIR = Path("/home/tutturuu/Documentos/Universidad/Tesis/Documentos/Archive/Resultados NP 1/Resultados 0r v1")
+CARBOXI_DIR = Path("~/CARBOXI")
+RESULTADOS_DIR = Path("~/resultados")
 CSV_PATH = RESULTADOS_DIR / "merge_resultados.csv"
-SALIDA_DIR = RESULTADOS_DIR / "figuras"
+SALIDA_DIR = RESULTADOS_DIR / "figuras_pdf"
 
 # Parámetros de simulación (se usa I_VALUE dinámico en main.py, mantener para otros módulos)
 I_VALUE = 80

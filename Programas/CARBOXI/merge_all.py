@@ -69,7 +69,7 @@ def merge_with_no_erosion(path_dir: Path) -> pl.DataFrame:
     for df in temp:
         cast_expr = [
             pl.col(c).cast(pl.Int64)
-            if df[c].dtype in [pl.UInt8, pl.UInt16, pl.UInt32]
+            if df[c].dtype in [pl.Int32, pl.UInt8, pl.UInt16, pl.UInt32]
             else pl.col(c)
             for c in df.columns
         ]
@@ -107,18 +107,18 @@ def main() -> None:
 
     output_dir = args.output or args.input  # fallback a input
 
-    try:
-        merged_df = merge_with_no_erosion(args.input)
-        if merged_df.is_empty():
-            print("No se encontraron datos para fusionar")
-            sys.exit(1)
-        output_path = output_dir / f"merge_{args.input.name}.csv"
-        merged_df.write_csv(output_path)
-        print(f"Total: {len(list(args.input.glob('*.parquet')) + list(args.input.glob('*NADA*.txt')))} archivos")
-        print(f"Guardado en: {output_path}")
-    except Exception as e:
-        print(f"Error: {e}")
+#    try:
+    merged_df = merge_with_no_erosion(args.input)
+    if merged_df.is_empty():
+        print("No se encontraron datos para fusionar")
         sys.exit(1)
+    output_path = output_dir / f"merge_{args.input.name}.csv"
+    merged_df.write_csv(output_path)
+    print(f"Total: {len(list(args.input.glob('*.parquet')) + list(args.input.glob('*NADA*.txt')))} archivos")
+    print(f"Guardado en: {output_path}")
+#    except Exception as e:
+#        print(f"Error: {e}")
+#        sys.exit(1)
 
 
 if __name__ == "__main__":
