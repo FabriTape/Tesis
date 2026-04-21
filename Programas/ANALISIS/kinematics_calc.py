@@ -43,6 +43,66 @@ def get_max_data_count(df: pd.DataFrame, ff: float) -> int:
     return counts.max() if len(counts) > 0 else 0
 
 
+def get_sim_positions(df: pd.DataFrame, ff: float, vel0: float) -> pd.DataFrame:
+    """Obtiene las posiciones únicas de una simulación específica.
+
+    Args:
+        df: DataFrame con datos.
+        ff: Factor de fricción.
+        vel0: Velocidad inicial.
+
+    Returns:
+        DataFrame con columnas [posx, posy] únicas de la sim.
+    """
+    return (
+        df[
+            (df["vel0"] == vel0)
+            & (df["ff"] == ff)
+            & (df["type"] == 2)
+            & (df["id"] == df["id"].iloc[0])
+        ][["posx", "posy"]]
+        .drop_duplicates()
+        .reset_index(drop=True)
+    )
+
+
+def get_max_positions(df: pd.DataFrame, ff: float) -> int:
+    """Calcula el máximo de posiciones únicas entre todas las simulaciones para un ff.
+
+    Args:
+        df: DataFrame con datos.
+        ff: Factor de fricción.
+
+    Returns:
+        Máximo número de posiciones únicas.
+    """
+    max_pos = 0
+    for vel0 in df[df["ff"] == ff]["vel0"].unique():
+        positions = get_sim_positions(df, ff, vel0)
+        max_pos = max(max_pos, len(positions))
+    return max_pos
+
+
+def get_global_positions(df: pd.DataFrame, ff: float) -> pd.DataFrame:
+    """Obtiene las posiciones globales para un ff específico.
+
+    Une las posiciones de todas las simulaciones de ese ff.
+
+    Args:
+        df: DataFrame con datos.
+        ff: Factor de fricción.
+
+    Returns:
+        DataFrame con columnas [posx, posy] únicas para ese ff.
+    """
+    all_positions = []
+    for vel0 in df[df["ff"] == ff]["vel0"].unique():
+        sim_pos = get_sim_positions(df, ff, vel0)
+        all_positions.append(sim_pos)
+    result = pd.concat(all_positions, ignore_index=True).drop_duplicates()
+    return result.reset_index(drop=True)
+
+
 def compute_heatmap_data(
     df: pd.DataFrame,
     ff: float,

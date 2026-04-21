@@ -10,7 +10,7 @@ import pandas as pd
 import seaborn as sns
 from cluster_calc import compute_unique_ids_raw
 from constants import FF_VALUES
-from kinematics_calc import get_global_grid, get_max_data_count
+from kinematics_calc import get_global_positions, get_max_positions
 from scipy.stats import t
 from uncertainties import ufloat, ufloat_fromstr
 
@@ -50,10 +50,9 @@ def run_confidence_intervals(df_raw):
     records = []
     guardado_de_erosion_crudo = pd.DataFrame()
 
-    global_grid = get_global_grid(df_raw)
-
     for ff in FF_VALUES:
-        max_data = get_max_data_count(df_raw, ff)
+        global_grid = get_global_positions(df_raw, ff)
+        max_data = get_max_positions(df_raw, ff)
         erosions = compute_unique_ids_raw(df_raw, ff, global_grid, max_data)
         for vel0, sim_arr in erosions.items():
             data = sim_arr[~np.isnan(sim_arr)]
