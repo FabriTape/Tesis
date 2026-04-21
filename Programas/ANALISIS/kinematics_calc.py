@@ -56,10 +56,7 @@ def get_sim_positions(df: pd.DataFrame, ff: float, vel0: float) -> pd.DataFrame:
     """
     return (
         df[
-            (df["vel0"] == vel0)
-            & (df["ff"] == ff)
-            & (df["type"] == 2)
-            & (df["id"] == df["id"].iloc[0])
+            (df["ff"] == ff)
         ][["posx", "posy"]]
         .drop_duplicates()
         .reset_index(drop=True)

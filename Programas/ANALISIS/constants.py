@@ -6,8 +6,8 @@ Define los parámetros globales y rutas utilizadas en el análisis.
 from pathlib import Path
 
 # Rutas
-CARBOXI_DIR = Path("CARBOXI")
-RESULTADOS_DIR = Path("resultados")
+CARBOXI_DIR = Path("~/CARBOXI")
+RESULTADOS_DIR = Path("~/resultados")
 CSV_PATH = RESULTADOS_DIR / "merge_resultados.csv"
 SALIDA_DIR = RESULTADOS_DIR / "figuras_pdf"
 
