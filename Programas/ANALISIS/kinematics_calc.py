@@ -1,5 +1,11 @@
+"""Módulo de cálculos cinemáticos y grilla global.
+
+Contiene funciones para calcular grillas, heatmaps y estadísticas de cinemática.
+"""
+
 import itertools
 
+import numpy as np
 import pandas as pd
 import numpy as np
 
@@ -7,9 +13,34 @@ def get_grid_pairs(df: pd.DataFrame) -> list[tuple[float, float]]:
     """Obtiene la grilla global (producto cartesiano de todos los posx y posy únicos)."""
     x_vals = df["posx"].unique()
     y_vals = df["posy"].unique()
-
-    # Producto cartesiano para asegurar una grilla completa global
     return list(itertools.product(x_vals, y_vals))
+
+
+def get_global_grid(df: pd.DataFrame) -> pd.DataFrame:
+    """Obtiene DataFrame con la grilla global union de todas las posiciones.
+
+    Returns:
+        DataFrame con columnas [posx, posy] de todas las posiciones únicas.
+    """
+    return df[["posx", "posy"]].drop_duplicates().reset_index(drop=True)
+
+
+def get_max_data_count(df: pd.DataFrame, ff: float) -> int:
+    """Calcula el máximo de datos reales entre todas las simulaciones para un ff dado.
+
+    Args:
+        df: DataFrame con datos.
+        ff: Factor de fricción.
+
+    Returns:
+        Máximo conteo de datos reales por simulación.
+    """
+    df_filt = df[(df["ff"] == ff) & (df["i"] == df["i"].max())]
+    df_filt = df_filt[
+        ((df_filt["type"] == 1) | ((df_filt["type"] == 2) & (df_filt["z"] > 1e-4)))
+    ]
+    counts = df_filt.groupby(["vel0", "angulo", "posx", "posy"]).size()
+    return counts.max() if len(counts) > 0 else 0
 
 
 def compute_heatmap_data(
