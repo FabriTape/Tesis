@@ -92,21 +92,25 @@ def compute_erosion_counts_with_zeros(
     result = {}
     for vel0 in df_filt["vel0"].unique():
         # Busca en el diccionario en O(1), si no existe pone 0
-        counts = [grouped.get((vel0, px, py), 0) for px, py in grid_pairs]
+        counts = [grouped.get((vel0, px, py), np.nan) for px, py in grid_pairs]
         result[vel0] = np.array(counts, dtype=float)
 
     return result
 
 
-def compute_unique_ids_raw(df: pd.DataFrame, ff: float) -> dict[float, list[int]]:
-    """Calcula IDs únicos por cada simulación individual.
+def compute_unique_ids_raw(
+    df: pd.DataFrame, ff: float, global_grid: pd.DataFrame, max_data: int
+) -> dict[float, np.ndarray]:
+    """Calcula IDs únicos por cada simulación individual con padding y NaN.
 
     Args:
         df: DataFrame con datos.
         ff: Factor de fricción.
+        global_grid: DataFrame con la grilla global (posx, posy).
+        max_data: Máximo de datos reales entre todas las simulaciones.
 
     Returns:
-        Dict con vel0 -> lista de IDs únicos por movimiento.
+        Dict con vel0 -> array de tamaño max_data (datos reales + padding 0).
     """
     df_filt = filter_erosion(df, ff)
 
@@ -117,9 +121,35 @@ def compute_unique_ids_raw(df: pd.DataFrame, ff: float) -> dict[float, list[int]
     )
     grouped.rename(columns={"id": "unique_ids"}, inplace=True)
 
+    grid_set = set(zip(global_grid["posx"], global_grid["posy"]))
+
     result = {}
     for vel0 in grouped["vel0"].unique():
-        result[vel0] = grouped[grouped["vel0"] == vel0]["unique_ids"].tolist()
+        sim_data = grouped[grouped["vel0"] == vel0]
+
+        sim_positions = set(zip(sim_data["posx"], sim_data["posy"]))
+
+        has_data = sim_positions & grid_set
+        missing = grid_set - sim_positions
+
+        values = []
+        for posx, posy in has_data:
+            val = sim_data[
+                (sim_data["posx"] == posx) & (sim_data["posy"] == posy)
+            ]["unique_ids"].values[0]
+            values.append(val)
+
+        padding_count = max(0, max_data - len(values))
+        values.extend([0] * padding_count)
+
+        missing_positions = [(px, py, np.nan) for px, py in missing]
+        if missing_positions:
+            arr = np.array(values + [np.nan] * len(missing_positions))
+        else:
+            arr = np.array(values)
+
+        result[vel0] = arr
+
     return result
 
 

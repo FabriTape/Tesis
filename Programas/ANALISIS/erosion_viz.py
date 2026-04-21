@@ -126,7 +126,6 @@ def plot_erosion_boxplot(df: pd.DataFrame, ff: float) -> Figure:
 
 
 def plot_erosion_heatmap(df: pd.DataFrame, ff: float, vel0: float) -> Figure:
-    # ... (Se mantiene igual tu código original para el heatmap)
     data = compute_heatmap_data(df, ff, vel0)
     if data.empty:
         return Figure()

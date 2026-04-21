@@ -10,11 +10,12 @@ import pandas as pd
 import seaborn as sns
 from cluster_calc import compute_unique_ids_raw
 from constants import FF_VALUES
+from kinematics_calc import get_global_grid, get_max_data_count
 from scipy.stats import t
 from uncertainties import ufloat, ufloat_fromstr
 
 # Configuración
-USE_STUDENT_IC, N_MOV, P_MAD = False, 9, 2.5
+USE_STUDENT_IC, P_MAD = False, 2.5
 
 
 def calc_ic(data: np.ndarray) -> dict:
@@ -48,12 +49,15 @@ def _style(ax, table, title):
 def run_confidence_intervals(df_raw):
     records = []
     guardado_de_erosion_crudo = pd.DataFrame()
-    # 1. Extracción y cálculos vectorizados
+
+    global_grid = get_global_grid(df_raw)
+
     for ff in FF_VALUES:
-        erosions = compute_unique_ids_raw(df_raw, ff)
-        for vel0, sim_df in erosions.items():
-            raw = np.array(sim_df).astype(float)
-            data = np.concatenate([raw, np.zeros(max(0, N_MOV - len(raw)))])
+        max_data = get_max_data_count(df_raw, ff)
+        erosions = compute_unique_ids_raw(df_raw, ff, global_grid, max_data)
+        for vel0, sim_arr in erosions.items():
+            data = sim_arr[~np.isnan(sim_arr)]
+            raw = np.array(data).astype(float)
 
             med = np.median(data)
             mad = np.median(np.abs(data - med))
