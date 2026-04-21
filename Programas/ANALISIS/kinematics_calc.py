@@ -1,7 +1,7 @@
 import itertools
 
 import pandas as pd
-
+import numpy as np
 
 def get_grid_pairs(df: pd.DataFrame) -> list[tuple[float, float]]:
     """Obtiene la grilla global (producto cartesiano de todos los posx y posy únicos)."""
@@ -40,7 +40,7 @@ def compute_heatmap_data(
         ]
 
         # Agrupar y crear la matriz 2D (pone NaN donde falta intersección interna)
-        pivot = df_validas.groupby(["posy", "posx"]).size().unstack(fill_value=0)
+        pivot = df_validas.groupby(["posy", "posx"]).size().unstack(fill_value=np.nan)
 
     # 3. EL PASO CLAVE: Forzar la grilla global.
     # Esto agrega las filas (posy) y columnas (posx) que faltan y les pone 0
