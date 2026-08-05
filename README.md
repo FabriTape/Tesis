@@ -45,8 +45,13 @@ Tesis/
     │   │   └── collision_erosion_bed.input              # Input LAMMPS (JKR)
     │   ├── datas/                   #   Cajas de partículas generadas (.data)
     │   ├── datos/                   #   Resultados agregados (9 y 49 movimientos)
-    │   ├── erosion.py               #   Genera las figuras de la tesis (set de 9 repeticiones)
-    │   └── erosion_49.py            #   Genera las figuras de la tesis (set de 49 repeticiones)
+    │   │   ├── procesados/          #     CSVs filtrados reutilizables (df_dist, df_cluster, …)
+    │   │   └── 9_mov/, 49_mov/      #     Ajustes, métricas y tablas LaTeX por set
+    │   ├── figuras/                 #   PNGs de la tesis (9_mov/ y 49_mov/)
+    │   ├── generador_figuras.py     #   Genera TODAS las figuras de la tesis (unifica 9 y 49, polars)
+    │   ├── verificar_polars.py      #   Verifica la equivalencia polars vs pandas
+    │   ├── erosion.py               #   Figuras de la tesis, set de 9 (original, pandas)
+    │   └── erosion_49.py            #   Figuras de la tesis, set de 49 (original, pandas)
     │
     ├── ANALISIS/                    # ─── P A S O  4 · ESTADÍSTICA ─────────────
     │   ├── main.py                  #   Genera el PDF con figuras de la tesis
@@ -128,10 +133,26 @@ python enqueue_sims.py
 ### 3. Estadística y figuras para la tesis
 
 ```bash
+# Análisis estadístico clásico (profundidades, intervalos de confianza, heatmaps)
 cd Programas/ANALISIS
 # Dependencias: pandas, matplotlib, seaborn, numpy, uncertainties
 python main.py
+
+# Figuras de la tesis a partir de los CSV mergeados (script unificado, polars)
+cd Programas/cluster
+python generador_figuras.py            # procesa ambos sets y genera todas las figuras
+python generador_figuras.py 9_mov      # solo el set de 9 repeticiones
+python generador_figuras.py 49_mov     # solo el set de 49 repeticiones
+python generador_figuras.py 9_mov 49_mov --forzar  # regenera ignorando el caché
+
+# Chequeo de equivalencia con las versiones originales (pandas)
+python verificar_polars.py
 ```
+
+`generador_figuras.py` reemplaza a `erosion.py` y `erosion_49.py`: procesa los
+datos con **polars**, guarda los resultados intermedios en `datos/procesados/`
+(se reutilizan si no se fuerza la recarga) y escribe las figuras en
+`figuras/9_mov/` y `figuras/49_mov/`.
 
 ## Lanzamientos
 
