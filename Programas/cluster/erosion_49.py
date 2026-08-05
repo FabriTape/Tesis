@@ -1,7 +1,11 @@
 """Análisis comparativo de erosión para el set de 49 repeticiones.
 
-Reutiliza las funciones de ``erosion`` (set de 9) para comparar resultados
-estadísticos, generar tablas LaTeX y animaciones de la evolución temporal.
+Reutiliza las funciones de ``erosion`` (set de 9) para generar las figuras de
+la tesis con el set de 49 movimientos: distribuciones de cluster, comparación
+de modelos de ajuste, supervivencia P_surv, heatmaps y tablas LaTeX.
+
+Uso:
+    python erosion_49.py
 """
 
 import warnings

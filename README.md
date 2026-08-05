@@ -45,8 +45,8 @@ Tesis/
     │   │   └── collision_erosion_bed.input              # Input LAMMPS (JKR)
     │   ├── datas/                   #   Cajas de partículas generadas (.data)
     │   ├── datos/                   #   Resultados agregados (9 y 49 movimientos)
-    │   ├── erosion.py               #   Análisis y figuras (set de 9 repeticiones)
-    │   └── erosion_49.py            #   Análisis comparativo y animaciones (49 movs)
+    │   ├── erosion.py               #   Genera las figuras de la tesis (set de 9 repeticiones)
+    │   └── erosion_49.py            #   Genera las figuras de la tesis (set de 49 repeticiones)
     │
     ├── ANALISIS/                    # ─── P A S O  4 · ESTADÍSTICA ─────────────
     │   ├── main.py                  #   Genera el PDF con figuras de la tesis

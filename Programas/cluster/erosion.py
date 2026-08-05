@@ -1,7 +1,11 @@
 """Análisis de erosión para el set de 9 repeticiones.
 
-Carga los resultados mergeados de las simulaciones, ajusta distribuciones de
-tamaño de cluster y genera las figuras de la tesis (PDF, CCDF, P(k), heatmaps).
+Genera las figuras de la tesis: distribuciones de erosión y de tamaño de
+cluster (PDF, CCDF, P(k)), heatmaps, violines, tablas LaTeX de profundidades
+y ajustes de modelos (ley de potencia).
+
+Uso:
+    python erosion.py
 """
 
 from pathlib import Path
