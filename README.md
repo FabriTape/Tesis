@@ -1,10 +1,155 @@
-# Tesis
-Este es mi repositorio donde voy a ir subiendo las actualizaciones de micodigo que permite el análisis de simulaciones de medios granulares usando Python y posiblemente processing.
-# Versión 0
-En una primera versión se usó pandas para leer directamente los csv y tardaba mucho (3 seg) en leer 27 archivos de ~80000 partículas
-# Versión 3
-Al pedir una opinion a las IA's Gemini y Grok decidí hacer uso de archivos parquet en vez de csv y la cosa mejoró mucho (mejoró a ~0.6 seg) 
-# Versión 3.1
-Para la versión que aun no se implementa se buscará paralelizar el trabajo y hacer uso de la biblioteca polaris
-# Versión 3.14
-To be continued ...
+# Tesis — Análisis de erosión en medios granulares
+
+Herramientas en **Python** para el análisis de simulaciones de **erosión en medios granulares** hechas con **LAMMPS**. El proyecto cubre todo el ciclo de trabajo:
+
+1. **Simular**: lanzamiento de simulaciones LAMMPS de impacto de proyectil sobre una cama de partículas de sílice (modelo JKR), con envío a cluster vía Slurm.
+2. **Analizar**: pipeline **CARBOXI** que detecta la onda de choque, filtra las partículas erosionadas y calcula su coordinación y tamaño de cluster con **OVITO**.
+3. **Comparar**: evaluación de distintas estrategias de filtrado de erosión (`comparar_filtros`).
+4. **Estadística**: intervalos de confianza, distribuciones de clusters y figuras para la tesis (`ANALISIS`, `cluster/`).
+
+El nombre de las versiones sigue los dígitos de π: **3 → 3.1 → 3.14 → 3.141** … cada versión agrega un dígito de precisión (y un hito del proyecto). Ver [Releases](#lanzamientos).
+
+## Estructura del repositorio
+
+```
+Tesis/
+├── README.md                        # Esta guía
+├── LICENSE                          # Licencia MIT
+├── Documentos/                      # Material de la tesis
+│   ├── linea_temporal.tex           #   Cronología de avances del proyecto
+│   ├── errores_timeline.tex         #   Registro de errores y fixes
+│   ├── Imagenes/                    #   Figuras comparativas (filtros con/sin tracking)
+│   └── resultados/                  #   CSVs de resultados de comparación de filtros
+└── Programas/                       # Todo el código
+    ├── CARBOXI/                     # ─── P A S O  2 · ANÁLISIS ────────────────
+    │   │                            # Pipeline de análisis de erosión (paquete instalable)
+    │   ├── __main__.py              #   `python -m CARBOXI [ruta]` (punto de entrada)
+    │   ├── main_pipeline.py         #   Orquesta el pipeline: onda + OVITO + guardado
+    │   ├── config_and_discovery.py  #   Config desde config.toml + descubre simulaciones
+    │   ├── config.toml              #   Parámetros: umbrales, material JKR, rutas
+    │   ├── wave_analysis.py         #   Detecta la onda de choque (fase 1)
+    │   ├── erosion_analysis.py      #   Coordinación y clusters con OVITO (fase 2)
+    │   ├── storage_and_viz.py       #   Lee dumps, guarda parquet, gráficos SVG
+    │   ├── trajectory_converter.py  #   parquet → dump/xyz para OVITO
+    │   ├── merge_all.py             #   Junta parquet de muchas sims en un CSV
+    │   └── pyproject.toml           #   Empaquetado (pip install ./CARBOXI)
+    │
+    ├── cluster/                     # ─── P A S O  1 · SIMULACIÓN ──────────────
+    │   ├── scripts/                 #   Scripts para correr sims en el cluster
+    │   │   ├── config.toml          #     Config central (barrido, material, filtros)
+    │   │   ├── read_config.py       #     TOML → variables de shell (config_vars.sh)
+    │   │   ├── encolar_sims.sh      #     Envía un job a Slurm por lote
+    │   │   ├── enqueue_sims.py      #     Controlador idempotente de sims
+    │   │   ├── run_erosion_bed_sims_lammps_move_np3.sh  # Lanzador LAMMPS con barrido
+    │   │   ├── slurm_submit_JKR.sh  #     Definición del job (nodos, partición)
+    │   │   └── collision_erosion_bed.input              # Input LAMMPS (JKR)
+    │   ├── datas/                   #   Cajas de partículas generadas (.data)
+    │   ├── datos/                   #   Resultados agregados (9 y 49 movimientos)
+    │   ├── erosion.py               #   Análisis y figuras (set de 9 repeticiones)
+    │   └── erosion_49.py            #   Análisis comparativo y animaciones (49 movs)
+    │
+    ├── ANALISIS/                    # ─── P A S O  4 · ESTADÍSTICA ─────────────
+    │   ├── main.py                  #   Genera el PDF con figuras de la tesis
+    │   ├── constants.py             #   Rutas y parámetros globales
+    │   ├── data_loader.py           #   Carga del CSV mergeado de resultados
+    │   ├── kinematics_calc.py       #   Cálculos cinemáticos y grilla del heatmap
+    │   ├── cluster_calc.py          #   Tamaños y distribución de clusters
+    │   ├── confidence_intervals.py  #   Intervalos de confianza (MAD + SE/Student)
+    │   └── erosion_viz.py           #   Boxplot y heatmap de erosión
+    │
+    ├── comparar_filtros/            # ─── P A S O  3 · VALIDACIÓN ──────────────
+    │   ├── main.py                  #   Ejecuta la comparación de filtros
+    │   ├── filtros.py               #   6 filtros: F1I/F1C, F2I/F2C, F3I/F3C
+    │   ├── lammps_reader.py         #   Lectura de dumps con polars
+    │   ├── metricas.py              #   Métricas por step con OVITO
+    │   ├── plots.py                 #   Gráficos comparativos
+    │   ├── solo_graficos.py         #   Regenera gráficos desde CSV ya calculados
+    │   └── run_all.py               #   Corre las variaciones de margen
+    │
+    ├── Ideas_de_implementacion/     # Prototipos y experimentos en curso
+    │   ├── fabric_tensor*.py        #   Tensor de fábrica (v1…v5) con OVITO
+    │   ├── crater_analisis.py       #   Análisis de cráteres
+    │   ├── aggregate_parquets.py    #   Agrega parquet de un filtro
+    │   ├── analisis_ocupacion.py    #   Ocupación del área XY por altura
+    │   ├── bayesian_sandbox.py      #   Modelos bayesianos (arviz/pymc)
+    │   ├── censored.py              #   Datos censurados (pymc)
+    │   └── plot_fabric.py           #   Grafica el tensor de fábrica
+    │
+    ├── legacy/                      # Scripts obsoletos o de prueba (referencia)
+    │   ├── analisis_Tesis.ipynb     #   Notebook de análisis original
+    │   ├── pdf_quitadas.py          #   Figuras removidas del pipeline principal
+    │   ├── analyze.py               #   Detección de formato y pipeline automático
+    │   ├── CARBOXIMINI/             #   Versión previa del pipeline de clusters
+    │   ├── solid/                   #   Módulos SOLID de un refactor descartado
+    │   ├── final/                   #   Últimos scripts de visualización de clusters
+    │   ├── prueba_*.py              #   Scripts de prueba documentados
+    │   ├── resume_controller.py     #   Retomar sims incompletas desde restart
+    │   └── slurm_resume.sh          #   Job Slurm para reanudar simulaciones
+    │
+    ├── plan.md                      # Plan de refactor del pipeline de simulación
+    └── resultados/                  # Salidas de CARBOXI (parquet + SVG)
+```
+
+## Cómo empezar
+
+### 1. Análisis de simulaciones (CARBOXI)
+
+```bash
+# Instalar el paquete (dependencias: polars, ovito, matplotlib, numpy)
+pip install ./Programas/CARBOXI
+
+# Procesar una carpeta de simulaciones LAMMPS
+python -m CARBOXI /ruta/a/simulaciones
+
+# Sin argumento: abre un navegador interactivo para elegir la carpeta
+python -m CARBOXI
+
+# Convertir trayectorias a formato OVITO
+python -m CARBOXI.trajectory_converter resultados.parquet --format dump
+```
+
+`CARBOXI` detecta automáticamente la onda de choque, filtra las partículas
+erosionadas (criterio **F3C** por defecto) y guarda resultados en `resultados/`
+como `.parquet` y gráficos SVG.
+
+### 2. Simulación en el cluster (LAMMPS + Slurm)
+
+Todo el barrido de parámetros se configura en `Programas/cluster/scripts/config.toml`
+(única fuente de verdad). Desde esa carpeta:
+
+```bash
+# Enviar un lote de simulaciones a Slurm
+./encolar_sims.sh
+
+# Alternativa controlada por Python (idempotente, evita duplicados)
+python enqueue_sims.py
+```
+
+### 3. Estadística y figuras para la tesis
+
+```bash
+cd Programas/ANALISIS
+# Dependencias: pandas, matplotlib, seaborn, numpy, uncertainties
+python main.py
+```
+
+## Lanzamientos
+
+| Versión | Fecha | Qué incluye |
+|---------|-------|-------------|
+| [v3](https://github.com/FabriTape/Tesis/releases/tag/v3) | Dic 2025 | Lectura de datos con **parquet** en lugar de CSV (3 s → ~0.6 s). |
+| [v3.1](https://github.com/FabriTape/Tesis/releases/tag/v3.1) | Dic 2025 | Módulo **Lector** con **polars**, paralelización y cálculos con **OVITO**. |
+| [v3.14](https://github.com/FabriTape/Tesis/releases/tag/v3.14) | Mar 2026 | **CARBOXI**: pipeline automático (máquina de estados, config externalizada, detección de onda). |
+| [v3.141](https://github.com/FabriTape/Tesis/releases/tag/v3.141) | Ago 2026 | Estado actual: scripts de simulación unificados, comparación de filtros, análisis estadístico. |
+
+## Ramas
+
+- **`main`**: rama estable. Apunta al estado actual del trabajo.
+- **`desarrollo`**: rama de desarrollo activo (idéntica a `main` en este momento).
+
+Los experimentos descartados quedan archivados como tags `archive/*` para
+conservar su historial sin ensuciar las ramas.
+
+## Licencia
+
+MIT — ver [LICENSE](LICENSE).

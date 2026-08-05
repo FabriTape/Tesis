@@ -1,3 +1,9 @@
+"""Análisis comparativo de erosión para el set de 49 repeticiones.
+
+Reutiliza las funciones de ``erosion`` (set de 9) para comparar resultados
+estadísticos, generar tablas LaTeX y animaciones de la evolución temporal.
+"""
+
 import warnings
 from pathlib import Path
 

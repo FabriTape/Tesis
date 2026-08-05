@@ -1,3 +1,9 @@
+"""Punto de entrada del análisis estadístico de erosión.
+
+Genera un PDF con las figuras de la tesis: boxplots, heatmaps y gráficos
+de erosión vs energía, a partir del CSV mergeado de resultados LAMMPS.
+"""
+
 import matplotlib.pyplot as plt
 from confidence_intervals import run_confidence_intervals
 from constants import CSV_PATH, FF_VALUES, SALIDA_DIR

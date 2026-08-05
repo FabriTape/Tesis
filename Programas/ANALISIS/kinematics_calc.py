@@ -1,3 +1,8 @@
+"""Módulo de cálculos cinemáticos.
+
+Provee la grilla global de posiciones y los datos para el heatmap de erosión.
+"""
+
 import itertools
 
 import pandas as pd

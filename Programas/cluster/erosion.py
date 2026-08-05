@@ -1,3 +1,9 @@
+"""Análisis de erosión para el set de 9 repeticiones.
+
+Carga los resultados mergeados de las simulaciones, ajusta distribuciones de
+tamaño de cluster y genera las figuras de la tesis (PDF, CCDF, P(k), heatmaps).
+"""
+
 from pathlib import Path
 
 import matplotlib.pyplot as plt
