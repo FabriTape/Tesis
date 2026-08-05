@@ -70,8 +70,11 @@ def _detect_bed_height(radios: int = 5) -> tuple[float, float]:
     """
     base = 1e-4
     if radios < 0:
+        # Umbral por DEBAJO de la cama: ambos umbrales coinciden (sin margen),
+        # de modo que también se capturan partículas levemente hundidas.
         return base + radios * RADIO_M, base + radios * RADIO_M
     else:
+        # Umbral en la cama + margen de N radios para el filtro CM del cluster.
         return base, base + radios * RADIO_M
 
 

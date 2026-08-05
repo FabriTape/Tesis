@@ -1,7 +1,7 @@
 """Visualización comparativa de filtros de erosión."""
 
 from pathlib import Path
-
+import numpy as np
 import matplotlib.pyplot as plt
 
 _STEP_TO_US = 1.25
@@ -114,11 +114,11 @@ def plot_comparison(
 
     # Plot (c): gaps acumulados vs tiempo
     ax = axes[1, 0]
-    for config, gaps_data in all_gaps.items():
+    for config, gaps_data in all_gaps_raw.items():
         if not gaps_data:
             continue
         time_us = [g["step"] * _STEP_TO_US for g in gaps_data]
-        gaps = [g["gaps_acumulados"] for g in gaps_data]
+        gaps = np.cumulative_sum([g["gaps"] for g in gaps_data])
         ax.plot(
             time_us,
             gaps,
@@ -128,7 +128,7 @@ def plot_comparison(
             linewidth=1.5,
         )
     ax.set_xlabel(r"tiempo [$\mu$s]", fontsize=_AXIS_FONTSIZE)
-    ax.set_ylabel("Gaps acumulados", fontsize=_AXIS_FONTSIZE)
+    ax.set_ylabel("fluctuaciones acumuladas", fontsize=_AXIS_FONTSIZE)
     ax.tick_params(labelsize=_AXIS_FONTSIZE)
     ax.text(
         0.02,
@@ -159,7 +159,7 @@ def plot_comparison(
                 linewidth=1.5,
             )
         ax.set_xlabel(r"tiempo [$\mu$s]", fontsize=_AXIS_FONTSIZE)
-        ax.set_ylabel("Gaps por step", fontsize=_AXIS_FONTSIZE)
+        ax.set_ylabel("fluctuaciones", fontsize=_AXIS_FONTSIZE)
         ax.tick_params(labelsize=_AXIS_FONTSIZE)
         ax.text(
             0.02,

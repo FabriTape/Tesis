@@ -109,8 +109,8 @@ def compute_metrics(
 def compute_gaps_per_step(df: pl.DataFrame) -> list[dict]:
     """Calcula gaps acumulados por step.
 
-    Para cada step, cuenta cuántos IDs detectados en pasos anteriores
-    no están presentes en el step actual.
+    Para cada step, cuenta cuántos IDs únicos han experimentado
+    una desaparición (gap) desde el inicio hasta el step actual.
 
     Args:
         df: DataFrame concatenado de todos los steps con columna "i".
@@ -124,12 +124,21 @@ def compute_gaps_per_step(df: pl.DataFrame) -> list[dict]:
 
     max_step = bed["i"].max()
     seen_ids: set[int] = set()
+    ever_dropped_ids: set[int] = set()  # Nuevo set para acumular caídas
     result = []
 
     for step in range(max_step + 1):
         step_ids = set(bed.filter(pl.col("i") == step)["id"].to_list())
-        gaps = len(seen_ids - step_ids)
-        result.append({"step": step, "gaps_acumulados": gaps})
+
+        # Identificamos qué IDs faltan en ESTE step específico
+        dropped_now = seen_ids - step_ids
+
+        # Agregamos esas ausencias al registro histórico acumulado
+        ever_dropped_ids.update(dropped_now)
+
+        # El acumulado real es el tamaño del registro histórico
+        result.append({"step": step, "gaps_acumulados": len(ever_dropped_ids)})
+
         seen_ids.update(step_ids)
 
     return result

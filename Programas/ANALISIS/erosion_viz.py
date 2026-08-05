@@ -11,7 +11,10 @@ from cluster_calc import compute_erosion_counts_with_zeros
 from constants import COLORS, I_VALUE
 from kinematics_calc import compute_heatmap_data, get_grid_pairs
 from matplotlib.figure import Figure
+from scipy.optimize import curve_fit
 from scipy.stats import t
+from sklearn.metrics import mean_squared_error
+from uncertainties import unumpy as unp
 
 
 def plot_erosion_boxplot(df: pd.DataFrame, ff: float) -> Figure:

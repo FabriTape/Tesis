@@ -6,8 +6,16 @@ Filtros individuales (F1I, F2I, F3I):
 Filtros de cluster (F1C, F2C, F3C):
   z > bed_height → Ovito → filtrar por CM del cluster
 
-bed_height = altura cruda de la cama (sin margen)
-max_height = bed_height + margen (para filtro CM del cluster)
+Referencias de altura:
+  bed_height    = altura cruda de la cama (sin margen)
+  max_height    = bed_height + margen (para filtro CM del cluster)
+  _FREEZE_HEIGHT = 2.4e-4 m: partículas por encima de esta altura SIEMPRE
+                  se conservan (son las eyectadas lejos de la cama,
+                  independientemente de vz o Δv).
+
+Todas las funciones de filtro comparten la misma firma:
+  (lf, bed_height, max_height, tol, prev_dump, pipeline) -> pl.DataFrame
+para poder seleccionarlas por nombre en main.FILTER_FUNCS.
 """
 
 import polars as pl
@@ -22,6 +30,8 @@ from ovito.pipeline import Pipeline, StaticSource  # type: ignore[import-untyped
 _COLUMNS = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 
 CONFIG_NAMES = ["F1I", "F1C", "F2I", "F2C", "F3I", "F3C"]
+# Altura [m] por encima de la cual una partícula se conserva SIEMPRE,
+# aunque no cumpla los criterios de vz o Δv del filtro.
 _FREEZE_HEIGHT = 2.4e-4
 
 
@@ -129,6 +139,9 @@ def filter_F2I(
         DataFrame con partículas eyectadas + proyectil.
     """
     return lf.filter(
+        # Precedencia: ((z > max_height) & (vz > 0)) | (z > _FREEZE_HEIGHT)
+        # → partículas eyectadas hacia arriba, o cualquiera muy por encima
+        # de la cama (proyectil / eyección lejana).
         (pl.col("z") > max_height) & (pl.col("vz") > 0) | (pl.col("z") > _FREEZE_HEIGHT)
     ).collect()
 
@@ -262,6 +275,29 @@ def filter_F3C(
     prev_dump: pl.DataFrame | None = None,
     pipeline: Pipeline | None = None,
 ) -> pl.DataFrame:
+    """F3C: z + vz + Δv del CM del cluster (cluster).
+
+    Secuencia:
+      1. Inicial: z > bed_height (candidatas).
+      2. Ovito: quedan los clusters con z_cm > max_height y vz_cm > 0.
+      3. Δv: se cruza con el dump anterior (inner join por id), se calcula
+         la variación de velocidad del CENTRO DE MASA del cluster entre
+         ambos dumps y se conserva si |Δv_cm| < tol (o z_cm > _FREEZE_HEIGHT).
+
+    A diferencia de F3I (que usa el Δv de cada partícula), aquí el criterio
+    se aplica por cluster, usando la velocidad media previa/actual.
+
+    Args:
+        lf: LazyFrame del dump.
+        bed_height: Altura de la cama cruda [m] (filtro inicial).
+        max_height: Umbral CM del cluster [m].
+        tol: Tolerancia de |Δv_cm| [m/s].
+        prev_dump: Dump anterior con columnas ["id", "vx", "vy", "vz"].
+        pipeline: Pipeline de Ovito.
+
+    Returns:
+        DataFrame con los clusters que cumplen los 3 criterios.
+    """
 
     df = lf.filter(pl.col("z") > bed_height).collect()
 

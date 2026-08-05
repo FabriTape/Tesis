@@ -1,5 +1,9 @@
 """Script para correr las 6 variaciones de filtro.
 
+Ejecuta main.py una vez por cada configuración de margen definida en
+CONFIGS, pasando como argumentos: radios (margen sobre la cama),
+tolerancia Δv fija (1e-6) y el nombre del subdirectorio de salida.
+
 Uso:
     python run_all.py
 """
@@ -11,14 +15,14 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 PYTHON = sys.executable
 
-# (nombre_subdir, radios, tracking_on_off)
-# CONFIGS = [
-#    ("0r", 0),
-#    ("1r", 1),
-#    ("2r", 2),
-#    ("5r", 5),
-# ]
-CONFIGS = [("-5r", -5)]
+# (nombre_subdir, radios)
+# radios < 0 → bed_height = base - N radios (umbral más bajo)
+# radios > 0 → max_height = base + N radios (margen sobre la cama)
+CONFIGS = [
+    ("-5r", -5),
+    ("0r", 0),
+    ("5r", 5),
+]
 
 
 def main() -> None:

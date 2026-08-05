@@ -36,10 +36,9 @@ def list_dump_files(directory: Path) -> list[Path]:
 
     Args:
         directory: Directorio con archivos output.*.gz.
-        tracking: Si es True, ordena por timestep descendente (más reciente primero).
 
     Returns:
-        Lista de rutas ordenadas por timestep.
+        Lista de rutas ordenadas por timestep ascendente.
     """
     files = list(directory.glob("output.*.gz"))
     files.sort(key=lambda p: _extract_timestep(p.name))
