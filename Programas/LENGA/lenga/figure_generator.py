@@ -64,6 +64,57 @@ class FigureGeneratorEngine:
         self.output_dir = Path(output_dir) if output_dir else Path(__file__).resolve().parent.parent / "figuras"
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.processed_data_cache: Dict[str, Tuple] = {}
+        self.custom_csv: Optional[Path] = None
+
+    def load_dataset(self, csv_path: Union[str, Path]) -> Tuple[bool, object, str]:
+        """Valida y carga un CSV consolidado, guardándolo como dataset activo.
+
+        Para los presets (``9_mov``/``49_mov``) la ruta se resuelve desde
+        ``gf.DATASETS``; un CSV personalizado se lee igual pero se registra en
+        ``self.custom_csv`` para usarlo al generar figuras.
+
+        Args:
+            csv_path (Union[str, Path]): Ruta al CSV consolidado de resultados.
+
+        Returns:
+            Tuple[bool, object, str]: Tupla con (exito, df_crudo, mensaje).
+        """
+        path = Path(csv_path)
+        if not path.exists():
+            return False, None, f"No existe el archivo: {path}"
+        try:
+            cfg = gf.DATASETS["9_mov"].copy()
+            cfg["csv"] = path
+            df = gf.leer_crudo(cfg)
+        except Exception as err:
+            return False, None, f"Error al leer el CSV: {err}"
+        self.custom_csv = path
+        return True, df, f"Dataset cargado: {path.name} ({len(df):,} filas)"
+
+    def _dataset_cfg(self, dataset_label: str) -> dict:
+        """Devuelve la configuración de ``generador_figuras.py`` para un dataset.
+
+        Los presets usan ``gf.DATASETS``; un CSV personalizado (``custom``)
+        clona el preset ``9_mov`` apuntando al archivo cargado y con caché
+        propia, para no pisar los resultados procesados de los presets.
+
+        Args:
+            dataset_label (str): Identificador ('9_mov', '49_mov', 'custom').
+
+        Returns:
+            dict: Configuración lista para ``gf.procesar_datos``.
+        """
+        if dataset_label == "custom" and self.custom_csv is not None:
+            cfg = gf.DATASETS["9_mov"].copy()
+            cfg["csv"] = self.custom_csv
+            cfg["cache_dir"] = self.output_dir / "cache_custom"
+            cfg["fig_dir"] = self.output_dir / "custom"
+        else:
+            name = dataset_label if dataset_label in gf.DATASETS else "9_mov"
+            cfg = gf.DATASETS[name].copy()
+            cfg["fig_dir"] = self.output_dir / name
+        cfg["fig_dir"].mkdir(parents=True, exist_ok=True)
+        return cfg
 
     def get_dataset_config(self, dataset_name: str = "9_mov") -> dict:
         """Obtiene la configuración exacta de un conjunto de datos desde gf.DATASETS.
@@ -74,16 +125,7 @@ class FigureGeneratorEngine:
         Returns:
             dict: Diccionario de configuración de generador_figuras.py.
         """
-        if dataset_name in gf.DATASETS:
-            cfg = gf.DATASETS[dataset_name].copy()
-        else:
-            cfg = gf.DATASETS["9_mov"].copy()
-
-        # Configurar directorio de figuras temporal para la salida de generador_figuras
-        tmp_fig_dir = self.output_dir / dataset_name
-        tmp_fig_dir.mkdir(parents=True, exist_ok=True)
-        cfg["fig_dir"] = tmp_fig_dir
-        return cfg
+        return self._dataset_cfg(dataset_name)
 
     def process_dataset(
         self, dataset_name: str = "9_mov", forzar: bool = False

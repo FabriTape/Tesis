@@ -233,7 +233,7 @@ class FiguresViewWidget(QWidget):
 
         for key, chk in self.check_boxes.items():
             if chk.isChecked():
-                fig, name = self.engine.generate_figure(key, self.current_df, dataset_label)
+                fig, name = self.engine.generate_figure(key, dataset_label)
                 self.generated_figures[name] = fig
 
                 # Crear widget con Matplotlib Canvas y Toolbar
