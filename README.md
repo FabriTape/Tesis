@@ -6,6 +6,7 @@ Herramientas en **Python** para el análisis de simulaciones de **erosión en me
 2. **Analizar**: pipeline **CARBOXI** que detecta la onda de choque, filtra las partículas erosionadas y calcula su coordinación y tamaño de cluster con **OVITO**.
 3. **Comparar**: evaluación de distintas estrategias de filtrado de erosión (`comparar_filtros`).
 4. **Estadística**: intervalos de confianza, distribuciones de clusters y figuras para la tesis (`cluster/`).
+5. **LENGA**: GUI de escritorio que integra el flujo completo — envío de simulaciones a Slurm, análisis remoto con CARBOXI y generación de figuras.
 
 El nombre de las versiones sigue los dígitos de π: **3 → 3.1 → 3.14 → 3.141** … cada versión agrega un dígito de precisión (y un hito del proyecto). Ver [Releases](#lanzamientos).
 
@@ -59,6 +60,19 @@ Tesis/
     │   ├── plots.py                 #   Gráficos comparativos
     │   ├── solo_graficos.py         #   Regenera gráficos desde CSV ya calculados
     │   └── run_all.py               #   Corre las variaciones de margen
+    │
+    ├── LENGA/                       # GUI: plataforma de simulación y análisis
+    │   ├── lenga/                   #   Paquete: GUI (PyQt5), SSH/Slurm, CARBOXI, figuras
+    │   │   ├── main.py              #     Punto de entrada (python -m lenga.main)
+    │   │   ├── gui/                 #     Ventanas (login, cluster, análisis, figuras)
+    │   │   ├── ssh_client.py        #     Conexión SSH al cluster (pexpect)
+    │   │   ├── cluster_manager.py   #     Envío de simulaciones a Slurm
+    │   │   ├── carboxi_runner.py    #     Análisis remoto CARBOXI + merge_all
+    │   │   ├── figure_generator.py  #     Ejecuta TAL CUAL cluster/generador_figuras.py
+    │   │   └── polars_shim.py       #     Shim polars para compatibilidad
+    │   ├── run_lenga.sh             #   Lanzador de la app
+    │   ├── lenga.desktop            #   Acceso directo de escritorio
+    │   └── requirements.txt         #   Dependencias (PyQt5, polars, pexpect, …)
     │
     ├── Ideas_de_implementacion/     # Prototipos y experimentos en curso
     │   ├── fabric_tensor*.py        #   Tensor de fábrica (v1…v5) con OVITO
@@ -139,6 +153,19 @@ python verificar_polars.py
 `legacy/`): procesa los datos con **polars**, guarda los resultados intermedios
 en `datos/procesados/` (se reutilizan si no se fuerza la recarga) y escribe las
 figuras en `figuras/9_mov/` y `figuras/49_mov/`.
+
+### 4. LENGA (GUI)
+
+```bash
+# Instalar dependencias y lanzar la interfaz gráfica
+pip install -r Programas/LENGA/requirements.txt
+./Programas/LENGA/run_lenga.sh
+```
+
+LENGA integra el flujo completo desde una ventana: conexión SSH al cluster,
+envío de simulaciones a Slurm, análisis remoto con CARBOXI (consolidación con
+`merge_all`) y generación de las figuras reutilizando
+`cluster/generador_figuras.py`.
 
 ## Lanzamientos
 
