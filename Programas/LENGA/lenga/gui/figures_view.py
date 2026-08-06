@@ -102,6 +102,8 @@ class FiguresViewWidget(QWidget):
         btn_all.clicked.connect(lambda: self._set_all_checks(True))
         btn_none = QPushButton("Desmarcar Todo")
         btn_none.clicked.connect(lambda: self._set_all_checks(False))
+        for btn in (btn_all, btn_none):
+            btn.setMinimumHeight(round(btn.sizeHint().height() * 1.6))
         h_select_all.addWidget(btn_all)
         h_select_all.addWidget(btn_none)
         v_figs.addLayout(h_select_all)

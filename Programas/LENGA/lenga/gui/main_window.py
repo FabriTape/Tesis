@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -65,6 +65,21 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(DARK_STYLESHEET)
 
         self._init_ui()
+
+        # Al iniciar: cargar automáticamente el estado de los nodos (solicita login si hace falta)
+        QTimer.singleShot(400, self._auto_bootstrap)
+
+    def _auto_bootstrap(self) -> None:
+        """Carga la lista de nodos al arrancar sin requerir clicks adicionales.
+
+        Si ya hay conexión SSH (o modo simulación), consulta `sinfo`/`squeue`
+        directamente; si no, abre el diálogo de autenticación (al aceptar, la
+        lista se refresca sola).
+        """
+        if self.ssh_client.is_connected or self.ssh_client.mock_mode:
+            self.cluster_view.refresh_status()
+        else:
+            self.open_login_dialog()
 
     def _init_ui(self) -> None:
         """Construye los elementos de la barra superior, navegación por pestañas y footer."""
