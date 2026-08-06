@@ -1,5 +1,6 @@
 """verificar_polars.py -- Compara el pipeline Polars (generador_figuras.py)
-contra el pipeline Pandas original (erosion.py / erosion_49.py).
+contra el pipeline Pandas original (erosion.py / erosion_49.py, ahora en
+``Programas/legacy/``).
 
 Uso::
 
@@ -22,11 +23,14 @@ exponentes difieren del ``erosion.py`` original y esa diferencia es intencional.
 
 from __future__ import annotations
 
+import os
 import sys
 
 import numpy as np
 import pandas as pd
 import polars as pl
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "legacy"))
 
 import erosion
 import generador_figuras as gf

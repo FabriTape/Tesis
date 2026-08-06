@@ -5,7 +5,7 @@ Herramientas en **Python** para el análisis de simulaciones de **erosión en me
 1. **Simular**: lanzamiento de simulaciones LAMMPS de impacto de proyectil sobre una cama de partículas de sílice (modelo JKR), con envío a cluster vía Slurm.
 2. **Analizar**: pipeline **CARBOXI** que detecta la onda de choque, filtra las partículas erosionadas y calcula su coordinación y tamaño de cluster con **OVITO**.
 3. **Comparar**: evaluación de distintas estrategias de filtrado de erosión (`comparar_filtros`).
-4. **Estadística**: intervalos de confianza, distribuciones de clusters y figuras para la tesis (`ANALISIS`, `cluster/`).
+4. **Estadística**: intervalos de confianza, distribuciones de clusters y figuras para la tesis (`cluster/`).
 
 El nombre de las versiones sigue los dígitos de π: **3 → 3.1 → 3.14 → 3.141** … cada versión agrega un dígito de precisión (y un hito del proyecto). Ver [Releases](#lanzamientos).
 
@@ -49,18 +49,7 @@ Tesis/
     │   │   └── 9_mov/, 49_mov/      #     Ajustes, métricas y tablas LaTeX por set
     │   ├── figuras/                 #   PNGs de la tesis (9_mov/ y 49_mov/)
     │   ├── generador_figuras.py     #   Genera TODAS las figuras de la tesis (unifica 9 y 49, polars)
-    │   ├── verificar_polars.py      #   Verifica la equivalencia polars vs pandas
-    │   ├── erosion.py               #   Figuras de la tesis, set de 9 (original, pandas)
-    │   └── erosion_49.py            #   Figuras de la tesis, set de 49 (original, pandas)
-    │
-    ├── ANALISIS/                    # ─── P A S O  4 · ESTADÍSTICA ─────────────
-    │   ├── main.py                  #   Genera el PDF con figuras de la tesis
-    │   ├── constants.py             #   Rutas y parámetros globales
-    │   ├── data_loader.py           #   Carga del CSV mergeado de resultados
-    │   ├── kinematics_calc.py       #   Cálculos cinemáticos y grilla del heatmap
-    │   ├── cluster_calc.py          #   Tamaños y distribución de clusters
-    │   ├── confidence_intervals.py  #   Intervalos de confianza (MAD + SE/Student)
-    │   └── erosion_viz.py           #   Boxplot y heatmap de erosión
+    │   └── verificar_polars.py      #   Verifica la equivalencia polars vs pandas (vs legacy/)
     │
     ├── comparar_filtros/            # ─── P A S O  3 · VALIDACIÓN ──────────────
     │   ├── main.py                  #   Ejecuta la comparación de filtros
@@ -89,9 +78,11 @@ Tesis/
     │   ├── final/                   #   Últimos scripts de visualización de clusters
     │   ├── prueba_*.py              #   Scripts de prueba documentados
     │   ├── resume_controller.py     #   Retomar sims incompletas desde restart
-    │   └── slurm_resume.sh          #   Job Slurm para reanudar simulaciones
+    │   ├── slurm_resume.sh          #   Job Slurm para reanudar simulaciones
+    │   ├── erosion.py               #   Figuras de la tesis, set de 9 (previo a generador_figuras.py)
+    │   ├── erosion_49.py            #   Figuras de la tesis, set de 49 (previo a generador_figuras.py)
+    │   └── ANALISIS/                #   Análisis estadístico previo (pandas): main.py, CI, heatmaps
     │
-    ├── plan.md                      # Plan de refactor del pipeline de simulación
     └── resultados/                  # Salidas de CARBOXI (parquet + SVG)
 ```
 
@@ -130,14 +121,9 @@ Todo el barrido de parámetros se configura en `Programas/cluster/scripts/config
 python enqueue_sims.py
 ```
 
-### 3. Estadística y figuras para la tesis
+### 3. Figuras de la tesis
 
 ```bash
-# Análisis estadístico clásico (profundidades, intervalos de confianza, heatmaps)
-cd Programas/ANALISIS
-# Dependencias: pandas, matplotlib, seaborn, numpy, uncertainties
-python main.py
-
 # Figuras de la tesis a partir de los CSV mergeados (script unificado, polars)
 cd Programas/cluster
 python generador_figuras.py            # procesa ambos sets y genera todas las figuras
@@ -145,14 +131,14 @@ python generador_figuras.py 9_mov      # solo el set de 9 repeticiones
 python generador_figuras.py 49_mov     # solo el set de 49 repeticiones
 python generador_figuras.py 9_mov 49_mov --forzar  # regenera ignorando el caché
 
-# Chequeo de equivalencia con las versiones originales (pandas)
+# Chequeo de equivalencia con las versiones originales (pandas, en legacy/)
 python verificar_polars.py
 ```
 
-`generador_figuras.py` reemplaza a `erosion.py` y `erosion_49.py`: procesa los
-datos con **polars**, guarda los resultados intermedios en `datos/procesados/`
-(se reutilizan si no se fuerza la recarga) y escribe las figuras en
-`figuras/9_mov/` y `figuras/49_mov/`.
+`generador_figuras.py` reemplaza a `erosion.py` y `erosion_49.py` (ahora en
+`legacy/`): procesa los datos con **polars**, guarda los resultados intermedios
+en `datos/procesados/` (se reutilizan si no se fuerza la recarga) y escribe las
+figuras en `figuras/9_mov/` y `figuras/49_mov/`.
 
 ## Lanzamientos
 
