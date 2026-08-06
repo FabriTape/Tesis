@@ -6,6 +6,7 @@ Herramientas en **Python** para el análisis de simulaciones de **erosión en me
 2. **Analizar**: pipeline **CARBOXI** que detecta la onda de choque, filtra las partículas erosionadas y calcula su coordinación y tamaño de cluster con **OVITO**.
 3. **Comparar**: evaluación de distintas estrategias de filtrado de erosión (`comparar_filtros`).
 4. **Estadística**: intervalos de confianza, distribuciones de clusters y figuras para la tesis (`cluster/`).
+5. **LENGA**: plataforma con interfaz gráfica (GUI) que integra autenticación SSH, monitoreo de nodos del cluster, formulario de simulaciones, análisis CARBOXI, descargas SCP y generador de figuras.
 
 El nombre de las versiones sigue los dígitos de π: **3 → 3.1 → 3.14 → 3.141** … cada versión agrega un dígito de precisión (y un hito del proyecto). Ver [Releases](#lanzamientos).
 
@@ -21,8 +22,14 @@ Tesis/
 │   ├── Imagenes/                    #   Figuras comparativas (filtros con/sin tracking)
 │   └── resultados/                  #   CSVs de resultados de comparación de filtros
 └── Programas/                       # Todo el código
+    ├── LENGA/                       # ─── G U I  I N T E G R A D A ───────────────
+    │   ├── lenga/                   #   Paquete de la interfaz gráfica PyQt5
+    │   ├── datos/                   #   Resultados descargados
+    │   ├── figuras/                 #   Figuras generadas TAL CUAL
+    │   ├── run_lenga.sh             #   Script ejecutable del programa
+    │   └── lenga.desktop            #   Lanzador de escritorio
+    │
     ├── CARBOXI/                     # ─── P A S O  2 · ANÁLISIS ────────────────
-    │   │                            # Pipeline de análisis de erosión (paquete instalable)
     │   ├── __main__.py              #   `python -m CARBOXI [ruta]` (punto de entrada)
     │   ├── main_pipeline.py         #   Orquesta el pipeline: onda + OVITO + guardado
     │   ├── config_and_discovery.py  #   Config desde config.toml + descubre simulaciones
@@ -36,126 +43,70 @@ Tesis/
     │
     ├── cluster/                     # ─── P A S O  1 · SIMULACIÓN ──────────────
     │   ├── scripts/                 #   Scripts para correr sims en el cluster
-    │   │   ├── config.toml          #     Config central (barrido, material, filtros)
-    │   │   ├── read_config.py       #     TOML → variables de shell (config_vars.sh)
-    │   │   ├── encolar_sims.sh      #     Envía un job a Slurm por lote
-    │   │   ├── enqueue_sims.py      #     Controlador idempotente de sims
-    │   │   ├── run_erosion_bed_sims_lammps_move_np3.sh  # Lanzador LAMMPS con barrido
-    │   │   ├── slurm_submit_JKR.sh  #     Definición del job (nodos, partición)
-    │   │   └── collision_erosion_bed.input              # Input LAMMPS (JKR)
     │   ├── datas/                   #   Cajas de partículas generadas (.data)
     │   ├── datos/                   #   Resultados agregados (9 y 49 movimientos)
-    │   │   ├── procesados/          #     CSVs filtrados reutilizables (df_dist, df_cluster, …)
-    │   │   └── 9_mov/, 49_mov/      #     Ajustes, métricas y tablas LaTeX por set
     │   ├── figuras/                 #   PNGs de la tesis (9_mov/ y 49_mov/)
-    │   ├── generador_figuras.py     #   Genera TODAS las figuras de la tesis (unifica 9 y 49, polars)
-    │   └── verificar_polars.py      #   Verifica la equivalencia polars vs pandas (vs legacy/)
+    │   └── generador_figuras.py     #   Genera TODAS las figuras de la tesis (unifica 9 y 49, polars)
     │
-    ├── comparar_filtros/            # ─── P A S O  3 · VALIDACIÓN ──────────────
-    │   ├── main.py                  #   Ejecuta la comparación de filtros
-    │   ├── filtros.py               #   6 filtros: F1I/F1C, F2I/F2C, F3I/F3C
-    │   ├── lammps_reader.py         #   Lectura de dumps con polars
-    │   ├── metricas.py              #   Métricas por step con OVITO
-    │   ├── plots.py                 #   Gráficos comparativos
-    │   ├── solo_graficos.py         #   Regenera gráficos desde CSV ya calculados
-    │   └── run_all.py               #   Corre las variaciones de margen
-    │
-    ├── Ideas_de_implementacion/     # Prototipos y experimentos en curso
-    │   ├── fabric_tensor*.py        #   Tensor de fábrica (v1…v5) con OVITO
-    │   ├── crater_analisis.py       #   Análisis de cráteres
-    │   ├── aggregate_parquets.py    #   Agrega parquet de un filtro
-    │   ├── analisis_ocupacion.py    #   Ocupación del área XY por altura
-    │   ├── bayesian_sandbox.py      #   Modelos bayesianos (arviz/pymc)
-    │   ├── censored.py              #   Datos censurados (pymc)
-    │   └── plot_fabric.py           #   Grafica el tensor de fábrica
-    │
-    ├── legacy/                      # Scripts obsoletos o de prueba (referencia)
-    │   ├── analisis_Tesis.ipynb     #   Notebook de análisis original
-    │   ├── pdf_quitadas.py          #   Figuras removidas del pipeline principal
-    │   ├── analyze.py               #   Detección de formato y pipeline automático
-    │   ├── CARBOXIMINI/             #   Versión previa del pipeline de clusters
-    │   ├── solid/                   #   Módulos SOLID de un refactor descartado
-    │   ├── final/                   #   Últimos scripts de visualización de clusters
-    │   ├── prueba_*.py              #   Scripts de prueba documentados
-    │   ├── resume_controller.py     #   Retomar sims incompletas desde restart
-    │   ├── slurm_resume.sh          #   Job Slurm para reanudar simulaciones
-    │   ├── erosion.py               #   Figuras de la tesis, set de 9 (previo a generador_figuras.py)
-    │   ├── erosion_49.py            #   Figuras de la tesis, set de 49 (previo a generador_figuras.py)
-    │   └── ANALISIS/                #   Análisis estadístico previo (pandas): main.py, CI, heatmaps
-    │
-    └── resultados/                  # Salidas de CARBOXI (parquet + SVG)
+    └── comparar_filtros/            # ─── P A S O  3 · VALIDACIÓN ──────────────
 ```
+
+## LENGA — Plataforma Unificada GUI
+
+LENGA unifica el flujo completo de simulación, análisis y gráficos en una aplicación de escritorio PyQt5:
+
+1. **Autenticación SSH y Monitoreo del Cluster**:
+   - Inicio de sesión seguro vía SSH (correo/usuario y contraseña).
+   - Monitoreo en tiempo real de nodos del cluster (`sinfo`), uso de CPU/GPU y colas (`squeue`).
+   - Selección de nodos destino con validación estricta de **máximo 2 nodos**.
+
+2. **Lanzador de Simulaciones LAMMPS**:
+   - Formulario de parámetros (`fills`, `vels`, `angles`, `moves`, `orientations`, `np`, `nsteps`).
+   - Generación automática de `config.toml` y scripts SLURM (`sbatch`).
+
+3. **Análisis Automático con CARBOXI**:
+   - Ejecución remota de `CARBOXI` y `python -m CARBOXI.merge_all`.
+
+4. **Gestor de Descargas SCP**:
+   - Descarga automática hacia `LENGA/datos/`.
+
+5. **Generador y Visor Interactivo de Figuras**:
+   - Renderizado de figuras **TAL CUAL** `generador_figuras.py` con lienzo Matplotlib interactivo.
 
 ## Cómo empezar
 
-### 1. Análisis de simulaciones (CARBOXI)
+### 1. Ejecutar LENGA (GUI)
 
 ```bash
-# Instalar el paquete (dependencias: polars, ovito, matplotlib, numpy)
-pip install ./Programas/CARBOXI
+# Mediante el script ejecutable
+/home/tutturuu/Documentos/Universidad/Tesis/Programas/LENGA/run_lenga.sh
 
-# Procesar una carpeta de simulaciones LAMMPS
-python -m CARBOXI /ruta/a/simulaciones
-
-# Sin argumento: abre un navegador interactivo para elegir la carpeta
-python -m CARBOXI
-
-# Convertir trayectorias a formato OVITO
-python -m CARBOXI.trajectory_converter resultados.parquet --format dump
+# O mediante Python
+cd Programas/LENGA
+python3 -m lenga.main
 ```
 
-`CARBOXI` detecta automáticamente la onda de choque, filtra las partículas
-erosionadas (criterio **F3C** por defecto) y guarda resultados en `resultados/`
-como `.parquet` y gráficos SVG.
-
-### 2. Simulación en el cluster (LAMMPS + Slurm)
-
-Todo el barrido de parámetros se configura en `Programas/cluster/scripts/config.toml`
-(única fuente de verdad). Desde esa carpeta:
+### 2. Análisis de simulaciones (CARBOXI)
 
 ```bash
-# Enviar un lote de simulaciones a Slurm
-./encolar_sims.sh
-
-# Alternativa controlada por Python (idempotente, evita duplicados)
-python enqueue_sims.py
+python -m CARBOXI /ruta/a/simulaciones
 ```
 
 ### 3. Figuras de la tesis
 
 ```bash
-# Figuras de la tesis a partir de los CSV mergeados (script unificado, polars)
 cd Programas/cluster
-python generador_figuras.py            # procesa ambos sets y genera todas las figuras
-python generador_figuras.py 9_mov      # solo el set de 9 repeticiones
-python generador_figuras.py 49_mov     # solo el set de 49 repeticiones
-python generador_figuras.py 9_mov 49_mov --forzar  # regenera ignorando el caché
-
-# Chequeo de equivalencia con las versiones originales (pandas, en legacy/)
-python verificar_polars.py
+python generador_figuras.py
 ```
-
-`generador_figuras.py` reemplaza a `erosion.py` y `erosion_49.py` (ahora en
-`legacy/`): procesa los datos con **polars**, guarda los resultados intermedios
-en `datos/procesados/` (se reutilizan si no se fuerza la recarga) y escribe las
-figuras en `figuras/9_mov/` y `figuras/49_mov/`.
 
 ## Lanzamientos
 
 | Versión | Fecha | Qué incluye |
 |---------|-------|-------------|
-| [v3](https://github.com/FabriTape/Tesis/releases/tag/v3) | Dic 2025 | Lectura de datos con **parquet** en lugar de CSV (3 s → ~0.6 s). |
-| [v3.1](https://github.com/FabriTape/Tesis/releases/tag/v3.1) | Dic 2025 | Módulo **Lector** con **polars**, paralelización y cálculos con **OVITO**. |
-| [v3.14](https://github.com/FabriTape/Tesis/releases/tag/v3.14) | Mar 2026 | **CARBOXI**: pipeline automático (máquina de estados, config externalizada, detección de onda). |
-| [v3.141](https://github.com/FabriTape/Tesis/releases/tag/v3.141) | Ago 2026 | Estado actual: scripts de simulación unificados, comparación de filtros, análisis estadístico. |
-
-## Ramas
-
-- **`main`**: rama estable. Apunta al estado actual del trabajo.
-- **`desarrollo`**: rama de desarrollo activo (idéntica a `main` en este momento).
-
-Los experimentos descartados quedan archivados como tags `archive/*` para
-conservar su historial sin ensuciar las ramas.
+| [v3](https://github.com/FabriTape/Tesis/releases/tag/v3) | Dic 2025 | Lectura de datos con **parquet** en lugar de CSV. |
+| [v3.1](https://github.com/FabriTape/Tesis/releases/tag/v3.1) | Dic 2025 | Módulo **Lector** con **polars**, paralelización y **OVITO**. |
+| [v3.14](https://github.com/FabriTape/Tesis/releases/tag/v3.14) | Mar 2026 | **CARBOXI**: pipeline automático. |
+| [v3.141](https://github.com/FabriTape/Tesis/releases/tag/v3.141) | Ago 2026 | Estado actual: **LENGA GUI**, scripts de simulación unificados, gráficos TAL CUAL. |
 
 ## Licencia
 
