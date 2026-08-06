@@ -121,11 +121,12 @@ QTabWidget::pane {
 QTabBar::tab {
     background-color: #181825;
     color: #a6adc8;
-    padding: 10px 20px;
+    padding: 6px 14px;
     border-top-left-radius: 6px;
     border-top-right-radius: 6px;
     margin-right: 2px;
     font-weight: bold;
+    font-size: 12px;
 }
 
 QTabBar::tab:selected {

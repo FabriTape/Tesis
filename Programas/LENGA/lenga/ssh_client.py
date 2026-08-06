@@ -8,8 +8,8 @@ del sistema via pexpect / subprocess.
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
-import subprocess
 from typing import Callable, Optional, Tuple
 
 
@@ -110,7 +110,7 @@ class SSHClientManager:
         user_host = f"{self.username}@{self.host}"
         ssh_cmd = (
             f"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
-            f"-p {self.port} {user_host} {subprocess.list2cmdline([command])}"
+            f"-p {self.port} {user_host} {shlex.quote(command)}"
         )
 
         try:

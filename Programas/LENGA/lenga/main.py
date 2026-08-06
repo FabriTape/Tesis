@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication
 
 from lenga.gui.main_window import MainWindow
@@ -34,6 +35,10 @@ def main() -> None:
     Raises:
         SystemExit: Al finalizar la ejecución del bucle principal de la GUI.
     """
+    # 0. Habilitar escalado HiDPI antes de crear la QApplication (Qt5)
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+
     # 1. Configurar parser de argumentos de consola
     parser = argparse.ArgumentParser(
         description="LENGA: Plataforma Unificada de Simulación y Análisis de Medios Granulares."
@@ -51,9 +56,9 @@ def main() -> None:
     app.setApplicationName("LENGA Granular Physics Platform")
     app.setOrganizationName("Universidad de Chile / Tesis Granular")
 
-    # 3. Instanciar y desplegar ventana principal (MainWindow)
+    # 3. Instanciar y desplegar ventana principal (MainWindow) maximizada
     window = MainWindow(dry_run=args.dry_run)
-    window.show()
+    window.showMaximized()
 
     # 4. Entrar al bucle de eventos de la GUI
     sys.exit(app.exec_())

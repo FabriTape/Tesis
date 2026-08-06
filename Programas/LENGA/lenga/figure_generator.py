@@ -53,6 +53,8 @@ class FigureGeneratorEngine:
         "profundidad_dmean_proj": "Profundidad: Proyectil d_mean vs Move",
         "profundidad_Dmax_bed": "Profundidad: Lecho D_max vs Move",
         "profundidad_Dmean_bed": "Profundidad: Lecho D_mean vs Move",
+        "heatmap_rebote": "Rebote: Heatmap Np/phi vs Velocidad (masa %)",
+        "heatmap_erosion": "Erosión: Heatmap Np/phi vs Velocidad (%)",
     }
 
     def __init__(self, output_dir: Optional[Union[str, Path]] = None) -> None:
@@ -176,17 +178,20 @@ class FigureGeneratorEngine:
 
             elif fig_type == "erosion_dist":
                 gf.plot_erosion_distribution(cfg, df_dist)
-                img_path = fig_dir / "plot_erosion_distribution.png"
+                img_path = fig_dir / "plot_power_law_todos.png"
 
             elif fig_type == "erosion_violin":
                 gf.plot_erosion_violin(cfg, df_dist)
-                img_path = fig_dir / "plot_erosion_violin.png"
+                img_path = fig_dir / "plot_violin_erosion.png"
 
             elif fig_type == "cluster_size":
+                relleno = cfg["relleno"]
+                legend_y, bottom = (-0.07, 0.08) if not relleno else (-0.2, 0.11)
                 gf.plot_cluster_size_distribution(
-                    cfg, df_cluster, df_raw, cfg["relleno"], "plot_cluster_size_distribution.png", 0.95, 1e-4
+                    cfg, df_cluster, df_raw, relleno,
+                    "plot_PDF_por_vel_cluster.png", legend_y, bottom,
                 )
-                img_path = fig_dir / "plot_cluster_size_distribution.png"
+                img_path = fig_dir / "plot_PDF_por_vel_cluster.png"
 
             elif fig_type == "cluster_survival":
                 gf.plot_cluster_survival(cfg, df_cluster, df_raw)
@@ -194,11 +199,27 @@ class FigureGeneratorEngine:
 
             elif fig_type == "model_comparison":
                 gf.plot_model_comparison(cfg, df_cluster, df_raw)
-                img_path = fig_dir / "plot_model_comparison.png"
+                img_path = fig_dir / "plot_PDF_alternativos.png"
 
             elif fig_type == "model_survival_comp":
                 gf.plot_model_survival_comparison(cfg, df_cluster, df_raw)
-                img_path = fig_dir / "plot_model_survival_comparison.png"
+                img_path = fig_dir / "plot_model_survival.png"
+
+            elif fig_type == "heatmap_rebote":
+                pivot_rebote, _ = gf.tabla_rebote_proyectil(cfg, df_raw)
+                gf.graficar_heatmap(
+                    cfg, pivot_rebote * 100, "Proporción de masa %",
+                    fig_dir / "heatmap_rebote.png",
+                )
+                img_path = fig_dir / "heatmap_rebote.png"
+
+            elif fig_type == "heatmap_erosion":
+                pivot_erosion, _ = gf.tabla_porcentaje_proyectil(cfg, df_raw)
+                gf.graficar_heatmap(
+                    cfg, pivot_erosion, "Proporción de Erosión %",
+                    fig_dir / "heatmap_erosion.png",
+                )
+                img_path = fig_dir / "heatmap_erosion.png"
 
             elif fig_type == "profundidad_dmax_proj":
                 gf.plot_profundidad(

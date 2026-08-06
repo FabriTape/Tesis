@@ -59,6 +59,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("LENGA — Plataforma de Simulación y Análisis de Medios Granulares")
         self.resize(1150, 780)
+        self.setMinimumSize(960, 640)
 
         # Aplicar el tema oscuro global (Catppuccin Mocha / Dark stylesheet)
         self.setStyleSheet(DARK_STYLESHEET)
@@ -115,10 +116,14 @@ class MainWindow(QMainWindow):
         self.download_view = DownloadViewWidget(self.ssh_client)
         self.figures_view = FiguresViewWidget()
 
-        self.tabs.addTab(self.cluster_view, "🖥️ Estado Cluster & Nodos")
-        self.tabs.addTab(self.analysis_view, "🧪 Análisis CARBOXI & Merge")
-        self.tabs.addTab(self.download_view, "📥 Descarga SCP Resultados")
-        self.tabs.addTab(self.figures_view, "📊 Generador de Figuras")
+        tab_bar = self.tabs.tabBar()
+        tab_bar.setUsesScrollButtons(True)
+        tab_bar.setExpanding(False)
+
+        self.tabs.addTab(self.cluster_view, "Cluster y Nodos")
+        self.tabs.addTab(self.analysis_view, "Análisis CARBOXI")
+        self.tabs.addTab(self.download_view, "Descarga SCP")
+        self.tabs.addTab(self.figures_view, "Generador de Figuras")
 
         main_layout.addWidget(self.tabs)
 

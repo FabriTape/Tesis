@@ -1,5 +1,5 @@
-"""
-Shim de Compatibilidad Polars -> Pandas para LENGA.
+"""Shim de Compatibilidad Polars -> Pandas para LENGA.
+
 Permite ejecutar cluster.generador_figuras de forma nativa TAL CUAL incluso si
 el paquete 'polars' no se encuentra instalado en la instalación de Python.
 """
@@ -40,6 +40,75 @@ def ensure_polars():
                 return s
             return Expr(_alias)
 
+        def replace(self, old_val, new_val):
+            def _replace(df):
+                s = self(df)
+                return s.replace(old_val, new_val)
+            return Expr(_replace)
+
+        def fill_null(self, value):
+            def _fill(df):
+                s = self(df)
+                return s.fillna(value)
+            return Expr(_fill)
+
+        def is_null(self):
+            return Expr(lambda df: self(df).isna())
+
+        def is_not_null(self):
+            return Expr(lambda df: self(df).notna())
+
+        def is_not_nan(self):
+            return Expr(lambda df: ~self(df).isna())
+
+        def eq(self, val):
+            return Expr(lambda df: self(df) == val)
+
+        def mean(self):
+            return Expr(lambda df: self(df).mean())
+
+        def max(self):
+            return Expr(lambda df: self(df).max())
+
+        def min(self):
+            return Expr(lambda df: self(df).min())
+
+        def sum(self):
+            return Expr(lambda df: self(df).sum())
+
+        def std(self, ddof=1):
+            return Expr(lambda df: self(df).std(ddof=ddof))
+
+        def var(self, ddof=0):
+            return Expr(lambda df: self(df).var(ddof=ddof))
+
+        def n_unique(self):
+            return Expr(lambda df: self(df).nunique())
+
+        def cum_sum(self):
+            return Expr(lambda df: self(df).cumsum())
+
+        def shift(self, n=1):
+            return Expr(lambda df: self(df).shift(n))
+
+        def cast(self, dtype):
+            return self
+
+        def over(self, *args, **kwargs):
+            return self
+
+        def __add__(self, other):
+            return Expr(lambda df: self(df) + (other(df) if isinstance(other, Expr) else other))
+
+        def __sub__(self, other):
+            return Expr(lambda df: self(df) - (other(df) if isinstance(other, Expr) else other))
+
+        def __mul__(self, other):
+            return Expr(lambda df: self(df) * (other(df) if isinstance(other, Expr) else other))
+
+        def __truediv__(self, other):
+            return Expr(lambda df: self(df) / (other(df) if isinstance(other, Expr) else other))
+
         def __eq__(self, other):
             return Expr(lambda df: self(df) == (other(df) if isinstance(other, Expr) else other))
 
@@ -64,8 +133,22 @@ def ensure_polars():
         def __or__(self, other):
             return Expr(lambda df: self(df) | (other(df) if isinstance(other, Expr) else other))
 
+    class WhenExpr:
+        def __init__(self, cond_expr):
+            self.cond_expr = cond_expr
+
+        def then(self, val):
+            def _then(df):
+                cond_s = self.cond_expr(df) if isinstance(self.cond_expr, Expr) else self.cond_expr
+                val_s = val(df) if isinstance(val, Expr) else val
+                return pd.Series(np.where(cond_s, val_s, np.nan), index=df.index)
+            return Expr(_then)
+
     def col(name):
         return Expr(lambda df: df[name])
+
+    def when(cond):
+        return WhenExpr(cond)
 
     class PLSeries:
         def __init__(self, s):
@@ -91,6 +174,9 @@ def ensure_polars():
         def abs(self):
             return PLSeries(self._s.abs())
 
+        def replace(self, old_val, new_val):
+            return PLSeries(self._s.replace(old_val, new_val))
+
         def alias(self, name):
             s_new = self._s.copy()
             s_new.name = name
@@ -104,6 +190,9 @@ def ensure_polars():
 
         def is_not_null(self):
             return PLSeries(~self._s.isna())
+
+        def cast(self, dtype):
+            return self
 
         def __getitem__(self, item):
             res = self._s[item]
@@ -171,10 +260,12 @@ def ensure_polars():
     mod = types.ModuleType("polars")
     mod._is_shim = True
     mod.col = col
+    mod.when = when
     mod.lit = lambda x: Expr(lambda df: x)
     mod.Float32 = np.float32
     mod.Float64 = np.float64
     mod.Int64 = np.int64
+    mod.Utf8 = str
     mod.read_csv = lambda p, **kw: PLDataFrame(pd.read_csv(p, **kw))
     mod.DataFrame = PLDataFrame
     mod.concat = lambda dfs: PLDataFrame(pd.concat([d.to_pandas() for d in dfs], ignore_index=True))
