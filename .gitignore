@@ -14,6 +14,6 @@ date.sh
 __pycache__/
 *.pyc
 .cache/
-#./sims/__pycache__
-#sims/erosion_bed_SI_ff_0.35_np_1_vel_-10_angle_0_move_0_0_0/
-#sims/erosion_bed_SI_ff_0.35_np_1_vel_-10_angle_0_move_0_-3.04_0/
+.DS_Store
+figuras/*.png
+figuras/*.pdf
