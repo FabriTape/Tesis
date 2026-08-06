@@ -1,9 +1,11 @@
-"""
-Diálogo de Autenticación e Inicio de Sesión SSH para LENGA.
+"""Diálogo de Autenticación e Inicio de Sesión SSH para LENGA.
+
 Pide correo/usuario y contraseña para autenticar con el cluster de cómputo.
 """
 
 from __future__ import annotations
+
+from typing import Optional
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtWidgets import (
@@ -24,10 +26,26 @@ from lenga.ssh_client import SSHClientManager
 
 
 class ConnectionWorker(QThread):
-    """Thread en segundo plano para verificar credenciales SSH sin congelar la GUI."""
+    """Thread worker en segundo plano para autenticar con SSH sin bloquear la GUI.
+
+    Attributes:
+        finished_signal (pyqtSignal): Señal emitida al finalizar la prueba (exito: bool, msg: str).
+    """
     finished_signal = pyqtSignal(bool, str)
 
-    def __init__(self, ssh_client: SSHClientManager, host: str, port: int, user: str, password: str, mock: bool):
+    def __init__(
+        self, ssh_client: SSHClientManager, host: str, port: int, user: str, password: str, mock: bool
+    ) -> None:
+        """Inicializa el worker de autenticación.
+
+        Args:
+            ssh_client (SSHClientManager): Administrador SSH.
+            host (str): Servidor/Host.
+            port (int): Puerto SSH.
+            user (str): Correo o usuario SSH.
+            password (str): Contraseña SSH.
+            mock (bool): Modo simulación.
+        """
         super().__init__()
         self.ssh = ssh_client
         self.host = host
@@ -36,16 +54,28 @@ class ConnectionWorker(QThread):
         self.password = password
         self.mock = mock
 
-    def run(self):
+    def run(self) -> None:
+        """Ejecuta la prueba de conexión en el hilo secundario."""
         self.ssh.configure(self.host, self.port, self.user, self.password, mock_mode=self.mock)
         success, msg = self.ssh.test_connection()
         self.finished_signal.emit(success, msg)
 
 
 class LoginDialog(QDialog):
-    """Diálogo de inicio de sesión SSH."""
+    """Diálogo modal para solicitar credenciales de acceso SSH al cluster.
 
-    def __init__(self, ssh_client: SSHClientManager, parent: Optional[QWidget] = None):
+    Args:
+        ssh_client (SSHClientManager): Gestor de conexión SSH.
+        parent (Optional[QWidget]): Widget padre de la ventana.
+    """
+
+    def __init__(self, ssh_client: SSHClientManager, parent: Optional[QWidget] = None) -> None:
+        """Inicializa el diálogo de inicio de sesión.
+
+        Args:
+            ssh_client (SSHClientManager): Objeto cliente SSH.
+            parent (Optional[QWidget]): Padre del diálogo.
+        """
         super().__init__(parent)
         self.ssh = ssh_client
         self.setWindowTitle("Autenticación SSH — LENGA Cluster")
@@ -54,7 +84,8 @@ class LoginDialog(QDialog):
 
         self._init_ui()
 
-    def _init_ui(self):
+    def _init_ui(self) -> None:
+        """Construye los widgets del formulario de autenticación."""
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
         layout.setContentsMargins(25, 25, 25, 25)
@@ -89,7 +120,7 @@ class LoginDialog(QDialog):
         self.input_password.setPlaceholderText("Contraseña SSH")
 
         self.chk_mock = QCheckBox("Modo Simulación / Mock (desarrollo local sin cluster)")
-        self.chk_mock.setChecked(True)  # Habilitado por defecto para facilitar pruebas de desarrollo
+        self.chk_mock.setChecked(True)
 
         form_layout.addRow("Servidor / Host:", self.input_host)
         form_layout.addRow("Puerto SSH:", self.input_port)
@@ -118,7 +149,8 @@ class LoginDialog(QDialog):
         btn_layout.addWidget(self.btn_connect)
         layout.addLayout(btn_layout)
 
-    def _handle_connect(self):
+    def _handle_connect(self) -> None:
+        """Maneja el evento del botón Conectar e inicia la verificación asíncrona."""
         host = self.input_host.text().strip()
         port = self.input_port.value()
         user = self.input_user.text().strip()
@@ -137,7 +169,13 @@ class LoginDialog(QDialog):
         self.worker.finished_signal.connect(self._on_connection_finished)
         self.worker.start()
 
-    def _on_connection_finished(self, success: bool, msg: str):
+    def _on_connection_finished(self, success: bool, msg: str) -> None:
+        """Callback al finalizar el worker de conexión SSH.
+
+        Args:
+            success (bool): Si la autenticación fue exitosa.
+            msg (str): Mensaje devuelto por la verificación.
+        """
         self.btn_connect.setEnabled(True)
         if success:
             self.lbl_status.setText(msg)

@@ -1,6 +1,10 @@
-"""
-Ventana Principal Shell (MainWindow) para LENGA.
-Integra las pestañas de estado del cluster, análisis CARBOXI, descarga SCP y generador de figuras.
+"""Ventana Principal Shell (MainWindow) para LENGA.
+
+Integra en una interfaz gráfica por pestañas los módulos de:
+1. Estado del Cluster & Monitoreo de Nodos.
+2. Análisis Remoto con CARBOXI & Consolidación CSV.
+3. Gestor de Descarga SCP de Resultados.
+4. Generador e Inspector Interactivo de Figuras.
 """
 
 from __future__ import annotations
@@ -33,9 +37,18 @@ from lenga.ssh_client import SSHClientManager
 
 
 class MainWindow(QMainWindow):
-    """Ventana Principal de la Aplicación LENGA."""
+    """Ventana Principal de la Aplicación LENGA.
 
-    def __init__(self, dry_run: bool = False):
+    Args:
+        dry_run (bool): Si es True, inicia la aplicación directamente en modo simulación (Mock).
+    """
+
+    def __init__(self, dry_run: bool = False) -> None:
+        """Inicializa la ventana principal.
+
+        Args:
+            dry_run (bool): Modo simulación sin requerir credenciales reales SSH.
+        """
         super().__init__()
         self.ssh_client = SSHClientManager()
         if dry_run:
@@ -47,12 +60,13 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("LENGA — Plataforma de Simulación y Análisis de Medios Granulares")
         self.resize(1150, 780)
 
-        # Aplicar tema oscuro
+        # Aplicar el tema oscuro global (Catppuccin Mocha / Dark stylesheet)
         self.setStyleSheet(DARK_STYLESHEET)
 
         self._init_ui()
 
-    def _init_ui(self):
+    def _init_ui(self) -> None:
+        """Construye los elementos de la barra superior, navegación por pestañas y footer."""
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
@@ -61,7 +75,7 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(12)
 
         # ---------------------------------------------------------------------
-        # TOP TOOLBAR & HEADER BAR
+        # BARRA SUPERIOR DE HERRAMIENTAS Y ESTADO DE SESIÓN SSH
         # ---------------------------------------------------------------------
         top_bar = QHBoxLayout()
 
@@ -75,7 +89,7 @@ class MainWindow(QMainWindow):
 
         top_bar.addStretch()
 
-        # SSH Status Badge
+        # Insignia de estado de la conexión SSH
         self.lbl_ssh_status = QLabel("SSH: Desconectado")
         self.lbl_ssh_status.setObjectName("BadgeWarning")
         top_bar.addWidget(self.lbl_ssh_status)
@@ -92,7 +106,7 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(top_bar)
 
         # ---------------------------------------------------------------------
-        # TAB NAVIGATION WIDGET
+        # PANEL DE NAVEGACIÓN POR PESTAÑAS (QTabWidget)
         # ---------------------------------------------------------------------
         self.tabs = QTabWidget()
 
@@ -109,7 +123,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.tabs)
 
         # ---------------------------------------------------------------------
-        # STATUS BAR FOOTER
+        # BARRA DE ESTADO INFERIOR
         # ---------------------------------------------------------------------
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
@@ -117,13 +131,15 @@ class MainWindow(QMainWindow):
 
         self.update_ssh_status_badge()
 
-    def open_login_dialog(self):
+    def open_login_dialog(self) -> None:
+        """Abre el diálogo modal de autenticación SSH."""
         dlg = LoginDialog(self.ssh_client, parent=self)
         if dlg.exec_() == LoginDialog.Accepted:
             self.update_ssh_status_badge()
             self.cluster_view.refresh_status()
 
-    def open_simulation_dialog(self):
+    def open_simulation_dialog(self) -> None:
+        """Abre la ventana modal del formulario para parametrizar y enviar simulaciones."""
         if not self.ssh_client.is_connected and not self.ssh_client.mock_mode:
             res = QMessageBox.question(
                 self,
@@ -140,7 +156,8 @@ class MainWindow(QMainWindow):
         dlg = SimulationDialog(self.cluster_mgr, self.cluster_view.cached_nodes, parent=self)
         dlg.exec_()
 
-    def update_ssh_status_badge(self):
+    def update_ssh_status_badge(self) -> None:
+        """Actualiza la insignia visual del estado de la conexión SSH en la barra superior."""
         if self.ssh_client.is_connected:
             mode_str = " (Mock)" if self.ssh_client.mock_mode else ""
             self.lbl_ssh_status.setText(f"✓ SSH: Conectado a {self.ssh_client.host}{mode_str}")

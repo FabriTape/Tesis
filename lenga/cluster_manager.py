@@ -1,7 +1,8 @@
-"""
-Gestor de Nodos y Generador de Trabajos SLURM para LENGA.
-Parsea comandos de sinfo/squeue, valida la regla de máximo 2 nodos por envío
-y construye las configuraciones de experimentos en TOML / SLURM.
+"""Gestor de Nodos y Generador de Trabajos SLURM para LENGA.
+
+Este módulo consulta y parsea la información de recursos del cluster mediante
+los comandos SLURM `sinfo` y `squeue`, valida la regla de selección de máximo 2 nodos
+y construye archivos de configuración TOML / SLURM para el envío de simulaciones.
 """
 
 from __future__ import annotations
@@ -16,11 +17,22 @@ from lenga.ssh_client import SSHClientManager
 
 @dataclass
 class ClusterNode:
-    """Información de estado de un nodo del cluster."""
+    """Representa la información y estado operativo de un nodo del cluster.
+
+    Attributes:
+        name (str): Nombre único del nodo (ej. 'gpu2', 'toko04').
+        partition (str): Partición a la que pertenece ('gpu', 'XL', 'cpu').
+        state_raw (str): Estado bruto devuelto por SLURM ('idle', 'alloc', 'mix').
+        state_display (str): Estado formateado para la GUI ('Libre', 'Ocupado', 'Mixto', 'No disponible').
+        cpus (str): Cantidad o especificación de CPUs.
+        gpus (str): Especificación de GPUs.
+        active_jobs (int): Número de trabajos actualmente ejecutándose en el nodo.
+        selected (bool): Indica si el nodo fue seleccionado por el usuario.
+    """
     name: str
     partition: str
     state_raw: str
-    state_display: str  # 'Libre', 'Ocupado', 'Mixto', 'No disponible'
+    state_display: str
     cpus: str = "N/A"
     gpus: str = "N/A"
     active_jobs: int = 0
@@ -28,13 +40,39 @@ class ClusterNode:
 
     @property
     def is_available(self) -> bool:
+        """Indica si el nodo está disponible para recibir nuevos trabajos.
+
+        Returns:
+            bool: True si el estado es 'Libre' o 'Mixto'.
+        """
         return self.state_display in ("Libre", "Mixto")
 
 
 @dataclass
 class SimulationConfig:
-    """Parámetros de configuración para el envío de simulaciones LAMMPS."""
-    # Parámetros del experimento
+    """Estructura de datos para parametrizar experimentos granulares en LAMMPS.
+
+    Attributes:
+        fills (List[float]): Lista de fracciones de llenado del lecho (ej. [0.15, 0.35]).
+        vels (List[float]): Lista de velocidades de impacto [m/s].
+        angles (List[float]): Lista de ángulos de impacto en grados.
+        moves (List[int]): Lista de desplazamientos discretos del grano.
+        orientations (List[str]): Orientaciones de rotación del lecho.
+        np_proyectil (int): Cantidad de partículas en el proyectil.
+        nsteps (int): Total de pasos (timesteps) a simular.
+        young_modulus (float): Módulo de Young del material [Pa].
+        poisson (float): Coeficiente de Poisson.
+        surface_energy (float): Energía superficial modelo JKR [J/m²].
+        density (float): Densidad del material [kg/m³].
+        ndumps (int): Frecuencia de escritura de dumps [timesteps].
+        nthermo (int): Frecuencia de escritura de thermo [timesteps].
+        timestep (float): Paso de integración temporal [s].
+        grain_radius_um (float): Radio del grano [μm].
+        selected_nodes (List[str]): Nodos del cluster seleccionados por el usuario.
+        partition (str): Partición SLURM elegida.
+        tasks_per_node (int): Tareas concurrentes por nodo.
+        remote_base_dir (str): Directorio raíz en el servidor remoto.
+    """
     fills: List[float] = field(default_factory=lambda: [0.15])
     vels: List[float] = field(default_factory=lambda: [-50.0])
     angles: List[float] = field(default_factory=lambda: [90.0])
@@ -43,34 +81,46 @@ class SimulationConfig:
     np_proyectil: int = 1
     nsteps: int = 2000000
 
-    # Propiedades del material (Sílice)
+    # Propiedades mecánicas y físicas del material (Sílice)
     young_modulus: float = 70.0e9
     poisson: float = 0.17
     surface_energy: float = 0.025
     density: float = 2000.0
 
-    # Configuración de simulación
+    # Configuración base de simulación
     ndumps: int = 25000
     nthermo: int = 5000
     timestep: float = 5e-11
     grain_radius_um: float = 0.76
 
-    # SLURM / Nodos
+    # SLURM / Nodos destino
     selected_nodes: List[str] = field(default_factory=lambda: ["gpu2"])
     partition: str = "gpu"
     tasks_per_node: int = 8
     remote_base_dir: str = "/home/fbazzoni"
 
     def validate_node_selection(self) -> Tuple[bool, str]:
-        """Valida que la cantidad de nodos seleccionados sea máximo 2."""
+        """Valida que la cantidad de nodos elegidos cumpla con el límite (Máximo 2 nodos).
+
+        Returns:
+            Tuple[bool, str]: Tupla con (es_valido: bool, mensaje: str).
+        """
         if not self.selected_nodes:
             return False, "Debe seleccionar al menos 1 nodo para enviar simulaciones."
         if len(self.selected_nodes) > 2:
-            return False, f"Límite excedido: Seleccionó {len(self.selected_nodes)} nodos. Máximo permitido: 2 nodos."
+            return (
+                False,
+                f"Límite excedido: Seleccionó {len(self.selected_nodes)} nodos. "
+                f"El máximo permitido es 2 nodos."
+            )
         return True, f"Nodos seleccionados ({len(self.selected_nodes)}/2): {', '.join(self.selected_nodes)}"
 
     def to_toml_string(self) -> str:
-        """Genera el contenido del archivo config.toml para enqueue_sims.py."""
+        """Genera el contenido del archivo TOML de configuración para encolar trabajos.
+
+        Returns:
+            str: Cadena formateada en TOML compatible con enqueue_sims.py.
+        """
         nodes_str = ", ".join([f'"{n}"' for n in self.selected_nodes])
         fills_str = ", ".join([str(f) for f in self.fills])
         vels_str = ", ".join([str(v) for v in self.vels])
@@ -120,27 +170,50 @@ nsteps       = [{self.nsteps}]
 
 
 class ClusterManager:
-    """Administra la consulta de recursos y envío de simulaciones al cluster."""
+    """Administra la consulta de recursos y envío de simulaciones al cluster.
 
-    def __init__(self, ssh_client: SSHClientManager):
+    Args:
+        ssh_client (SSHClientManager): Cliente SSH configurado para enviar comandos.
+    """
+
+    def __init__(self, ssh_client: SSHClientManager) -> None:
+        """Inicializa el administrador del cluster.
+
+        Args:
+            ssh_client (SSHClientManager): Instancia del administrador de conexiones SSH.
+        """
         self.ssh = ssh_client
 
     def fetch_nodes_status(self) -> Tuple[bool, List[ClusterNode], str]:
-        """Consulta sinfo y squeue para obtener la lista de nodos y su estado."""
+        """Consulta comandos sinfo y squeue para obtener la lista de nodos y su estado.
+
+        Returns:
+            Tuple[bool, List[ClusterNode], str]: Tupla con (exito, lista_nodos, mensaje).
+        """
+        # 1. Ejecutar sinfo para obtener lista de nodos y particiones
         success_sinfo, out_sinfo, err_sinfo = self.ssh.run_command("sinfo --format='%N|%P|%T|%c|%G'")
         if not success_sinfo:
-            # Fallback a sinfo estándar
             success_sinfo, out_sinfo, err_sinfo = self.ssh.run_command("sinfo")
             if not success_sinfo:
-                return False, [], f"Error al ejecutar sinfo: {err_sinfo}"
+                return False, [], f"Error al ejecutar sinfo en el cluster: {err_sinfo}"
 
+        # 2. Ejecutar squeue para contar trabajos activos por nodo
         success_sq, out_sq, _ = self.ssh.run_command("squeue --format='%i|%P|%j|%u|%t|%M|%D|%R'")
         active_jobs_per_node = self._parse_squeue_jobs(out_sq if success_sq else "")
 
+        # 3. Parsear resultado de sinfo y estructurar lista de ClusterNode
         nodes = self._parse_sinfo_output(out_sinfo, active_jobs_per_node)
-        return True, nodes, "Estado de nodos actualizado."
+        return True, nodes, "Estado de nodos del cluster actualizado correctamente."
 
     def _parse_squeue_jobs(self, squeue_out: str) -> Dict[str, int]:
+        """Parsea la salida del comando squeue para contabilizar trabajos activos por nodo.
+
+        Args:
+            squeue_out (str): Salida del comando squeue.
+
+        Returns:
+            Dict[str, int]: Diccionario con nombre_nodo -> cantidad_trabajos.
+        """
         jobs_count: Dict[str, int] = {}
         lines = squeue_out.strip().splitlines()
         for line in lines[1:]:
@@ -154,6 +227,15 @@ class ClusterManager:
         return jobs_count
 
     def _parse_sinfo_output(self, sinfo_out: str, active_jobs: Dict[str, int]) -> List[ClusterNode]:
+        """Parsea la salida de sinfo y construye objetos ClusterNode.
+
+        Args:
+            sinfo_out (str): Salida en texto plano de sinfo.
+            active_jobs (Dict[str, int]): Conteo de trabajos por nodo.
+
+        Returns:
+            List[ClusterNode]: Lista de objetos de estado de nodos.
+        """
         nodes_dict: Dict[str, ClusterNode] = {}
         lines = sinfo_out.strip().splitlines()
         if not lines:
@@ -194,7 +276,7 @@ class ClusterManager:
             else:
                 display = "No disponible"
 
-            # Expandir nombres de nodo simples o listas
+            # Expandir nombres de nodo si vienen en rango (ej. node[01-03])
             for n_name in self._expand_nodelist(node_names):
                 if n_name not in nodes_dict:
                     nodes_dict[n_name] = ClusterNode(
@@ -210,7 +292,14 @@ class ClusterManager:
         return list(nodes_dict.values())
 
     def _expand_nodelist(self, nodelist_str: str) -> List[str]:
-        """Expande sintaxis compacta de SLURM como node[01-03] a ['node01', 'node02', 'node03']."""
+        """Expande la sintaxis compacta de rangos de nodos de SLURM.
+
+        Args:
+            nodelist_str (str): Cadena de lista de nodos (ej. 'node[01-03]').
+
+        Returns:
+            List[str]: Lista con los nombres individuales de cada nodo.
+        """
         if "[" not in nodelist_str:
             return [n.strip() for n in nodelist_str.split(",") if n.strip()]
 
@@ -232,19 +321,27 @@ class ClusterManager:
         return result
 
     def submit_simulations(self, config: SimulationConfig) -> Tuple[bool, str]:
-        """Valida y envía el job de simulación al cluster."""
+        """Valida las restricciones y envía el trabajo de simulación al cluster.
+
+        Args:
+            config (SimulationConfig): Configuración del experimento.
+
+        Returns:
+            Tuple[bool, str]: Tupla con (exito: bool, respuesta: str).
+        """
+        # 1. Validar la restricción estricta de máximo 2 nodos seleccionados
         valid, msg = config.validate_node_selection()
         if not valid:
             return False, msg
 
+        # 2. Generar el contenido del archivo TOML
         toml_content = config.to_toml_string()
         remote_dir = f"{config.remote_base_dir}/lenga_jobs"
         remote_toml_path = f"{remote_dir}/config_lenga.toml"
 
-        # Crear carpeta remota y subir config.toml
         self.ssh.run_command(f"mkdir -p {remote_dir}")
         
-        # Guardar archivo local temporal para subirlo
+        # 3. Guardar archivo temporal local y subir vía SCP
         import tempfile
         with tempfile.NamedTemporaryFile("w", suffix=".toml", delete=False) as tf:
             tf.write(toml_content)
@@ -253,18 +350,21 @@ class ClusterManager:
         try:
             success, up_msg = self.ssh.upload_file(temp_local, remote_toml_path)
             if not success:
-                return False, f"Fallo al cargar config.toml: {up_msg}"
+                return False, f"Fallo al cargar config.toml en el servidor remoto: {up_msg}"
         finally:
             if os.path.exists(temp_local):
                 os.remove(temp_local)
 
-        # Enviar script a la cola SLURM
-        sbatch_cmd = f"cd {config.remote_base_dir}/cluster/scripts && sbatch --nodelist={','.join(config.selected_nodes)} slurm_submit_JKR.sh"
+        # 4. Enviar el script a la cola de trabajos SLURM (sbatch)
+        sbatch_cmd = (
+            f"cd {config.remote_base_dir}/cluster/scripts && "
+            f"sbatch --nodelist={','.join(config.selected_nodes)} slurm_submit_JKR.sh"
+        )
         if self.ssh.mock_mode:
             sbatch_cmd = f"echo 'Enviado job mock a nodos {config.selected_nodes}'"
 
         success_sb, stdout_sb, stderr_sb = self.ssh.run_command(sbatch_cmd)
         if success_sb:
-            return True, f"Simulaciones lanzadas con éxito en nodos {config.selected_nodes}.\nRespuesta: {stdout_sb.strip()}"
+            return True, f"Simulaciones lanzadas con éxito en nodos {config.selected_nodes}.\n{stdout_sb.strip()}"
         else:
-            return False, f"Error al enviar sbatch: {stderr_sb.strip()}"
+            return False, f"Error al ejecutar sbatch en el cluster: {stderr_sb.strip()}"

@@ -1,6 +1,8 @@
-"""
-Gestor de conexiones SSH y transferencias SCP para LENGA.
-Soporta autenticación mediante usuario/correo y contraseña usando pexpect / subprocess.
+"""Gestor de conexiones SSH y transferencias SCP para LENGA.
+
+Este módulo implementa el cliente de comunicación seguro con el cluster de cómputo,
+soportando autenticación por usuario/correo y contraseña utilizando las herramientas
+del sistema via pexpect / subprocess.
 """
 
 from __future__ import annotations
@@ -12,9 +14,26 @@ from typing import Callable, Optional, Tuple
 
 
 class SSHClientManager:
-    """Administra conexiones SSH y transferencias SCP con el cluster de cómputo."""
+    """Administra la sesión SSH, comandos remotos y transferencias SCP con el cluster.
 
-    def __init__(self, host: str = "", port: int = 22, username: str = "", password: str = ""):
+    Attributes:
+        host (str): Dirección IP o hostname del cluster SSH.
+        port (int): Puerto de la conexión SSH (default: 22).
+        username (str): Usuario o correo de inicio de sesión SSH.
+        password (str): Contraseña del usuario SSH.
+        is_connected (bool): Indica si se verificó exitosamente la sesión SSH.
+        mock_mode (bool): Si es True, simula comandos locales sin conectar a internet/SSH.
+    """
+
+    def __init__(self, host: str = "", port: int = 22, username: str = "", password: str = "") -> None:
+        """Inicializa el administrador de clientes SSH con credenciales opcionales.
+
+        Args:
+            host (str): Servidor/Host SSH.
+            port (int): Puerto SSH (default: 22).
+            username (str): Usuario o correo SSH.
+            password (str): Contraseña del usuario SSH.
+        """
         self.host = host.strip()
         self.port = port
         self.username = username.strip()
@@ -22,8 +41,21 @@ class SSHClientManager:
         self.is_connected = False
         self.mock_mode = False
 
-    def configure(self, host: str, port: int, username: str, password: str, mock_mode: bool = False):
-        """Actualiza las credenciales de conexión SSH."""
+    def configure(
+        self, host: str, port: int, username: str, password: str, mock_mode: bool = False
+    ) -> None:
+        """Configura y actualiza las credenciales de la sesión SSH activa.
+
+        Args:
+            host (str): Servidor o IP del cluster.
+            port (int): Puerto SSH.
+            username (str): Correo o usuario SSH.
+            password (str): Contraseña SSH.
+            mock_mode (bool): Si es True, activa el modo simulación local sin cluster.
+
+        Returns:
+            None
+        """
         self.host = host.strip()
         self.port = port
         self.username = username.strip()
@@ -32,50 +64,72 @@ class SSHClientManager:
         self.is_connected = False
 
     def test_connection(self) -> Tuple[bool, str]:
-        """Verifica la conectividad SSH con las credenciales actuales."""
+        """Prueba la conectividad SSH ejecutando un comando de diagnóstico remoto.
+
+        Returns:
+            Tuple[bool, str]: Tupla con (éxito: bool, mensaje_resultado: str).
+
+        Raises:
+            None
+        """
+        # 1. En modo simulación (mock), retornar éxito inmediatamente
         if self.mock_mode:
             self.is_connected = True
-            return True, "Conexión SSH exitosa (Modo Simulación / Mock)"
+            return True, "Conexión SSH exitosa (Modo Simulación / Mock local)."
 
+        # 2. Validar que host y usuario no estén vacíos
         if not self.host or not self.username:
-            return False, "Host y Usuario/Correo son requeridos."
+            return False, "Host y Usuario/Correo son requeridos para la conexión SSH."
 
+        # 3. Ejecutar comando de prueba 'echo SSH OK'
         success, stdout, stderr = self.run_command("echo 'SSH OK'")
         if success and "SSH OK" in stdout:
             self.is_connected = True
-            return True, "Conexión SSH establecida correctamente."
+            return True, "Conexión SSH establecida correctamente con el cluster."
         else:
             self.is_connected = False
             error_msg = stderr.strip() if stderr else "No se pudo autenticar o conectar al servidor SSH."
             return False, error_msg
 
     def run_command(self, command: str, timeout: int = 60) -> Tuple[bool, str, str]:
+        """Ejecuta un comando remoto vía SSH respondiendo automáticamente a la contraseña.
+
+        Args:
+            command (str): Comando bash a ejecutar en el servidor remoto.
+            timeout (int): Tiempo máximo de espera en segundos (default: 60).
+
+        Returns:
+            Tuple[bool, str, str]: Tupla con (éxito: bool, stdout: str, stderr: str).
         """
-        Ejecuta un comando remoto vía SSH.
-        Retorna (exito, stdout, stderr).
-        """
+        # 1. Redirigir si está activado el modo simulación
         if self.mock_mode:
             return self._mock_command(command)
 
         import pexpect
 
         user_host = f"{self.username}@{self.host}"
-        ssh_cmd = f"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p {self.port} {user_host} {subprocess.list2cmdline([command])}"
+        ssh_cmd = (
+            f"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
+            f"-p {self.port} {user_host} {subprocess.list2cmdline([command])}"
+        )
 
         try:
+            # 2. Iniciar proceso pexpect e interactuar con la consola SSH
             child = pexpect.spawn(ssh_cmd, encoding="utf-8", timeout=timeout)
-            i = child.expect([
+            index = child.expect([
                 r"[pP]assword:",
                 r"Are you sure you want to continue connecting",
                 pexpect.EOF,
                 pexpect.TIMEOUT
             ])
             
-            if i == 1:
+            # Confirmar fingerprint si es primera conexión
+            if index == 1:
                 child.sendline("yes")
-                i = child.expect([r"[pP]assword:", pexpect.EOF, pexpect.TIMEOUT])
+                index = child.expect([r"[pP]assword:", pexpect.EOF, pexpect.TIMEOUT])
 
-            if i == 0:
+            # Responder contraseña si es solicitada
+            if index == 0:
                 child.sendline(self.password)
                 child.expect(pexpect.EOF)
                 output = child.before
@@ -84,7 +138,7 @@ class SSHClientManager:
                     return True, output, ""
                 else:
                     return False, output, f"Exit code {child.exitstatus}"
-            elif i == 2:
+            elif index == 2:
                 output = child.before
                 child.close()
                 if child.exitstatus == 0:
@@ -93,19 +147,28 @@ class SSHClientManager:
                     return False, output, f"Exit status {child.exitstatus}"
             else:
                 child.close()
-                return False, "", "Tiempo de espera agotado (Timeout en SSH)"
+                return False, "", "Tiempo de espera agotado (Timeout en SSH)."
 
-        except Exception as e:
-            return False, "", str(e)
+        except Exception as err:
+            return False, "", str(err)
 
     def download_file(
         self, remote_path: str, local_path: str, progress_callback: Optional[Callable[[str], None]] = None
     ) -> Tuple[bool, str]:
-        """Descarga un archivo o carpeta remota usando SCP."""
+        """Descarga un archivo o directorio remoto usando el protocolo SCP.
+
+        Args:
+            remote_path (str): Ruta absoluta o relativa del archivo remoto en el cluster.
+            local_path (str): Ruta de destino en el sistema de archivos local.
+            progress_callback (Optional[Callable[[str], None]]): Callback para reportar el progreso.
+
+        Returns:
+            Tuple[bool, str]: Tupla con (exito: bool, mensaje: str).
+        """
         if self.mock_mode:
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
             if progress_callback:
-                progress_callback("Descarga simulada completada.")
+                progress_callback("Descarga SCP simulada completada.")
             return True, f"Descarga simulada de {remote_path} a {local_path} exitosa."
 
         import pexpect
@@ -119,9 +182,9 @@ class SSHClientManager:
                 progress_callback(f"Iniciando descarga SCP de {remote_path}...")
                 
             child = pexpect.spawn(scp_cmd, encoding="utf-8", timeout=300)
-            i = child.expect([r"[pP]assword:", pexpect.EOF, pexpect.TIMEOUT])
+            index = child.expect([r"[pP]assword:", pexpect.EOF, pexpect.TIMEOUT])
             
-            if i == 0:
+            if index == 0:
                 child.sendline(self.password)
                 child.expect(pexpect.EOF)
                 child.close()
@@ -131,7 +194,7 @@ class SSHClientManager:
                     return True, f"Archivo descargado en {local_path}"
                 else:
                     return False, f"Error en SCP (código {child.exitstatus}): {child.before}"
-            elif i == 1:
+            elif index == 1:
                 child.close()
                 if child.exitstatus == 0:
                     return True, f"Archivo descargado en {local_path}"
@@ -139,13 +202,21 @@ class SSHClientManager:
                     return False, f"Error SCP: {child.before}"
             else:
                 child.close()
-                return False, "Timeout durante la descarga SCP."
+                return False, "Timeout durante la transferencia SCP."
 
-        except Exception as e:
-            return False, f"Error en transferencia SCP: {str(e)}"
+        except Exception as err:
+            return False, f"Error en transferencia SCP: {str(err)}"
 
     def upload_file(self, local_path: str, remote_path: str) -> Tuple[bool, str]:
-        """Sube un archivo o carpeta local hacia el cluster usando SCP."""
+        """Sube un archivo o carpeta local hacia el cluster de cómputo usando SCP.
+
+        Args:
+            local_path (str): Ruta del archivo o carpeta local a transferir.
+            remote_path (str): Ruta remota de destino en el cluster.
+
+        Returns:
+            Tuple[bool, str]: Tupla con (exito: bool, mensaje: str).
+        """
         if self.mock_mode:
             return True, f"Carga simulada de {local_path} a {remote_path} exitosa."
 
@@ -156,9 +227,9 @@ class SSHClientManager:
 
         try:
             child = pexpect.spawn(scp_cmd, encoding="utf-8", timeout=300)
-            i = child.expect([r"[pP]assword:", pexpect.EOF, pexpect.TIMEOUT])
+            index = child.expect([r"[pP]assword:", pexpect.EOF, pexpect.TIMEOUT])
             
-            if i == 0:
+            if index == 0:
                 child.sendline(self.password)
                 child.expect(pexpect.EOF)
                 child.close()
@@ -166,7 +237,7 @@ class SSHClientManager:
                     return True, f"Archivo cargado en {remote_path}"
                 else:
                     return False, f"Error en subida SCP: {child.before}"
-            elif i == 1:
+            elif index == 1:
                 child.close()
                 if child.exitstatus == 0:
                     return True, f"Archivo cargado en {remote_path}"
@@ -176,11 +247,18 @@ class SSHClientManager:
                 child.close()
                 return False, "Timeout durante la subida SCP."
 
-        except Exception as e:
-            return False, f"Error en subida SCP: {str(e)}"
+        except Exception as err:
+            return False, f"Error en subida SCP: {str(err)}"
 
     def _mock_command(self, command: str) -> Tuple[bool, str, str]:
-        """Respuestas simuladas para desarrollo local sin conexión real a cluster."""
+        """Genera respuestas simuladas para desarrollo local sin conexión al cluster.
+
+        Args:
+            command (str): Comando simulado.
+
+        Returns:
+            Tuple[bool, str, str]: Salida simulada (exito, stdout, stderr).
+        """
         if "sinfo" in command:
             mock_sinfo = (
                 "PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST\n"

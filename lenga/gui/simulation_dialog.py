@@ -1,7 +1,7 @@
-"""
-Ventana Modal / Formulario de Envío de Simulaciones LAMMPS para LENGA.
+"""Ventana Modal / Formulario de Envío de Simulaciones LAMMPS para LENGA.
+
 Permite configurar los parámetros del experimento granular y seleccionar los nodos destino
-(enforzando la restricción de seleccionar MÁXIMO 2 NODOS).
+(enforzando la restricción estricta de seleccionar MÁXIMO 2 NODOS).
 """
 
 from __future__ import annotations
@@ -32,9 +32,24 @@ from lenga.cluster_manager import ClusterManager, ClusterNode, SimulationConfig
 
 
 class SimulationDialog(QDialog):
-    """Ventana de Formulario para configurar y lanzar simulaciones."""
+    """Ventana modal de formulario para parametrizar y lanzar simulaciones granulares.
 
-    def __init__(self, cluster_mgr: ClusterManager, available_nodes: List[ClusterNode], parent: Optional[QWidget] = None):
+    Args:
+        cluster_mgr (ClusterManager): Instancia del gestor de cluster SLURM.
+        available_nodes (List[ClusterNode]): Lista de nodos detectados en el cluster.
+        parent (Optional[QWidget]): Widget padre de la ventana modal.
+    """
+
+    def __init__(
+        self, cluster_mgr: ClusterManager, available_nodes: List[ClusterNode], parent: Optional[QWidget] = None
+    ) -> None:
+        """Inicializa el formulario de simulaciones.
+
+        Args:
+            cluster_mgr (ClusterManager): Gestor del cluster.
+            available_nodes (List[ClusterNode]): Nodos conocidos del cluster.
+            parent (Optional[QWidget]): Widget padre.
+        """
         super().__init__(parent)
         self.cluster_mgr = cluster_mgr
         self.available_nodes = available_nodes
@@ -44,7 +59,8 @@ class SimulationDialog(QDialog):
 
         self._init_ui()
 
-    def _init_ui(self):
+    def _init_ui(self) -> None:
+        """Construye las secciones del formulario y la tabla de selección de nodos."""
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -113,9 +129,7 @@ class SimulationDialog(QDialog):
         self.table_nodes.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table_nodes.setSelectionMode(QTableWidget.NoSelection)
 
-        self._populate_nodes_table()
         v_nodes.addWidget(self.table_nodes)
-
         layout.addWidget(grp_nodes)
 
         # ---------------------------------------------------------------------
@@ -133,7 +147,11 @@ class SimulationDialog(QDialog):
         btn_layout.addWidget(self.btn_submit)
         layout.addLayout(btn_layout)
 
-    def _populate_nodes_table(self):
+        # Poblar la tabla de nodos después de instanciar los botones
+        self._populate_nodes_table()
+
+    def _populate_nodes_table(self) -> None:
+        """Pobla la tabla de nodos con los nodos disponibles y sus estados."""
         nodes_to_show = self.available_nodes if self.available_nodes else [
             ClusterNode("gpu2", "gpu", "idle", "Libre", "16", "1", 0),
             ClusterNode("toko04", "XL", "alloc", "Ocupado", "32", "0", 1),
@@ -146,7 +164,6 @@ class SimulationDialog(QDialog):
 
         for row, node in enumerate(nodes_to_show):
             chk = QCheckBox()
-            # Seleccionar por defecto el primer nodo libre si existe
             if row == 0:
                 chk.setChecked(True)
             chk.stateChanged.connect(self._update_node_selection_count)
@@ -181,6 +198,11 @@ class SimulationDialog(QDialog):
         self._update_node_selection_count()
 
     def _get_selected_node_names(self) -> List[str]:
+        """Obtiene la lista de nombres de nodos marcados por el usuario.
+
+        Returns:
+            List[str]: Lista de nombres de nodos seleccionados.
+        """
         selected = []
         for row in range(self.table_nodes.rowCount()):
             chk = self.check_boxes[row]
@@ -189,7 +211,8 @@ class SimulationDialog(QDialog):
                 selected.append(node_name)
         return selected
 
-    def _update_node_selection_count(self):
+    def _update_node_selection_count(self) -> None:
+        """Actualiza el contador de selección de nodos y valida el límite (máximo 2 nodos)."""
         selected = self._get_selected_node_names()
         count = len(selected)
 
@@ -211,7 +234,8 @@ class SimulationDialog(QDialog):
             if has_submit:
                 self.btn_submit.setEnabled(False)
 
-    def _handle_submit(self):
+    def _handle_submit(self) -> None:
+        """Valida el formulario y envía el trabajo al cluster mediante ClusterManager."""
         selected_nodes = self._get_selected_node_names()
         if len(selected_nodes) > 2:
             QMessageBox.critical(self, "Error de Selección", "No puede seleccionar más de 2 nodos para enviar simulaciones.")
@@ -226,8 +250,8 @@ class SimulationDialog(QDialog):
             angles = [float(x.strip()) for x in self.txt_angles.text().split(",") if x.strip()]
             moves = [int(x.strip()) for x in self.txt_moves.text().split(",") if x.strip()]
             orientations = [x.strip() for x in self.txt_orientations.text().split(",") if x.strip()]
-        except ValueError as e:
-            QMessageBox.critical(self, "Error de Formato", f"Revise los valores numéricos ingresados: {str(e)}")
+        except ValueError as err:
+            QMessageBox.critical(self, "Error de Formato", f"Revise los valores numéricos ingresados: {str(err)}")
             return
 
         config = SimulationConfig(
