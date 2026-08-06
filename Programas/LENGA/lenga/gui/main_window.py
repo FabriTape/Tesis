@@ -33,6 +33,7 @@ from lenga.gui.figures_view import FiguresViewWidget
 from lenga.gui.login_dialog import LoginDialog
 from lenga.gui.simulation_dialog import SimulationDialog
 from lenga.gui.style import DARK_STYLESHEET
+from lenga.gui.tables_view import TablesViewWidget
 from lenga.ssh_client import SSHClientManager
 
 
@@ -130,6 +131,7 @@ class MainWindow(QMainWindow):
         self.analysis_view = AnalysisViewWidget(self.carboxi_runner)
         self.download_view = DownloadViewWidget(self.ssh_client)
         self.figures_view = FiguresViewWidget()
+        self.tables_view = TablesViewWidget()
 
         tab_bar = self.tabs.tabBar()
         tab_bar.setUsesScrollButtons(True)
@@ -139,6 +141,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.analysis_view, "Análisis CARBOXI")
         self.tabs.addTab(self.download_view, "Descarga SCP")
         self.tabs.addTab(self.figures_view, "Generador de Figuras")
+        self.tabs.addTab(self.tables_view, "Generar Tablas")
 
         main_layout.addWidget(self.tabs)
 

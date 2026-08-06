@@ -192,22 +192,35 @@ class ClusterManager:
         Returns:
             Tuple[bool, List[ClusterNode], str]: Tupla con (exito, lista_nodos, mensaje).
         """
+        debug = os.environ.get("LENGA_DEBUG") == "1"
+
+        def _log(attempt: str, ok: bool, out: str, err: str = "") -> None:
+            if debug:
+                print(f"[LENGA-DEBUG] intento: {attempt} | success={ok}")
+                print(f"[LENGA-DEBUG]   stdout:\n{out[:3000]}")
+                if err:
+                    print(f"[LENGA-DEBUG]   stderr: {err[:500]}")
+
         # 1. Probar sinfo con flag -N (orientado a nodos individuales) y formato explícito pipe.
         #    -a incluye TODAS las particiones (incluso down/reservadas).
         sinfo_cmd = 'sinfo -a -N -o "%N|%P|%T|%c|%C|%G"'
         success_sinfo, out_sinfo, err_sinfo = self.ssh.run_command(sinfo_cmd)
+        _log(sinfo_cmd, success_sinfo, out_sinfo, err_sinfo)
 
         if not success_sinfo or not out_sinfo.strip() or "INVALID" in out_sinfo.upper():
             sinfo_cmd = 'sinfo -a -N -o "%N|%P|%T|%c|%G"'
             success_sinfo, out_sinfo, err_sinfo = self.ssh.run_command(sinfo_cmd)
+            _log(sinfo_cmd, success_sinfo, out_sinfo, err_sinfo)
 
         if not success_sinfo or not out_sinfo.strip():
             sinfo_cmd = "sinfo -a -N"
             success_sinfo, out_sinfo, err_sinfo = self.ssh.run_command(sinfo_cmd)
+            _log(sinfo_cmd, success_sinfo, out_sinfo, err_sinfo)
 
         if not success_sinfo or not out_sinfo.strip():
             sinfo_cmd = "sinfo -a"
             success_sinfo, out_sinfo, err_sinfo = self.ssh.run_command(sinfo_cmd)
+            _log(sinfo_cmd, success_sinfo, out_sinfo, err_sinfo)
             if not success_sinfo:
                 return False, [], f"Error al ejecutar sinfo en el cluster: {err_sinfo}"
 
@@ -217,12 +230,21 @@ class ClusterManager:
         success_sq, out_sq, _ = self.ssh.run_command("squeue --format='%i|%P|%j|%u|%t|%M|%D|%R'")
         if not success_sq or not out_sq.strip():
             success_sq, out_sq, _ = self.ssh.run_command("squeue")
+        _log("squeue", success_sq, out_sq if success_sq else "")
 
         self.last_squeue_raw = out_sq if success_sq else ""
         active_jobs_per_node = self._parse_squeue_jobs(self.last_squeue_raw)
 
         # 3. Parsear resultado de sinfo y estructurar lista de ClusterNode
         nodes = self._parse_sinfo_output(out_sinfo, active_jobs_per_node)
+
+        if debug:
+            print(f"[LENGA-DEBUG] nodos parseados: {len(nodes)}")
+            for n in nodes:
+                print(
+                    f"[LENGA-DEBUG]   {n.name} | {n.partition} | {n.state_display} "
+                    f"| cpus={n.cpus} | gpus={n.gpus} | jobs={n.active_jobs}"
+                )
         return True, nodes, "Estado de nodos del cluster actualizado correctamente."
 
     def _parse_squeue_jobs(self, squeue_out: str) -> Dict[str, int]:

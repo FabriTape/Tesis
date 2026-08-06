@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFileDialog,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -27,6 +28,7 @@ from PyQt5.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSplitter,
     QTabWidget,
     QVBoxLayout,
@@ -108,14 +110,35 @@ class FiguresViewWidget(QWidget):
         h_select_all.addWidget(btn_none)
         v_figs.addLayout(h_select_all)
 
+        # La lista de checkboxes vive en un QScrollArea: si la ventana es chica,
+        # el scroll queda contenido dentro del recuadro y NUNCA se superpone con
+        # los botones de acción de abajo.
+        scroll_figs = QScrollArea()
+        scroll_figs.setWidgetResizable(True)
+        scroll_figs.setFrameShape(QFrame.NoFrame)
+        scroll_figs.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_figs.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
+        check_container = QWidget()
+        v_checks = QVBoxLayout(check_container)
+        v_checks.setContentsMargins(2, 4, 6, 4)
+        v_checks.setSpacing(2)
+
         self.check_boxes: Dict[str, QCheckBox] = {}
         for key, name in self.engine.AVAILABLE_FIGURES.items():
             chk = QCheckBox(name)
             chk.setChecked(True)
+            chk.setStyleSheet("font-size: 12px; padding: 1px 0;")
             self.check_boxes[key] = chk
-            v_figs.addWidget(chk)
+            v_checks.addWidget(chk)
+        v_checks.addStretch()
 
-        v_left.addWidget(grp_figs)
+        scroll_figs.setWidget(check_container)
+        v_figs.addWidget(scroll_figs)
+
+        # El grupo de figuras absorbe el espacio disponible (stretch 1) para que
+        # los botones de acción conserven su tamaño fijo al pie del panel.
+        v_left.addWidget(grp_figs, 1)
 
         # 3. Action Buttons
         self.btn_generate = QPushButton("🎨 Generar y Visualizar Figuras")
@@ -128,7 +151,6 @@ class FiguresViewWidget(QWidget):
         self.btn_export.clicked.connect(self.export_figures)
         v_left.addWidget(self.btn_export)
 
-        v_left.addStretch()
         splitter.addWidget(left_widget)
 
         # ---------------------------------------------------------------------

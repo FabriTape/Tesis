@@ -94,6 +94,9 @@ class SSHClientManager:
     def run_command(self, command: str, timeout: int = 60) -> Tuple[bool, str, str]:
         """Ejecuta un comando remoto vía SSH respondiendo automáticamente a la contraseña.
 
+        Si el comando no se encuentra (exit 127), se reintenta envuelto en un shell de
+        login (`bash -lc`) para que se carguen los PATH de los módulos/Slurm del cluster.
+
         Args:
             command (str): Comando bash a ejecutar en el servidor remoto.
             timeout (int): Tiempo máximo de espera en segundos (default: 60).
@@ -105,16 +108,28 @@ class SSHClientManager:
         if self.mock_mode:
             return self._mock_command(command)
 
-        import pexpect
-
         user_host = f"{self.username}@{self.host}"
-        ssh_cmd = (
+        base_ssh = (
             f"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
-            f"-p {self.port} {user_host} {shlex.quote(command)}"
+            f"-p {self.port} {user_host}"
         )
 
+        ok, output, error = self._exec_ssh(f"{base_ssh} {shlex.quote(command)}", timeout)
+
+        # 2. Si el comando remoto no se encontró (exit 127), reintentar con shell de login
+        #    para que el perfil del cluster agregue los binarios de Slurm al PATH.
+        if not ok and "127" in error:
+            inner = command.replace("'", "'\\''")
+            login_cmd = f"bash -lc '{inner}'"
+            ok, output, error = self._exec_ssh(f"{base_ssh} {shlex.quote(login_cmd)}", timeout)
+
+        return ok, output, error
+
+    def _exec_ssh(self, ssh_cmd: str, timeout: int) -> Tuple[bool, str, str]:
+        """Ejecuta una sesión pexpect SSH respondiendo a contraseña y fingerprint."""
+        import pexpect
+
         try:
-            # 2. Iniciar proceso pexpect e interactuar con la consola SSH
             child = pexpect.spawn(ssh_cmd, encoding="utf-8", timeout=timeout)
             index = child.expect([
                 r"[pP]assword:",
@@ -122,7 +137,7 @@ class SSHClientManager:
                 pexpect.EOF,
                 pexpect.TIMEOUT
             ])
-            
+
             # Confirmar fingerprint si es primera conexión
             if index == 1:
                 child.sendline("yes")
