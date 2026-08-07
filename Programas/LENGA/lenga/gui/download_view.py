@@ -151,7 +151,7 @@ class DownloadViewWidget(QWidget):
         v_s.addWidget(self.btn_download_spec)
 
         v_specific.addWidget(grp_spec)
-        self.download_tabs.addTab(tab_specific, "🎯 Simulación Específica")
+        self.download_tabs.addTab(tab_specific, "Simulación Específica")
 
         layout.addWidget(self.download_tabs)
 
@@ -252,12 +252,12 @@ class DownloadViewWidget(QWidget):
     def _on_download_finished(self, success: bool, msg: str, trigger_btn: QPushButton):
         trigger_btn.setEnabled(True)
         if success:
-            self.lbl_status.setText(f"✓ {msg}")
+            self.lbl_status.setText(f"{msg}")
             self.lbl_status.setStyleSheet("color: #a6e3a1; font-weight: bold;")
             QMessageBox.information(self, "Descarga Completa", msg)
             self.refresh_local_files()
         else:
-            self.lbl_status.setText(f"❌ {msg}")
+            self.lbl_status.setText(f"{msg}")
             self.lbl_status.setStyleSheet("color: #f38ba8; font-weight: bold;")
             QMessageBox.critical(self, "Fallo SCP", msg)
 

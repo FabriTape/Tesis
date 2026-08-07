@@ -82,11 +82,11 @@ class AnalysisViewWidget(QWidget):
 
         # Buttons
         h_btns = QHBoxLayout()
-        self.btn_run_full = QPushButton("🚀 Ejecutar Análisis CARBOXI Completo + Merge")
+        self.btn_run_full = QPushButton("Ejecutar Análisis CARBOXI Completo + Merge")
         self.btn_run_full.setObjectName("PrimaryButton")
         self.btn_run_full.clicked.connect(self._start_full_analysis)
 
-        self.btn_merge_only = QPushButton("📊 Consolidar CSV (Solo merge_all)")
+        self.btn_merge_only = QPushButton("Consolidar CSV (Solo merge_all)")
         self.btn_merge_only.clicked.connect(self._start_merge_only)
 
         h_btns.addWidget(self.btn_run_full)
@@ -126,11 +126,11 @@ class AnalysisViewWidget(QWidget):
         self.btn_merge_only.setEnabled(True)
 
         if success:
-            self.log("✓ Pipeline finalizado exitosamente.")
+            self.log("Pipeline finalizado exitosamente.")
             self.log(msg)
             QMessageBox.information(self, "Análisis Exitoso", "El análisis CARBOXI y la consolidación CSV finalizaron correctamente.")
         else:
-            self.log(f"❌ Error en la ejecución: {msg}")
+            self.log(f"Error en la ejecución: {msg}")
             QMessageBox.critical(self, "Fallo en Análisis", f"Ocurrió un error: {msg}")
 
     def _start_merge_only(self):
@@ -138,9 +138,9 @@ class AnalysisViewWidget(QWidget):
         self.log("Ejecutando consolidación manual merge_all...")
         success, msg = self.runner.trigger_merge_only(remote_dir)
         if success:
-            self.log("✓ Merge consolidado.")
+            self.log("Merge consolidado.")
             self.log(msg)
             QMessageBox.information(self, "Merge Exitoso", msg)
         else:
-            self.log(f"❌ Error en merge: {msg}")
+            self.log(f"Error en merge: {msg}")
             QMessageBox.critical(self, "Fallo en Merge", msg)

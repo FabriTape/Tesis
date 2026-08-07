@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QColor, QPainter
 from PyQt5.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -23,6 +24,43 @@ from PyQt5.QtWidgets import (
 )
 
 from lenga.ssh_client import SSHClientManager
+
+
+class HintLineEdit(QLineEdit):
+    """QLineEdit con placeholder tenue (semitransparente) dibujado a mano.
+
+    El stylesheet global de LENGA fija el color del texto y evita que el
+    placeholder use la paleta, así que se pinta el texto de ayuda manualmente
+    con baja opacidad para que se lea como una sugerencia, no como un valor.
+    """
+
+    def __init__(
+        self,
+        placeholder: str = "",
+        hint_color: QColor = QColor(236, 239, 241, 85),
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._hint_color = hint_color
+        self.setPlaceholderText(placeholder)
+
+    def paintEvent(self, event) -> None:
+        ph = self.placeholderText()
+        self.setPlaceholderText("")
+        super().paintEvent(event)
+        self.setPlaceholderText(ph)
+
+        if ph and not self.text():
+            painter = QPainter(self)
+            painter.setPen(self._hint_color)
+            font = self.font()
+            font.setItalic(True)
+            painter.setFont(font)
+            painter.drawText(
+                self.rect().adjusted(10, 0, -8, 0),
+                Qt.AlignVCenter | Qt.AlignLeft,
+                ph,
+            )
 
 
 class ConnectionWorker(QThread):
@@ -109,15 +147,13 @@ class LoginDialog(QDialog):
         form_layout = QFormLayout()
         form_layout.setSpacing(10)
 
-        self.input_host = QLineEdit("toko04")
-        self.input_host.setPlaceholderText("Ej: toko04.cluster.local o IP")
+        self.input_host = HintLineEdit("Ejemplo: cluster.dominio.com")
 
         self.input_port = QSpinBox()
         self.input_port.setRange(1, 65535)
         self.input_port.setValue(22)
 
-        self.input_user = QLineEdit("fbazzoni")
-        self.input_user.setPlaceholderText("Correo o usuario SSH")
+        self.input_user = HintLineEdit("Ejemplo: usuario@cluster.dominio.com")
 
         self.input_password = QLineEdit()
         self.input_password.setEchoMode(QLineEdit.Password)

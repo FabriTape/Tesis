@@ -203,7 +203,7 @@ class FiguresViewWidget(QWidget):
         v_table_layout.addWidget(self.tbl_data_display, 1)
         v_table_layout.addWidget(self.tbl_data_display, 1)
 
-        self.main_right_tabs.addTab(self.table_view_widget, "📋 Vista de Tablas de Datos")
+        self.main_right_tabs.addTab(self.table_view_widget, "Vista de Tablas de Datos")
 
         v_right.addWidget(self.main_right_tabs, 1)
         splitter.addWidget(right_widget)

@@ -11,13 +11,18 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import logging
 from pathlib import Path
 import sys
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication
 
+from lenga import __version__
 from lenga.gui.main_window import MainWindow
+from lenga.logging_setup import log_uncaught_exception, setup_logging
+
+logger = logging.getLogger("lenga")
 
 
 def main() -> None:
@@ -40,9 +45,14 @@ def main() -> None:
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
+    # 0.1 Configurar logging (consola + archivo) y captura de excepciones
+    setup_logging()
+    log_uncaught_exception()
+    logger.info("LENGA+ v%s — arranque de la aplicación", __version__)
+
     # 1. Configurar parser de argumentos de consola
     parser = argparse.ArgumentParser(
-        description="LENGA: Plataforma Unificada de Simulación y Análisis de Medios Granulares."
+        description=f"LENGA+ v{__version__}: Plataforma Unificada de Simulación y Análisis de Medios Granulares."
     )
     parser.add_argument(
         "--dry-run",
@@ -51,6 +61,8 @@ def main() -> None:
         help="Inicia la aplicación en modo simulación (Mock local sin requerir cluster SSH)."
     )
     args = parser.parse_args()
+    if args.dry_run:
+        logger.info("Modo simulación (--dry-run / mock) activado.")
 
     # 2. Inicializar bucle de eventos QApplication
     app = QApplication(sys.argv)

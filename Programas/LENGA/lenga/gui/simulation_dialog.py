@@ -223,17 +223,17 @@ class SimulationDialog(QDialog):
         has_submit = hasattr(self, "btn_submit")
 
         if count == 0:
-            self.lbl_node_counter.setText("Nodos Seleccionados: 0 / 2 (⚠️ Seleccione al menos 1 nodo)")
+            self.lbl_node_counter.setText("Nodos Seleccionados: 0 / 2 (Seleccione al menos 1 nodo)")
             self.lbl_node_counter.setStyleSheet("font-weight: bold; color: #f38ba8;")
             if has_submit:
                 self.btn_submit.setEnabled(False)
         elif count <= 2:
-            self.lbl_node_counter.setText(f"Nodos Seleccionados: {count} / 2 (✓ Configuración válida)")
+            self.lbl_node_counter.setText(f"Nodos Seleccionados: {count} / 2 (Configuración válida)")
             self.lbl_node_counter.setStyleSheet("font-weight: bold; color: #a6e3a1;")
             if has_submit:
                 self.btn_submit.setEnabled(True)
         else:
-            self.lbl_node_counter.setText(f"Nodos Seleccionados: {count} / 2 (❌ ¡LÍMITE EXCEDIDO! Máximo 2 nodos)")
+            self.lbl_node_counter.setText(f"Nodos Seleccionados: {count} / 2 (¡LÍMITE EXCEDIDO! Máximo 2 nodos)")
             self.lbl_node_counter.setStyleSheet("font-weight: bold; color: #f38ba8;")
             if has_submit:
                 self.btn_submit.setEnabled(False)

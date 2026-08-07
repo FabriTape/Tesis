@@ -27,8 +27,10 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from lenga import __version__
 from lenga.carboxi_runner import CarboxiRunner
 from lenga.cluster_manager import ClusterManager
+from lenga.data_check import build_warning_message, check_local_datasets
 from lenga.gui.analysis_view import AnalysisViewWidget
 from lenga.gui.cluster_view import ClusterViewWidget
 from lenga.gui.download_view import DownloadViewWidget
@@ -93,8 +95,23 @@ class MainWindow(QMainWindow):
 
         self._init_ui()
 
+        # Chequeo de datos locales requeridos por figuras y tablas
+        try:
+            self.data_report = check_local_datasets()
+        except Exception:
+            self.data_report = {}
+        QTimer.singleShot(900, self._maybe_warn_missing_data)
+
         # Al iniciar: cargar automáticamente el estado de los nodos (solicita login si hace falta)
         QTimer.singleShot(400, self._auto_bootstrap)
+
+    def _maybe_warn_missing_data(self) -> None:
+        """Muestra un aviso claro al arranque si faltan datos locales."""
+        if not getattr(self, "data_report", None):
+            return
+        message = build_warning_message(self.data_report)
+        if message:
+            QMessageBox.warning(self, "Datos locales incompletos", message)
 
     def _auto_bootstrap(self) -> None:
         """Carga la lista de nodos al arrancar sin requerir clicks adicionales.
@@ -162,6 +179,10 @@ class MainWindow(QMainWindow):
         self.btn_sim_form.clicked.connect(self.open_simulation_dialog)
         top_bar.addWidget(self.btn_sim_form)
 
+        self.btn_about = QPushButton("Acerca de")
+        self.btn_about.clicked.connect(self.open_about_dialog)
+        top_bar.addWidget(self.btn_about)
+
         main_layout.addLayout(top_bar)
 
         # ---------------------------------------------------------------------
@@ -221,21 +242,37 @@ class MainWindow(QMainWindow):
         dlg = SimulationDialog(self.cluster_mgr, self.cluster_view.cached_nodes, parent=self)
         dlg.exec_()
 
+    def open_about_dialog(self) -> None:
+        """Muestra el diálogo 'Acerca de' con el logo y la versión de la app."""
+        logo_pixmap = QPixmap(str(self.logo_path)).scaled(
+            96, 96, Qt.KeepAspectRatio, Qt.SmoothTransformation
+        )
+        dlg = QMessageBox(self)
+        dlg.setWindowTitle("Acerca de LENGA+")
+        dlg.setIconPixmap(logo_pixmap)
+        dlg.setText(
+            f"<h3>LENGA+ v{__version__}</h3>"
+            "<p>Plataforma de Simulación y Análisis de Medios Granulares.</p>"
+            "<p>Integra simulaciones LAMMPS v&iacute;a SSH/Slurm, an&aacute;lisis remoto "
+            "CARBOXI, descarga SCP y generaci&oacute;n de figuras y tablas LaTeX.</p>"
+        )
+        dlg.exec_()
+
     def update_ssh_status_badge(self) -> None:
         """Actualiza la insignia visual del estado de la conexión SSH en la barra superior."""
         if self.ssh_client.is_connected:
             mode_str = " (Mock)" if self.ssh_client.mock_mode else ""
-            self.lbl_ssh_status.setText(f"✓ SSH: Conectado a {self.ssh_client.host}{mode_str}")
+            self.lbl_ssh_status.setText(f"SSH: Conectado a {self.ssh_client.host}{mode_str}")
             self.lbl_ssh_status.setObjectName("BadgeSuccess")
             self.lbl_ssh_status.setStyle(self.lbl_ssh_status.style())
             self.status_bar.showMessage(f"Conectado vía SSH a {self.ssh_client.username}@{self.ssh_client.host}")
         elif self.ssh_client.mock_mode:
-            self.lbl_ssh_status.setText("✓ SSH: Modo Simulación / Mock")
+            self.lbl_ssh_status.setText("SSH: Modo Simulación / Mock")
             self.lbl_ssh_status.setObjectName("BadgeSuccess")
             self.lbl_ssh_status.setStyle(self.lbl_ssh_status.style())
             self.status_bar.showMessage("Ejecutando en Modo Simulación (Mock local)")
         else:
-            self.lbl_ssh_status.setText("⚠️ SSH: Desconectado")
+            self.lbl_ssh_status.setText("SSH: Desconectado")
             self.lbl_ssh_status.setObjectName("BadgeWarning")
             self.lbl_ssh_status.setStyle(self.lbl_ssh_status.style())
             self.status_bar.showMessage("Sin conexión SSH activa.")

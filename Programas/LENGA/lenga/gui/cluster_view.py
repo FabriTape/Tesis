@@ -97,7 +97,7 @@ class ClusterViewWidget(QWidget):
         self.cached_nodes = nodes
         unique_nodes_count = len(set(n.name for n in nodes))
         self.lbl_info.setText(
-            f"✓ Sincronizado: {len(nodes)} entradas de nodo/partición ({unique_nodes_count} nodos físicos únicos) en el cluster."
+            f"Sincronizado: {len(nodes)} entradas de nodo/partición ({unique_nodes_count} nodos físicos únicos) en el cluster."
         )
 
         from PyQt5.QtGui import QColor, QFont
