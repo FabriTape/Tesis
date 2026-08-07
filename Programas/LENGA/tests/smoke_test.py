@@ -169,6 +169,44 @@ class LengaSmokeTest(unittest.TestCase):
         texts = [dlg.lst.item(i).text() for i in range(dlg.lst.count())]
         self.assertEqual(texts, ["carpeta_sim/"])
 
+    def test_analysis_view_has_remote_browse(self):
+        from lenga.gui.analysis_view import AnalysisViewWidget
+        from lenga.ssh_client import SSHClientManager
+
+        ssh = SSHClientManager("cluster.dominio.com", 22, "usuario", "")
+        ssh.is_connected = True
+        runner = object.__new__(type("FakeRunner", (), {}))
+        runner.ssh = ssh
+        view = AnalysisViewWidget(runner)
+        self.assertEqual(view.btn_browse_remote.text(), "Examinar remoto...")
+        self.assertEqual(view.txt_remote_dir.text(), "~")
+
+    def test_local_browse_dialog(self):
+        from lenga.gui.local_browse_dialog import LocalBrowseDialog
+
+        tmp = Path(__file__).resolve().parent / "_tmp_browse_test"
+        (tmp / "sub").mkdir(parents=True, exist_ok=True)
+        (tmp / "dato.csv").write_text("a,b\n")
+
+        dlg = LocalBrowseDialog(start_path=str(tmp), select_files=True)
+        texts = [dlg.lst.item(i).text() for i in range(dlg.lst.count())]
+        self.assertIn("sub/", texts)
+        self.assertIn("dato.csv", texts)
+
+        # Click en un archivo lo selecciona
+        idx = texts.index("dato.csv")
+        dlg._on_click(dlg.lst.item(idx))
+        self.assertEqual(dlg.selected_local_path(), str(tmp / "dato.csv"))
+
+        # Doble click en una carpeta navega
+        idx_dir = texts.index("sub/")
+        dlg._on_double_click(dlg.lst.item(idx_dir))
+        self.assertEqual(dlg.current_path, str(tmp / "sub"))
+
+        import shutil
+
+        shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

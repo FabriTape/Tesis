@@ -8,6 +8,7 @@ from typing import Optional
 
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import (
+    QDialog,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -20,6 +21,8 @@ from PyQt5.QtWidgets import (
 )
 
 from lenga.carboxi_runner import CarboxiRunner
+from lenga.gui.remote_browse_dialog import RemoteBrowseDialog
+from lenga.ssh_client import SSHClientManager
 
 
 class AnalysisWorker(QThread):
@@ -69,12 +72,15 @@ class AnalysisViewWidget(QWidget):
 
         self.txt_remote_dir = QLineEdit("~")
         self.txt_remote_dir.setPlaceholderText("Directorio base en el cluster")
+        self.btn_browse_remote = QPushButton("Examinar remoto...")
+        self.btn_browse_remote.clicked.connect(self._browse_remote_dir)
 
         self.txt_node = QLineEdit("gpu2")
         self.txt_node.setPlaceholderText("Nodo para ejecutar el análisis (ej: gpu2)")
 
         h_config.addWidget(QLabel("Directorio Remoto:"))
         h_config.addWidget(self.txt_remote_dir)
+        h_config.addWidget(self.btn_browse_remote)
         h_config.addWidget(QLabel("Nodo Objetivo:"))
         h_config.addWidget(self.txt_node)
 
@@ -106,6 +112,32 @@ class AnalysisViewWidget(QWidget):
 
     def log(self, text: str):
         self.txt_log.append(f"> {text}")
+
+    def _browse_remote_dir(self):
+        ssh = self.runner.ssh
+        if not ssh.is_connected and not ssh.mock_mode:
+            QMessageBox.warning(self, "Sin Conexión SSH", "Inicie sesión SSH para examinar directorios remotos.")
+            return
+        if ssh.mock_mode:
+            self.log("Exploración no disponible en modo simulación.")
+            QMessageBox.information(
+                self, "Modo Simulación",
+                "Para examinar directorios remotos es necesario conectarse a un cluster real.\n"
+                "El modo simulación (mock) no puede listar carpetas remotas.",
+            )
+            return
+
+        dlg = RemoteBrowseDialog(
+            ssh,
+            start_path=self.txt_remote_dir.text().strip() or "~",
+            select_files=False,
+            parent=self,
+        )
+        if dlg.exec_() == QDialog.Accepted:
+            remote_dir = dlg.selected_remote_path()
+            if remote_dir:
+                self.txt_remote_dir.setText(remote_dir)
+                self.log(f"Directorio remoto seleccionado: {remote_dir}")
 
     def _start_full_analysis(self):
         remote_dir = self.txt_remote_dir.text().strip()

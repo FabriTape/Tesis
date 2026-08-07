@@ -185,6 +185,7 @@ QT_QPA_PLATFORM=offscreen python3 -m unittest Programas/LENGA/tests/smoke_test.p
 | [v3.1](https://github.com/FabriTape/Tesis/releases/tag/v3.1) | Dic 2025 | Módulo **Lector** con **polars**, paralelización y cálculos con **OVITO**. |
 | [v3.14](https://github.com/FabriTape/Tesis/releases/tag/v3.14) | Mar 2026 | **CARBOXI**: pipeline automático (máquina de estados, config externalizada, detección de onda). |
 | [v3.141](https://github.com/FabriTape/Tesis/releases/tag/v3.141) | Ago 2026 | Estado actual: scripts de simulación unificados, comparación de filtros, análisis estadístico. |
+| LENGA+ v1.1 | Ago 2026 | GUI LENGA+ (rama `desarrollo`): explorador de archivos local y remoto (SSH), tema Otoño Austral, pestaña de tablas LaTeX, chequeo de datos y logging. |
 
 ## Ramas
 

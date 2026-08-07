@@ -16,7 +16,6 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QComboBox,
     QDialog,
-    QFileDialog,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -31,6 +30,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from lenga.gui.local_browse_dialog import LocalBrowseDialog
 from lenga.gui.remote_browse_dialog import RemoteBrowseDialog
 from lenga.ssh_client import SSHClientManager
 
@@ -181,17 +181,19 @@ class DownloadViewWidget(QWidget):
         self.refresh_local_files()
 
     def _browse_local_path(self):
-        dir_path = QFileDialog.getExistingDirectory(
-            self, "Seleccionar carpeta de destino local", str(self.local_dir)
-        )
-        if dir_path:
-            remote_name = Path(self.txt_remote.text().strip()).name or "merge_resultados.csv"
-            self.txt_local.setText(str(Path(dir_path) / remote_name))
+        dlg = LocalBrowseDialog(start_path=self.txt_local.text(), select_files=False, parent=self)
+        if dlg.exec_() == QDialog.Accepted:
+            dir_path = dlg.selected_local_path()
+            if dir_path:
+                remote_name = Path(self.txt_remote.text().strip()).name or "merge_resultados.csv"
+                self.txt_local.setText(str(Path(dir_path) / remote_name))
 
     def _browse_spec_local(self):
-        dir_path = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta destino", str(self.local_dir))
-        if dir_path:
-            self.txt_spec_local.setText(dir_path)
+        dlg = LocalBrowseDialog(start_path=self.txt_spec_local.text(), select_files=False, parent=self)
+        if dlg.exec_() == QDialog.Accepted:
+            dir_path = dlg.selected_local_path()
+            if dir_path:
+                self.txt_spec_local.setText(dir_path)
 
     def _resolve_remote_sim_dir(self, sim_name: str) -> Optional[str]:
         """Resuelve la ruta remota exacta de una simulación (el batch dir difiere por orientación)."""

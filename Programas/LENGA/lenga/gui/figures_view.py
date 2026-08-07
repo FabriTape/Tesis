@@ -20,7 +20,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QFileDialog,
+    QDialog,
     QFrame,
     QGroupBox,
     QHBoxLayout,
@@ -39,6 +39,7 @@ from PyQt5.QtWidgets import (
 )
 
 from lenga.figure_generator import FigureGeneratorEngine
+from lenga.gui.local_browse_dialog import LocalBrowseDialog
 
 
 class FiguresViewWidget(QWidget):
@@ -245,13 +246,13 @@ class FiguresViewWidget(QWidget):
             self.lbl_path.setText(f"Preset seleccionado: {data}")
 
     def _browse_csv(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Seleccionar archivo CSV consolidado", "", "Archivos CSV (*.csv);;Todos (*)"
-        )
-        if file_path:
-            self.custom_csv_path = Path(file_path)
-            self.lbl_path.setText(self.custom_csv_path.name)
-            self.load_dataset()
+        dlg = LocalBrowseDialog(start_path="~", select_files=True, parent=self)
+        if dlg.exec_() == QDialog.Accepted:
+            file_path = dlg.selected_local_path()
+            if file_path:
+                self.custom_csv_path = Path(file_path)
+                self.lbl_path.setText(self.custom_csv_path.name)
+                self.load_dataset()
 
     def _set_all_checks(self, checked: bool):
         for chk in self.check_boxes.values():
