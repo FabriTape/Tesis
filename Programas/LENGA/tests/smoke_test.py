@@ -54,6 +54,27 @@ class LengaSmokeTest(unittest.TestCase):
         self.assertEqual(tab_labels, EXPECTED_TABS)
         self.assertTrue(hasattr(window, "btn_about"))
 
+    def test_changelog_content_and_about_widgets(self):
+        from unittest.mock import patch
+
+        from PyQt5.QtWidgets import QDialog, QTextEdit, QToolButton
+
+        from lenga import CHANGELOG
+
+        self.assertIn("v1.1.0", CHANGELOG)
+        self.assertIn("v1.0.0", CHANGELOG)
+        window = MainWindow(dry_run=True)
+        with patch.object(QDialog, "exec_", return_value=QDialog.Accepted):
+            window.open_about_dialog()
+        found_changelog = []
+        for widget in window.findChildren(QToolButton):
+            if "Log de cambios" in widget.text():
+                found_changelog.append(widget)
+        self.assertEqual(len(found_changelog), 1)
+        self.assertTrue(found_changelog[0].isCheckable())
+        txt = window.findChildren(QTextEdit)
+        self.assertTrue(any("v1.1.0" in t.toPlainText() for t in txt))
+
     def test_login_hint_line_edit(self):
         hint = HintLineEdit(placeholder="Ejemplo: cluster.dominio.com")
         hint.setText("")

@@ -15,6 +15,7 @@ from typing import Optional
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QColor, QIcon, QPainter, QPixmap
 from PyQt5.QtWidgets import (
+    QDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -23,11 +24,13 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QStatusBar,
     QTabWidget,
+    QTextEdit,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
-from lenga import __version__
+from lenga import CHANGELOG, __version__
 from lenga.carboxi_runner import CarboxiRunner
 from lenga.cluster_manager import ClusterManager
 from lenga.data_check import build_warning_message, check_local_datasets
@@ -243,19 +246,54 @@ class MainWindow(QMainWindow):
         dlg.exec_()
 
     def open_about_dialog(self) -> None:
-        """Muestra el diálogo 'Acerca de' con el logo y la versión de la app."""
+        """Muestra el diálogo 'Acerca de' con el logo, la versión y el log de cambios desplegable."""
         logo_pixmap = QPixmap(str(self.logo_path)).scaled(
             96, 96, Qt.KeepAspectRatio, Qt.SmoothTransformation
         )
-        dlg = QMessageBox(self)
+        dlg = QDialog(self)
         dlg.setWindowTitle("Acerca de LENGA+")
-        dlg.setIconPixmap(logo_pixmap)
-        dlg.setText(
+        dlg.setModal(True)
+        layout = QVBoxLayout(dlg)
+        layout.setSpacing(12)
+
+        img_logo = QLabel()
+        img_logo.setPixmap(logo_pixmap)
+        img_logo.setAlignment(Qt.AlignCenter)
+        layout.addWidget(img_logo)
+
+        header = QLabel(
             f"<h3>LENGA+ v{__version__}</h3>"
             "<p>Plataforma de Simulación y Análisis de Medios Granulares.</p>"
             "<p>Integra simulaciones LAMMPS v&iacute;a SSH/Slurm, an&aacute;lisis remoto "
             "CARBOXI, descarga SCP y generaci&oacute;n de figuras y tablas LaTeX.</p>"
         )
+        header.setAlignment(Qt.AlignCenter)
+        layout.addWidget(header)
+
+        btn_changelog = QToolButton()
+        btn_changelog.setObjectName("ChangelogToggle")
+        btn_changelog.setText("▸  Log de cambios")
+        btn_changelog.setCheckable(True)
+        btn_changelog.setToolButtonStyle(Qt.ToolButtonTextOnly)
+
+        txt_changelog = QTextEdit()
+        txt_changelog.setReadOnly(True)
+        txt_changelog.setPlainText(CHANGELOG)
+        txt_changelog.hide()
+
+        def toggle_changelog(checked: bool) -> None:
+            txt_changelog.setVisible(checked)
+            btn_changelog.setText("▾  Log de cambios" if checked else "▸  Log de cambios")
+
+        btn_changelog.toggled.connect(toggle_changelog)
+        layout.addWidget(btn_changelog, alignment=Qt.AlignLeft)
+        layout.addWidget(txt_changelog)
+
+        btn_close = QPushButton("Cerrar")
+        btn_close.setObjectName("PrimaryButton")
+        btn_close.clicked.connect(dlg.accept)
+        layout.addWidget(btn_close, alignment=Qt.AlignRight)
+
         dlg.exec_()
 
     def update_ssh_status_badge(self) -> None:

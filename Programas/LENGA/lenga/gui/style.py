@@ -124,6 +124,34 @@ QPushButton#DangerButton:hover {
     background-color: #EE6060;
 }
 
+/* Botón desplegable "Log de cambios" (se pinta naranja cuando está abierto) */
+QToolButton#ChangelogToggle {
+    background-color: rgba(44, 46, 48, 0.85);
+    color: #ECEFF1;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 7px;
+    padding: 6px 14px;
+    font-weight: 600;
+    text-align: left;
+}
+
+QToolButton#ChangelogToggle:hover {
+    background-color: rgba(58, 61, 64, 0.95);
+    border-color: #D95C14;
+    color: #FFFFFF;
+}
+
+QToolButton#ChangelogToggle:checked {
+    background-color: #D95C14;
+    color: #FFFFFF;
+    border: 1px solid #E86820;
+    border-top: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+QToolButton#ChangelogToggle:checked:hover {
+    background-color: #E86820;
+}
+
 /* Entradas de texto y números con efecto de profundidad hundida */
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QTextEdit, QPlainTextEdit {
     background-color: rgba(22, 23, 24, 0.75);
