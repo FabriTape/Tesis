@@ -66,6 +66,19 @@ class LengaSmokeTest(unittest.TestCase):
         hint.setText("usuario@cluster")
         self.assertEqual(hint.text(), "usuario@cluster")
 
+    def test_login_unified_user_host_field(self):
+        from lenga.ssh_client import SSHClientManager
+
+        ssh = SSHClientManager("", 22, "", "")
+        dialog = LoginDialog(ssh)
+        self.assertTrue(hasattr(dialog, "input_user_host"))
+        self.assertFalse(hasattr(dialog, "input_host"))
+        self.assertFalse(hasattr(dialog, "input_user"))
+        self.assertEqual(dialog._split_user_host("fbazzoni@cluster.dominio.com"), ("fbazzoni", "cluster.dominio.com"))
+        self.assertEqual(dialog._split_user_host("fbazzoni"), ("", ""))
+        self.assertEqual(dialog._split_user_host("@cluster.dominio.com"), ("", ""))
+        self.assertEqual(dialog._split_user_host("fbazzoni@"), ("", ""))
+
     def test_data_check_report(self):
         from lenga.data_check import build_warning_message, check_local_datasets
 

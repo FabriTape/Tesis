@@ -147,13 +147,11 @@ class LoginDialog(QDialog):
         form_layout = QFormLayout()
         form_layout.setSpacing(10)
 
-        self.input_host = HintLineEdit("Ejemplo: cluster.dominio.com")
+        self.input_user_host = HintLineEdit("Ejemplo: usuario@cluster.dominio.com")
 
         self.input_port = QSpinBox()
         self.input_port.setRange(1, 65535)
         self.input_port.setValue(22)
-
-        self.input_user = HintLineEdit("Ejemplo: usuario@cluster.dominio.com")
 
         self.input_password = QLineEdit()
         self.input_password.setEchoMode(QLineEdit.Password)
@@ -162,9 +160,8 @@ class LoginDialog(QDialog):
         self.chk_mock = QCheckBox("Modo Simulación / Mock (desarrollo local sin cluster)")
         self.chk_mock.setChecked(True)
 
-        form_layout.addRow("Servidor / Host:", self.input_host)
+        form_layout.addRow("Usuario@Servidor:", self.input_user_host)
         form_layout.addRow("Puerto SSH:", self.input_port)
-        form_layout.addRow("Correo / Usuario:", self.input_user)
         form_layout.addRow("Contraseña:", self.input_password)
         
         layout.addLayout(form_layout)
@@ -189,17 +186,38 @@ class LoginDialog(QDialog):
         btn_layout.addWidget(self.btn_connect)
         layout.addLayout(btn_layout)
 
+    @staticmethod
+    def _split_user_host(value: str) -> tuple[str, str]:
+        """Separa ``usuario@servidor`` en (usuario, servidor).
+
+        Retorna (usuario, host) si el formato es válido; si falta el ``@`` o
+        alguna de las dos partes queda vacía, retorna ("", "").
+        """
+        if "@" not in value:
+            return "", ""
+        user, host = value.split("@", 1)
+        user, host = user.strip(), host.strip()
+        if not user or not host:
+            return "", ""
+        return user, host
+
     def _handle_connect(self) -> None:
         """Maneja el evento del botón Conectar e inicia la verificación asíncrona."""
-        host = self.input_host.text().strip()
+        user_host = self.input_user_host.text().strip()
         port = self.input_port.value()
-        user = self.input_user.text().strip()
         password = self.input_password.text()
         mock = self.chk_mock.isChecked()
 
-        if not mock and (not host or not user):
-            QMessageBox.warning(self, "Campos Incompletos", "Por favor complete el servidor y el correo/usuario SSH.")
-            return
+        user, host = "", ""
+        if not mock:
+            user, host = self._split_user_host(user_host)
+            if not user or not host:
+                QMessageBox.warning(
+                    self,
+                    "Formato Inválido",
+                    "Ingrese el servidor como usuario@servidor (Ejemplo: usuario@cluster.dominio.com).",
+                )
+                return
 
         self.btn_connect.setEnabled(False)
         self.lbl_status.setText("Conectando y verificando credenciales SSH...")
