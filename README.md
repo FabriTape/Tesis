@@ -157,23 +157,63 @@ figuras en `figuras/9_mov/` y `figuras/49_mov/`.
 
 ### 4. LENGA+ (GUI)
 
+Interfaz de escritorio que integra el flujo completo de la tesis desde una
+ventana: simular, analizar con CARBOXI, descargar resultados y generar las
+figuras y tablas LaTeX. Está en `Programas/LENGA/` y actualmente vive en la
+rama `desarrollo` (v1.1.0).
+
+#### Requisitos
+
+- **Python 3.10+** con `tkinter` disponible (se usa solo para el diálogo de contraseña).
+- Dependencias Python: `pip install -r Programas/LENGA/requirements.txt`
+  (PyQt5, polars, pandas, matplotlib, seaborn, scipy, scikit-learn, uncertainties,
+  pexpect, tomli).
+- **Cluster**: una cuenta con acceso SSH por contraseña a `toko.uncu.edu.ar`.
+  No se guardan credenciales en el código ni en disco: se piden al conectar.
+
+#### Instalación y lanzamiento
+
 ```bash
-# Instalar dependencias y lanzar la interfaz gráfica
+# 1) Instalar dependencias
 pip install -r Programas/LENGA/requirements.txt
+
+# 2) Lanzar la interfaz
 ./Programas/LENGA/run_lenga.sh
 
-# Opcional: instalar el acceso directo de escritorio (.desktop)
+# (Opcional) acceso directo en el menú de aplicaciones
 ./Programas/LENGA/install.sh
 ```
 
-LENGA+ integra el flujo completo desde una ventana: conexión SSH al cluster,
-envío de simulaciones a Slurm, análisis remoto con CARBOXI (consolidación con
+#### Uso
+
+Al iniciar se abre el diálogo de conexión: ingresar host, usuario y contraseña
+del cluster, o tildar **"Modo Simulación / Mock"** para probar la GUI en local
+sin conexión (las acciones remotas quedan deshabilitadas con un aviso). LENGA+
+integra el flujo completo desde una ventana: conexión SSH al cluster, envío de
+simulaciones a Slurm, análisis remoto con CARBOXI (consolidación con
 `merge_all`), generación de las figuras y de las tablas LaTeX reutilizando
-`cluster/generador_figuras.py` (pestañas "Generador de Figuras" y "Generar
-Tablas").
+`cluster/generador_figuras.py`.
+
+#### Prestaciones (pestañas)
+
+| Pestaña | Qué hace |
+|---------|----------|
+| **Cluster y Nodos** | Estado de la conexión, formato y envío de nuevas simulaciones LAMMPS (diálogo "Nueva Simulación") y monitoreo de la cola Slurm. |
+| **Análisis CARBOXI** | Ejecuta el pipeline CARBOXI en el cluster (onda de choque, OVITO, `merge_all`) y configuración del directorio remoto. |
+| **Descarga SCP** | Baja resultados: consolidado global (directorio entero) o una simulación específica, con **explorador de carpetas remoto** que navega el sistema de archivos del cluster por SSH. |
+| **Generador de Figuras** | Genera las figuras de la tesis reutilizando `cluster/generador_figuras.py`, con vista previa interactiva (matplotlib) y modo comparativo `9_mov`/`49_mov`. |
+| **Generar Tablas** | Compila las tablas LaTeX de resultados (presets de simulaciones, repeticiones, presets y velocidades) en código listo para pegar en `Documentos/`. |
+
+Además, todas las rutas (locales y remotas) se eligen con exploradores de
+archivos propios en vez de diálogos del sistema; hay un **chequeo de datos** al
+arranque que avisa si faltan los CSV locales, **logging** rotativo en
+`Programas/LENGA/logs/lenga.log` (2 MB × 5) y un botón **"Acerca de"** con la
+versión de la app.
+
+#### Tests
 
 ```bash
-# Smoke test headless (verifica pestañas, login y chequeo de datos)
+# Smoke test headless (verifica pestañas, login, exploradores y chequeo de datos)
 QT_QPA_PLATFORM=offscreen python3 -m unittest Programas/LENGA/tests/smoke_test.py
 ```
 
