@@ -53,7 +53,11 @@ class SimulationDialog(QDialog):
         super().__init__(parent)
         self.cluster_mgr = cluster_mgr
         self.available_nodes = available_nodes
-        self.setWindowTitle("Formulario de Envío de Simulaciones — LAMMPS")
+        self.setWindowTitle("Formulario de Envío de Simulaciones — LENGA+")
+        from pathlib import Path
+        from PyQt5.QtGui import QIcon
+        logo_path = Path(__file__).resolve().parent / "assets/LengaPlus.png"
+        self.setWindowIcon(QIcon(str(logo_path)))
         self.resize(750, 680)
         self.setModal(True)
 

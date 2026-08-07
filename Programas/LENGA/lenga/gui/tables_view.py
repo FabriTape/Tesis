@@ -65,6 +65,8 @@ class TablesViewWidget(QWidget):
         v_ds = QVBoxLayout(grp_ds)
 
         self.cbo_preset = QComboBox()
+        from PyQt5.QtWidgets import QListView
+        self.cbo_preset.setView(QListView())
         self.cbo_preset.addItem("Preset: 9 Repeticiones (9_mov)", "9_mov")
         self.cbo_preset.addItem("Preset: 49 Repeticiones (49_mov)", "49_mov")
         self.cbo_preset.currentIndexChanged.connect(self._on_dataset_changed)
@@ -83,13 +85,15 @@ class TablesViewWidget(QWidget):
         self.scroll_tables = QScrollArea()
         self.scroll_tables.setWidgetResizable(True)
         self.scroll_tables.setFrameShape(QFrame.NoFrame)
+        self.scroll_tables.setStyleSheet("QScrollArea { background-color: #181825; border: 1px solid #313244; border-radius: 6px; }")
         self.scroll_tables.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.scroll_tables.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
         self.check_container = QWidget()
+        self.check_container.setStyleSheet("background-color: #181825; border-radius: 4px;")
         self.v_checks = QVBoxLayout(self.check_container)
-        self.v_checks.setContentsMargins(2, 4, 6, 4)
-        self.v_checks.setSpacing(2)
+        self.v_checks.setContentsMargins(6, 6, 6, 6)
+        self.v_checks.setSpacing(4)
 
         self.scroll_tables.setWidget(self.check_container)
         v_tab.addWidget(self.scroll_tables)
@@ -121,12 +125,12 @@ class TablesViewWidget(QWidget):
         v_right.setContentsMargins(10, 0, 0, 0)
 
         self.tabs_latex = QTabWidget()
-        v_right.addWidget(self.tabs_latex)
+        v_right.addWidget(self.tabs_latex, 1)
 
         splitter.addWidget(right_widget)
 
-        splitter.setSizes([260, 600])
-        layout.addWidget(splitter)
+        splitter.setSizes([270, 630])
+        layout.addWidget(splitter, 1)
 
         self._rebuild_checklist()
 
@@ -148,7 +152,7 @@ class TablesViewWidget(QWidget):
         for key in self.engine.TABLES_FOR_DATASET.get(dataset, []):
             chk = QCheckBox(self.engine.AVAILABLE_TABLES.get(key, key))
             chk.setChecked(True)
-            chk.setStyleSheet("font-size: 12px; padding: 1px 0;")
+            chk.setStyleSheet("font-size: 12px; padding: 3px 0; color: #cdd6f4;")
             self.check_boxes[key] = chk
             self.v_checks.addWidget(chk)
         self.v_checks.addStretch()

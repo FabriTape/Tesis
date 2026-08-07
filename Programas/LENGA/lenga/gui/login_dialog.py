@@ -78,7 +78,11 @@ class LoginDialog(QDialog):
         """
         super().__init__(parent)
         self.ssh = ssh_client
-        self.setWindowTitle("Autenticación SSH — LENGA Cluster")
+        self.setWindowTitle("Autenticación SSH — Cluster LENGA+")
+        from pathlib import Path
+        from PyQt5.QtGui import QIcon
+        logo_path = Path(__file__).resolve().parent / "assets/LengaPlus.png"
+        self.setWindowIcon(QIcon(str(logo_path)))
         self.resize(420, 360)
         self.setModal(True)
 

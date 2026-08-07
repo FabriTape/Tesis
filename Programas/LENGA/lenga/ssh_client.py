@@ -63,6 +63,11 @@ class SSHClientManager:
         self.mock_mode = mock_mode
         self.is_connected = False
 
+    def disconnect(self) -> None:
+        """Cierra la sesión SSH activa y limpia credenciales de la memoria."""
+        self.password = ""
+        self.is_connected = False
+
     def test_connection(self) -> Tuple[bool, str]:
         """Prueba la conectividad SSH ejecutando un comando de diagnóstico remoto.
 

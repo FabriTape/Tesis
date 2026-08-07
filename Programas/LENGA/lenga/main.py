@@ -11,6 +11,7 @@ Uso:
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 import sys
 
 from PyQt5.QtCore import Qt
@@ -53,8 +54,13 @@ def main() -> None:
 
     # 2. Inicializar bucle de eventos QApplication
     app = QApplication(sys.argv)
-    app.setApplicationName("LENGA Granular Physics Platform")
-    app.setOrganizationName("Universidad de Chile / Tesis Granular")
+    app.setApplicationName("LENGA+ Granular Physics Platform")
+    app.setOrganizationName("UNCuyo / Tesis Granular")
+
+    logo_path = Path(__file__).resolve().parent / "gui/assets/LengaPlus.png"
+    if logo_path.exists():
+        from PyQt5.QtGui import QIcon
+        app.setWindowIcon(QIcon(str(logo_path)))
 
     # 3. Instanciar y desplegar ventana principal (MainWindow) maximizada
     window = MainWindow(dry_run=args.dry_run)

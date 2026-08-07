@@ -51,7 +51,7 @@ class ClusterViewWidget(QWidget):
         self.btn_refresh.clicked.connect(self.refresh_status)
         header_layout.addWidget(self.btn_refresh)
 
-        self.btn_open_form = QPushButton("⚡ Abrir Formulario de Simulaciones")
+        self.btn_open_form = QPushButton("Abrir Formulario de Simulaciones")
         self.btn_open_form.setObjectName("PrimaryButton")
         self.btn_open_form.clicked.connect(self._open_simulation_dialog)
         header_layout.addWidget(self.btn_open_form)
@@ -66,13 +66,19 @@ class ClusterViewWidget(QWidget):
         self.tbl_nodes.setColumnCount(6)
         self.tbl_nodes.setHorizontalHeaderLabels(["Nombre Nodo", "Partición", "Estado", "CPUs", "GPUs", "Trabajos Activos"])
         self.tbl_nodes.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.tbl_nodes.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.tbl_nodes.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.tbl_nodes.setSelectionBehavior(QTableWidget.SelectRows)
+        self.tbl_nodes.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tbl_nodes.setAlternatingRowColors(False)
+        self.tbl_nodes.verticalHeader().setVisible(True)
         v_nodes.addWidget(self.tbl_nodes)
 
-        layout.addWidget(grp_nodes)
+        layout.addWidget(grp_nodes, 1)
 
         # Status Footer
         self.lbl_info = QLabel("Presione 'Actualizar Estado Nodos' para sincronizar con el cluster SSH.")
-        self.lbl_info.setStyleSheet("color: #a6adc8;")
+        self.lbl_info.setStyleSheet("color: #a6adc8; font-weight: 500;")
         layout.addWidget(self.lbl_info)
 
     def refresh_status(self):
@@ -89,7 +95,12 @@ class ClusterViewWidget(QWidget):
             return
 
         self.cached_nodes = nodes
-        self.lbl_info.setText(f"✓ Sincronizado: {len(nodes)} nodos encontrados en el cluster.")
+        unique_nodes_count = len(set(n.name for n in nodes))
+        self.lbl_info.setText(
+            f"✓ Sincronizado: {len(nodes)} entradas de nodo/partición ({unique_nodes_count} nodos físicos únicos) en el cluster."
+        )
+
+        from PyQt5.QtGui import QColor, QFont
 
         self.tbl_nodes.setRowCount(len(nodes))
         for row, node in enumerate(nodes):
@@ -97,12 +108,18 @@ class ClusterViewWidget(QWidget):
             self.tbl_nodes.setItem(row, 1, QTableWidgetItem(node.partition))
             
             item_state = QTableWidgetItem(node.state_display)
+            font = item_state.font()
+            font.setBold(True)
+            item_state.setFont(font)
+
             if node.state_display == "Libre":
-                item_state.setForeground(Qt.green)
+                item_state.setForeground(QColor("#5C9449"))
             elif node.state_display == "Ocupado":
-                item_state.setForeground(Qt.yellow)
+                item_state.setForeground(QColor("#E5C07B"))
+            elif node.state_display == "Mixto":
+                item_state.setForeground(QColor("#D95C14"))
             else:
-                item_state.setForeground(Qt.red)
+                item_state.setForeground(QColor("#EE6060"))
 
             self.tbl_nodes.setItem(row, 2, item_state)
             self.tbl_nodes.setItem(row, 3, QTableWidgetItem(node.cpus))

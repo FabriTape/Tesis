@@ -9,10 +9,13 @@ Integra en una interfaz gráfica por pestañas los módulos de:
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QColor, QIcon, QPainter, QPixmap
 from PyQt5.QtWidgets import (
+    QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -37,19 +40,40 @@ from lenga.gui.tables_view import TablesViewWidget
 from lenga.ssh_client import SSHClientManager
 
 
+class AmbientBackgroundWidget(QWidget):
+    """Widget contenedor principal que renderiza la imagen del bosque de lengas en modo cover tenue."""
+
+    def __init__(self, bg_image_path: Path, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.bg_pixmap = QPixmap(str(bg_image_path))
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        if not self.bg_pixmap.isNull():
+            scaled = self.bg_pixmap.scaled(
+                self.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation
+            )
+            x = (scaled.width() - self.width()) // 2
+            y = (scaled.height() - self.height()) // 2
+            painter.drawPixmap(0, 0, scaled, x, y, self.width(), self.height())
+
+            # Capa tenue de oscurecimiento (32% opaco overlay / 68% visibilidad imagen)
+            overlay = QColor(30, 32, 34, 82)
+            painter.fillRect(self.rect(), overlay)
+        else:
+            painter.fillRect(self.rect(), QColor("#1E2022"))
+        super().paintEvent(event)
+
+
 class MainWindow(QMainWindow):
-    """Ventana Principal de la Aplicación LENGA.
+    """Ventana Principal de la Aplicación LENGA+.
 
     Args:
-        dry_run (bool): Si es True, inicia la aplicación directamente en modo simulación (Mock).
+        dry_run (bool): Si es True, no requiere servidor SSH remoto real (modo demo).
     """
 
     def __init__(self, dry_run: bool = False) -> None:
-        """Inicializa la ventana principal.
-
-        Args:
-            dry_run (bool): Modo simulación sin requerir credenciales reales SSH.
-        """
+        """Inicializa la ventana principal y sus componentes GUI."""
         super().__init__()
         self.ssh_client = SSHClientManager()
         if dry_run:
@@ -58,7 +82,9 @@ class MainWindow(QMainWindow):
         self.cluster_mgr = ClusterManager(self.ssh_client)
         self.carboxi_runner = CarboxiRunner(self.ssh_client)
 
-        self.setWindowTitle("LENGA — Plataforma de Simulación y Análisis de Medios Granulares")
+        self.logo_path = Path(__file__).resolve().parent / "assets/LengaPlus.png"
+        self.setWindowTitle("LENGA+ — Plataforma de Simulación y Análisis de Medios Granulares")
+        self.setWindowIcon(QIcon(str(self.logo_path)))
         self.resize(1150, 780)
         self.setMinimumSize(960, 640)
 
@@ -84,7 +110,8 @@ class MainWindow(QMainWindow):
 
     def _init_ui(self) -> None:
         """Construye los elementos de la barra superior, navegación por pestañas y footer."""
-        central_widget = QWidget()
+        bg_path = Path(__file__).resolve().parent / "assets/lenga_bg_forest.png"
+        central_widget = AmbientBackgroundWidget(bg_path, self)
         self.setCentralWidget(central_widget)
 
         main_layout = QVBoxLayout(central_widget)
@@ -96,14 +123,29 @@ class MainWindow(QMainWindow):
         # ---------------------------------------------------------------------
         top_bar = QHBoxLayout()
 
-        title_lbl = QLabel("LENGA")
+        # Contenedor con fondo negro semitransparente para el título y logo Lenga+
+        title_box = QFrame()
+        title_box.setObjectName("HeaderTitleBox")
+        h_title = QHBoxLayout(title_box)
+        h_title.setContentsMargins(12, 6, 16, 6)
+        h_title.setSpacing(10)
+
+        logo_lbl = QLabel()
+        logo_pixmap = QPixmap(str(self.logo_path)).scaled(
+            32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation
+        )
+        logo_lbl.setPixmap(logo_pixmap)
+        h_title.addWidget(logo_lbl)
+
+        title_lbl = QLabel("LENGA+")
         title_lbl.setObjectName("HeaderTitle")
-        top_bar.addWidget(title_lbl)
+        h_title.addWidget(title_lbl)
 
         subtitle_lbl = QLabel("|  Simulación & Análisis Granular (Tesis)")
-        subtitle_lbl.setStyleSheet("color: #a6adc8; font-size: 13px; font-weight: 500;")
-        top_bar.addWidget(subtitle_lbl)
+        subtitle_lbl.setStyleSheet("color: #ECEFF1; font-size: 13px; font-weight: 500;")
+        h_title.addWidget(subtitle_lbl)
 
+        top_bar.addWidget(title_box)
         top_bar.addStretch()
 
         # Insignia de estado de la conexión SSH
@@ -111,11 +153,11 @@ class MainWindow(QMainWindow):
         self.lbl_ssh_status.setObjectName("BadgeWarning")
         top_bar.addWidget(self.lbl_ssh_status)
 
-        self.btn_login = QPushButton("🔑 Iniciar Sesión SSH")
+        self.btn_login = QPushButton("Iniciar Sesión SSH")
         self.btn_login.clicked.connect(self.open_login_dialog)
         top_bar.addWidget(self.btn_login)
 
-        self.btn_sim_form = QPushButton("⚡ Nueva Simulación (LAMMPS)")
+        self.btn_sim_form = QPushButton("Nueva Simulación (LAMMPS)")
         self.btn_sim_form.setObjectName("PrimaryButton")
         self.btn_sim_form.clicked.connect(self.open_simulation_dialog)
         top_bar.addWidget(self.btn_sim_form)

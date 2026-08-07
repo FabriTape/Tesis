@@ -329,8 +329,9 @@ class ClusterManager:
             for n_name in self._expand_nodelist(node_names):
                 if not n_name:
                     continue
-                if n_name not in nodes_dict:
-                    nodes_dict[n_name] = ClusterNode(
+                node_key = (n_name, partition)
+                if node_key not in nodes_dict:
+                    nodes_dict[node_key] = ClusterNode(
                         name=n_name,
                         partition=partition,
                         state_raw=state,
