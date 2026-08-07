@@ -158,7 +158,7 @@ class SimulationDialog(QDialog):
         """Pobla la tabla de nodos con los nodos disponibles y sus estados."""
         nodes_to_show = self.available_nodes if self.available_nodes else [
             ClusterNode("gpu2", "gpu", "idle", "Libre", "16", "1", 0),
-            ClusterNode("toko04", "XL", "alloc", "Ocupado", "32", "0", 1),
+            ClusterNode("xl01", "XL", "alloc", "Ocupado", "32", "0", 1),
             ClusterNode("node01", "cpu", "idle", "Libre", "16", "0", 0),
             ClusterNode("node02", "cpu", "idle", "Libre", "16", "0", 0),
         ]

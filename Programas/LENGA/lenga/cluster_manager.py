@@ -20,7 +20,7 @@ class ClusterNode:
     """Representa la información y estado operativo de un nodo del cluster.
 
     Attributes:
-        name (str): Nombre único del nodo (ej. 'gpu2', 'toko04').
+        name (str): Nombre único del nodo (ej. 'gpu2', 'xl01').
         partition (str): Partición a la que pertenece ('gpu', 'XL', 'cpu').
         state_raw (str): Estado bruto devuelto por SLURM ('idle', 'alloc', 'mix').
         state_display (str): Estado formateado para la GUI ('Libre', 'Ocupado', 'Mixto', 'No disponible').
@@ -97,7 +97,7 @@ class SimulationConfig:
     selected_nodes: List[str] = field(default_factory=lambda: ["gpu2"])
     partition: str = "gpu"
     tasks_per_node: int = 8
-    remote_base_dir: str = "/home/fbazzoni"
+    remote_base_dir: str = "~"
 
     def validate_node_selection(self) -> Tuple[bool, str]:
         """Valida que la cantidad de nodos elegidos cumpla con el límite (Máximo 2 nodos).

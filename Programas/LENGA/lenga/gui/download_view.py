@@ -15,6 +15,7 @@ from typing import Optional
 from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QComboBox,
+    QDialog,
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
@@ -30,6 +31,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from lenga.gui.remote_browse_dialog import RemoteBrowseDialog
 from lenga.ssh_client import SSHClientManager
 
 
@@ -60,6 +62,7 @@ class DownloadViewWidget(QWidget):
         self.ssh = ssh_client
         self.local_dir = Path(__file__).resolve().parent.parent.parent / "datos"
         self.local_dir.mkdir(parents=True, exist_ok=True)
+        self._resolved_sim_dir: Optional[str] = None
 
         self._init_ui()
 
@@ -85,10 +88,13 @@ class DownloadViewWidget(QWidget):
         v_g = QVBoxLayout(grp_global)
 
         h_remote = QHBoxLayout()
-        self.txt_remote = QLineEdit("/home/fbazzoni/resultados/merge_resultados.csv")
+        self.txt_remote = QLineEdit("~/resultados/merge_resultados.csv")
         self.txt_remote.setPlaceholderText("Ruta remota del archivo o carpeta .csv")
+        self.btn_browse_remote = QPushButton("Examinar remoto...")
+        self.btn_browse_remote.clicked.connect(self._browse_remote_file)
         h_remote.addWidget(QLabel("Ruta Remota:"))
         h_remote.addWidget(self.txt_remote)
+        h_remote.addWidget(self.btn_browse_remote)
         v_g.addLayout(h_remote)
 
         h_local = QHBoxLayout()
@@ -175,35 +181,78 @@ class DownloadViewWidget(QWidget):
         self.refresh_local_files()
 
     def _browse_local_path(self):
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Seleccionar ubicación de destino local", str(self.local_dir), "Archivos CSV (*.csv);;Todos (*)"
+        dir_path = QFileDialog.getExistingDirectory(
+            self, "Seleccionar carpeta de destino local", str(self.local_dir)
         )
-        if file_path:
-            self.txt_local.setText(file_path)
+        if dir_path:
+            remote_name = Path(self.txt_remote.text().strip()).name or "merge_resultados.csv"
+            self.txt_local.setText(str(Path(dir_path) / remote_name))
 
     def _browse_spec_local(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta destino", str(self.local_dir))
         if dir_path:
             self.txt_spec_local.setText(dir_path)
 
+    def _resolve_remote_sim_dir(self, sim_name: str) -> Optional[str]:
+        """Resuelve la ruta remota exacta de una simulación (el batch dir difiere por orientación)."""
+        if self.ssh.mock_mode:
+            return f"./Buffer/{sim_name}"
+        cmd = (
+            'find "$HOME" -maxdepth 5 -type d '
+            f"-name {shlex.quote(sim_name)} 2>/dev/null | head -1; true"
+        )
+        success, stdout, err = self.ssh.run_command(cmd)
+        if success and stdout.strip():
+            for line in stdout.splitlines():
+                line = line.strip()
+                if not line or line.startswith("Warning: Permanently added") or "to the list of known hosts" in line:
+                    continue
+                return line
+        return None
+
+    def _browse_remote_file(self):
+        if not self.ssh.is_connected and not self.ssh.mock_mode:
+            QMessageBox.warning(self, "Sin Conexión SSH", "Inicie sesión SSH para examinar archivos remotos.")
+            return
+        if self.ssh.mock_mode:
+            self.lbl_status.setText("Exploración no disponible en modo simulación.")
+            QMessageBox.information(
+                self, "Modo Simulación",
+                "Para examinar archivos remotos es necesario conectarse a un cluster real.\n"
+                "El modo simulación (mock) no puede listar carpetas remotas.",
+            )
+            return
+
+        dlg = RemoteBrowseDialog(self.ssh, start_path="~", select_files=True, parent=self)
+        if dlg.exec_() == QDialog.Accepted:
+            remote_file = dlg.selected_remote_path()
+            if remote_file:
+                self.txt_remote.setText(remote_file)
+                self.lbl_status.setText(f"Ruta remota seleccionada: {remote_file}")
+
     def _explore_remote_simulations(self):
         if not self.ssh.is_connected and not self.ssh.mock_mode:
             QMessageBox.warning(self, "Sin Conexión SSH", "Inicie sesión SSH para explorar simulaciones en el cluster.")
             return
 
-        self.lbl_status.setText("Explorando carpetas de simulaciones en el cluster...")
-        success, stdout, err = self.ssh.run_command("ls -d /home/*/sims/* 2>/dev/null || ls -d ./sims/* 2>/dev/null || echo ''")
-        if success and stdout.strip():
-            sim_list = [Path(line.strip()).name for line in stdout.splitlines() if line.strip()]
-            if sim_list:
-                selected_sim, ok = QMessageBox.getItem(
-                    self, "Simulaciones Encontradas en Cluster", "Seleccione la simulación a descargar:", sim_list, 0, False
-                )
-                if ok and selected_sim:
-                    self.txt_sim_name.setText(selected_sim)
-                    self.lbl_status.setText(f"Simulación seleccionada: {selected_sim}")
-                return
-        QMessageBox.information(self, "Exploración", "No se encontraron simulaciones o se utilizó el modo simulación.")
+        if self.ssh.mock_mode:
+            self.lbl_status.setText("Exploración no disponible en modo simulación.")
+            QMessageBox.information(
+                self,
+                "Modo Simulación",
+                "Para explorar las simulaciones del cluster es necesario conectarse "
+                "a un cluster real.\nEl modo simulación (mock) no puede listar carpetas remotas.",
+            )
+            return
+
+        dlg = RemoteBrowseDialog(self.ssh, start_path="~", select_files=False, parent=self)
+        if dlg.exec_() == QDialog.Accepted:
+            remote_dir = dlg.selected_remote_path()
+            if remote_dir:
+                sim_name = Path(remote_dir.rstrip("/")).name
+                self.txt_sim_name.setText(sim_name)
+                self._resolved_sim_dir = remote_dir
+                self.lbl_status.setText(f"Simulación seleccionada: {sim_name}  ({remote_dir})")
 
     def _start_download_global(self):
         remote_path = self.txt_remote.text().strip()
@@ -219,18 +268,28 @@ class DownloadViewWidget(QWidget):
             QMessageBox.warning(self, "Nombre Incompleto", "Especifique el nombre o ID de la simulación.")
             return
 
-        # Sanitizar nombre de simulación
-        safe_name = shlex.quote(sim_name)
-        remote_base_path = f"/home/{self.ssh.username}/sims/{sim_name}" if self.ssh.username else f"./sims/{sim_name}"
+        remote_sim_dir = self._resolved_sim_dir
+        if not (remote_sim_dir and Path(remote_sim_dir.rstrip("/")).name == sim_name):
+            remote_sim_dir = self._resolve_remote_sim_dir(sim_name)
+            self._resolved_sim_dir = remote_sim_dir
+
+        if not remote_sim_dir:
+            self.lbl_status.setText(f"Simulación '{sim_name}' no encontrada en el cluster.")
+            QMessageBox.warning(
+                self, "Simulación no encontrada",
+                f"No se encontró la simulación '{sim_name}' en el cluster.\n"
+                "Use 'Explorar en Cluster' para elegirla manualmente.",
+            )
+            return
 
         if comp_type == "trajectory":
-            remote_target = f"{remote_base_path}/*.parquet"
+            remote_target = f"{remote_sim_dir}/*.parquet"
             local_target = str(local_base / f"{sim_name}_trajectory.parquet")
         elif comp_type == "metadata":
-            remote_target = f"{remote_base_path}/*.json"
+            remote_target = f"{remote_sim_dir}/*.json"
             local_target = str(local_base / f"{sim_name}_metadata.json")
         else:
-            remote_target = remote_base_path
+            remote_target = remote_sim_dir
             local_target = str(local_base / sim_name)
 
         self._execute_scp_download(remote_target, local_target, self.btn_download_spec)

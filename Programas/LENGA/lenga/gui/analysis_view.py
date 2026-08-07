@@ -67,7 +67,7 @@ class AnalysisViewWidget(QWidget):
         grp_config = QGroupBox("Parámetros de Ejecución Remota")
         h_config = QHBoxLayout(grp_config)
 
-        self.txt_remote_dir = QLineEdit("/home/fbazzoni")
+        self.txt_remote_dir = QLineEdit("~")
         self.txt_remote_dir.setPlaceholderText("Directorio base en el cluster")
 
         self.txt_node = QLineEdit("gpu2")

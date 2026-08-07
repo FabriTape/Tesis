@@ -28,7 +28,7 @@ class CarboxiRunner:
 
     def run_analysis_pipeline(
         self,
-        remote_base_dir: str = "/home/fbazzoni",
+        remote_base_dir: str = "~",
         target_node: str = "gpu2",
         progress_callback: Optional[Callable[[str], None]] = None
     ) -> Tuple[bool, str]:
@@ -39,7 +39,7 @@ class CarboxiRunner:
         2. Ejecutar python -m CARBOXI.merge_all sobre el directorio de resultados.
 
         Args:
-            remote_base_dir (str): Directorio raíz del usuario en el cluster (default: '/home/fbazzoni').
+            remote_base_dir (str): Directorio raíz del usuario en el cluster (default: '~').
             target_node (str): Nodo objetivo para la ejecución (default: 'gpu2').
             progress_callback (Optional[Callable[[str], None]]): Callback para reportar logs en la GUI.
 
@@ -80,11 +80,11 @@ class CarboxiRunner:
         else:
             return False, f"Error durante CARBOXI.merge_all: {stderr_m.strip()}"
 
-    def trigger_merge_only(self, remote_base_dir: str = "/home/fbazzoni") -> Tuple[bool, str]:
+    def trigger_merge_only(self, remote_base_dir: str = "~") -> Tuple[bool, str]:
         """Ejecuta únicamente la consolidación merge_all sobre los datos existentes.
 
         Args:
-            remote_base_dir (str): Directorio raíz remoto del proyecto (default: '/home/fbazzoni').
+            remote_base_dir (str): Directorio raíz remoto del proyecto (default: '~').
 
         Returns:
             Tuple[bool, str]: Tupla con (exito: bool, resultado: str).

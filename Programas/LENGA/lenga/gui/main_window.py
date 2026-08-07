@@ -79,7 +79,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.ssh_client = SSHClientManager()
         if dry_run:
-            self.ssh_client.configure("toko04", 22, "fbazzoni", "", mock_mode=True)
+            self.ssh_client.configure("", 22, "", "", mock_mode=True)
 
         self.cluster_mgr = ClusterManager(self.ssh_client)
         self.carboxi_runner = CarboxiRunner(self.ssh_client)

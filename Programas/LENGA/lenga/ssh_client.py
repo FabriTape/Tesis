@@ -116,6 +116,7 @@ class SSHClientManager:
         user_host = f"{self.username}@{self.host}"
         base_ssh = (
             f"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
+            f"-o LogLevel=ERROR "
             f"-p {self.port} {user_host}"
         )
 
@@ -195,7 +196,7 @@ class SSHClientManager:
 
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
         user_host = f"{self.username}@{self.host}"
-        scp_cmd = f"scp -r -o StrictHostKeyChecking=no -P {self.port} {user_host}:{remote_path} {local_path}"
+        scp_cmd = f"scp -r -o StrictHostKeyChecking=no -o LogLevel=ERROR -P {self.port} {user_host}:{remote_path} {local_path}"
 
         try:
             if progress_callback:
@@ -243,7 +244,7 @@ class SSHClientManager:
         import pexpect
 
         user_host = f"{self.username}@{self.host}"
-        scp_cmd = f"scp -r -o StrictHostKeyChecking=no -P {self.port} {local_path} {user_host}:{remote_path}"
+        scp_cmd = f"scp -r -o StrictHostKeyChecking=no -o LogLevel=ERROR -P {self.port} {local_path} {user_host}:{remote_path}"
 
         try:
             child = pexpect.spawn(scp_cmd, encoding="utf-8", timeout=300)
@@ -283,14 +284,14 @@ class SSHClientManager:
             mock_sinfo = (
                 "PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST\n"
                 "gpu*      up   infinite      1   idle  gpu2\n"
-                "XL        up   infinite      1   alloc toko04\n"
+                "XL        up   infinite      1   alloc xl01\n"
                 "cpu       up   infinite      2   idle  node01,node02\n"
             )
             return True, mock_sinfo, ""
         elif "squeue" in command:
             mock_squeue = (
                 "JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)\n"
-                " 1042        XL JKR_sims fbazzoni  R   02:15:00      1 toko04\n"
+                " 1042        XL JKR_sims usuario  R   02:15:00      1 xl01\n"
             )
             return True, mock_squeue, ""
         elif "CARBOXI" in command:

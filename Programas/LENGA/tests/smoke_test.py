@@ -86,6 +86,89 @@ class LengaSmokeTest(unittest.TestCase):
         self.assertIn("49_mov", engine.TABLES_FOR_DATASET)
         self.assertGreater(len(engine.TABLES_FOR_DATASET["9_mov"]), 0)
 
+    def test_download_view_remote_sims(self):
+        from lenga.gui.download_view import DownloadViewWidget
+        from lenga.ssh_client import SSHClientManager
+
+        ssh = SSHClientManager("cluster.dominio.com", 22, "usuario", "")
+        ssh.is_connected = True
+        view = DownloadViewWidget(ssh)
+
+        fake_out = (
+            "/home/usuario/cluster/scripts/Buffer/sims_SI_erosion_bed_100um__ff_0.35_vel_-50_"
+            "move_0_NP_1_angle_0/erosion_bed_SI_ff_0.35_np_1_vel_-50_angle_0_move_0_0_0"
+        )
+        commands = []
+        ssh.run_command = lambda cmd, timeout=60: commands.append(cmd) or (True, fake_out, "")
+        resolved = view._resolve_remote_sim_dir("erosion_bed_SI_ff_0.35_np_1_vel_-50_angle_0_move_0_0_0")
+        self.assertEqual(
+            resolved,
+            "/home/usuario/cluster/scripts/Buffer/sims_SI_erosion_bed_100um__ff_0.35_vel_-50_"
+            "move_0_NP_1_angle_0/erosion_bed_SI_ff_0.35_np_1_vel_-50_angle_0_move_0_0_0",
+        )
+        # El comando usa $HOME (sin hardcodear usuario) y termina siempre en éxito
+        self.assertIn('"$HOME"', commands[0])
+        self.assertTrue(commands[0].rstrip().endswith("true"))
+
+    def test_download_view_mock_explore(self):
+        from lenga.gui.download_view import DownloadViewWidget
+        from lenga.ssh_client import SSHClientManager
+
+        ssh = SSHClientManager("mock", 22, "usuario", "")
+        ssh.mock_mode = True
+        view = DownloadViewWidget(ssh)
+        resolved = view._resolve_remote_sim_dir("erosion_bed_SI_ff_0.35_np_1_vel_-50_angle_0_move_0_0_0")
+        self.assertEqual(resolved, "./Buffer/erosion_bed_SI_ff_0.35_np_1_vel_-50_angle_0_move_0_0_0")
+
+    def test_remote_browse_dialog(self):
+        from lenga.gui.remote_browse_dialog import RemoteBrowseDialog
+        from lenga.ssh_client import SSHClientManager
+
+        ssh = SSHClientManager("cluster.dominio.com", 22, "usuario", "")
+        ssh.is_connected = True
+
+        def fake_run(cmd, timeout=60):
+            if "echo $HOME" in cmd:
+                return True, "/home/usuario\n", ""
+            return True, "carpeta_sim/\narchivo.csv\n", ""
+
+        ssh.run_command = fake_run
+        dlg = RemoteBrowseDialog(ssh, start_path="~", select_files=True)
+        self.assertEqual(dlg.current_path, "/home/usuario")
+        texts = [dlg.lst.item(i).text() for i in range(dlg.lst.count())]
+        self.assertIn("carpeta_sim/", texts)
+        self.assertIn("archivo.csv", texts)
+
+        dlg._on_click(dlg.lst.item(1))
+        self.assertEqual(dlg.selected_remote_path(), "/home/usuario/archivo.csv")
+
+        # Doble click entra en la carpeta
+        dlg._on_double_click(dlg.lst.item(0))
+        self.assertEqual(dlg.current_path, "/home/usuario/carpeta_sim")
+        self.assertEqual(dlg.selected_remote_path(), "/home/usuario/carpeta_sim")
+
+    def test_remote_browse_dialog_filters_ssh_warning(self):
+        from lenga.gui.remote_browse_dialog import RemoteBrowseDialog
+        from lenga.ssh_client import SSHClientManager
+
+        ssh = SSHClientManager("cluster.dominio.com", 22, "usuario", "")
+        ssh.is_connected = True
+
+        def fake_run(cmd, timeout=60):
+            if "echo $HOME" in cmd:
+                return True, "/home/usuario\n", ""
+            return (
+                True,
+                "Warning: Permanently added 'cluster.dominio.com' (ED25519) "
+                "to the list of known hosts.\ncarpeta_sim/\n",
+                "",
+            )
+
+        ssh.run_command = fake_run
+        dlg = RemoteBrowseDialog(ssh, start_path="~")
+        texts = [dlg.lst.item(i).text() for i in range(dlg.lst.count())]
+        self.assertEqual(texts, ["carpeta_sim/"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
