@@ -152,7 +152,7 @@ figuras en `figuras/9_mov/` y `figuras/49_mov/`.
 ## Ramas
 
 - **`main`**: rama estable. Apunta al estado actual del trabajo.
-- **`desarrollo`**: rama de desarrollo activo (Se está trabajando en el desarrollo de una interfaz gráfica que centralice el trabajo. Este programa que se encuentra en desarrollo y revisión se llamará LENGA+).
+- **`desarrollo`**: rama de desarrollo activo (Se está trabajando en el desarrollo de una interfaz gráfica que centralice el trabajo. Este programa que se encuentra en desarrollo y revisión, se llamará LENGA+).
 
 Los experimentos descartados quedan archivados como tags `archive/*` para
 conservar su historial sin ensuciar las ramas.
