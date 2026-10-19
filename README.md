@@ -77,6 +77,7 @@ Tesis/
     │   ├── solid/                   #   Módulos SOLID de un refactor descartado
     │   ├── final/                   #   Últimos scripts de visualización de clusters
     │   ├── prueba_*.py              #   Scripts de prueba documentados
+    │   ├── nuevo_plot_erosion/      #   Prototipo de figuras de balance de momento (removidas del pipeline)
     │   ├── resume_controller.py     #   Retomar sims incompletas desde restart
     │   ├── slurm_resume.sh          #   Job Slurm para reanudar simulaciones
     │   ├── erosion.py               #   Figuras de la tesis, set de 9 (previo a generador_figuras.py)
