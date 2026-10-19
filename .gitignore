@@ -13,6 +13,7 @@ date.sh
 ./date.sh
 __pycache__/
 *.pyc
+.ipynb_checkpoints/
 .cache/
 .venv/
 #./sims/__pycache__
