@@ -92,6 +92,7 @@ Tesis/
     │   ├── solid/                   #   Módulos SOLID de un refactor descartado
     │   ├── final/                   #   Últimos scripts de visualización de clusters
     │   ├── prueba_*.py              #   Scripts de prueba documentados
+    │   ├── nuevo_plot_erosion/      #   Prototipo de figuras de balance de momento (removidas del pipeline)
     │   ├── resume_controller.py     #   Retomar sims incompletas desde restart
     │   ├── slurm_resume.sh          #   Job Slurm para reanudar simulaciones
     │   ├── erosion.py               #   Figuras de la tesis, set de 9 (previo a generador_figuras.py)
@@ -229,8 +230,10 @@ QT_QPA_PLATFORM=offscreen python3 -m unittest Programas/LENGA/tests/smoke_test.p
 
 ## Ramas
 
-- **`main`**: rama estable. Apunta al estado actual del trabajo.
-- **`desarrollo`**: rama de desarrollo activo (idéntica a `main` en este momento).
+- **`main`**: rama estable, **congelada en el estado previo a LENGA+** (último
+  commit antes de integrar la GUI). No recibe los cambios de LENGA+.
+- **`desarrollo`**: rama de desarrollo activo. Incluye LENGA+ (v1.1.0), que está
+  en construcción y puede tener bugs conocidos.
 
 Los experimentos descartados quedan archivados como tags `archive/*` para
 conservar su historial sin ensuciar las ramas.
