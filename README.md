@@ -65,7 +65,9 @@ Tesis/
     │   ├── comparar_y_mergear.sh    #   Regenera el merge del "después" y ejecuta la comparación
     │   ├── lanzar_pre_merge.sh      #   Corre el baseline pre-merge (paquete viejo) sobre 9 o 25 movimientos
     │   ├── limpieza_fase1.sh        #   Elimina archivos obsoletos tras la reconciliación
-    │   └── reubicar_9moves.py       #   Reubica y deduplica los parquet de 9 movimientos
+    │   ├── reubicar_9moves.py       #   Reubica y deduplica los parquet de 9 movimientos
+    │   ├── suma_tiempos.py          #   Suma horas y core-horas desde nas/
+    │   └── analisis_completo.py     #   Suma horas y core-horas en nas/, sims_emmanuel/, SIMULACIONES/Buffer/
     │
     ├── Ideas_de_implementacion/     # Prototipos y experimentos en curso
     │   ├── fabric_tensor*.py        #   Tensor de fábrica (v1…v5) con OVITO
@@ -167,6 +169,24 @@ físicos de las simulaciones:
   parquet de 9 movimientos tras la reconciliación.
 
 Las salidas de estos scripts (`.txt`/`.csv` de comparación) no se versionan.
+
+### 5. Cálculo de tiempos de simulación
+
+`Programas/scripts_de_comparacion/` incluye además dos scripts para estimar el tiempo
+total empleado en las simulaciones a partir de las marcas temporales (`mtime`) de los
+archivos:
+
+- **`suma_tiempos.py`** — Escanea `nas/` (excluyendo `sims_25_moves`). Para cada carpeta
+  de simulación busca el `output` final (`output.N.gz` más reciente, o
+  `output_trayectoria.dump`). Calcula la duración entre `pre-run_with_projectile.data`
+  y ese archivo. Obtiene el número de núcleos desde `log.lammps` (grilla MPI) o del
+  nombre de la carpeta (`cores_N`). Imprime el detalle por simulación, la suma de
+  horas, el total en *core-horas* y el equivalente con 32, 64 o 128 núcleos.
+- **`analisis_completo.py`** — Versión general que recorre `nas/`, `sims_emmanuel/`
+  y `SIMULACIONES/Buffer/` con sus listas de exclusión. Usa el mismo criterio para
+  duración y núcleos, y además extrae el coeficiente de fricción (`ff = 0.15` o
+  `0.35`) del nombre de la subcarpeta. Útil para obtener un total global entre
+  distintos discos/directorios.
 
 ## Lanzamientos
 
