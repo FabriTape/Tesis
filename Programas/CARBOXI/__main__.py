@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Punto de entrada para ejecutar CARBOXI como módulo.
 
 Uso:

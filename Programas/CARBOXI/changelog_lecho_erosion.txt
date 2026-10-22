@@ -1,0 +1,86 @@
+=== REGISTRO DE EDICIONES: lecho_erosion ===
+Fecha: 2026-10-20
+
+=== MERGE DE RECONCILIACIÓN (octubre 2026) ===
+
+Contexto: se reconciliaron 3 versiones de CARBOXI
+  (~/CARBOXI, CARBOXI.bak.20260620 y GitHub main).
+  F2C + lecho_erosion + rotación = VERSIÓN CANÓNICA.
+  F3C queda archivada en el historial de GitHub (rama main pre-merge /
+  desarrollo) como investigación futura: presenta comportamiento anómalo
+  (clusters que aceleran de golpe en el aire, se frenan y siguen en MRU).
+
+Cambios portados desde GitHub main (neutrales para resultados):
+  1. config_and_discovery.py
+     - browse_for_simulation(): navegador interactivo de carpetas
+       (python -m CARBOXI sin argumentos).
+  2. main_pipeline.py
+     - _metadata_valid(): reemplaza el check any(== "N/A").
+     - Si run_topology_analysis retorna lista vacía, escribe marcador
+       *_NADA_F2C_*.txt en lugar de fallar.
+     - Después de guardar parquet, genera gráfico SVG con plot_erosion.
+  3. io.py
+     - save_no_erosion_flag(): marcador de simulación sin erosión.
+     - plot_erosion() + helpers: gráfico 2x2 (eyectadas, clusters,
+       gaps acumulados, gaps/step) exportado a SVG.
+     - plot_empty(): gráfico vacío cuando no hay datos.
+  4. merge_all.py
+     - merge_with_no_erosion(): merge que incluye filas sintéticas
+       para marcadores NADA (proyectil_erosion=false).
+
+NO portado (a propósito):
+  - Filtro F3C, tolerancia_v_cm, umbral_techo_radios=0.0 (F3C archivado).
+  - _select_bed_height dinámico (mantener comparabilidad con resultados
+    existentes: bed_height_ff_015 fija).
+  - Cambio de _SIM_PREFIX a "erosion_" (el discovery local
+    sims_SI_ + _EROSION_PREFIX ya está probado con las carpetas reales).
+
+=== REGISTRO DE EDICIONES PREVIAS: lecho_erosion ===
+Fecha: 2026-06-12
+
+=== ARCHIVOS MODIFICADOS ===
+
+1. erosion_analysis.py
+   Backup previo: erosion_analysis.py.bak.pre_mod
+
+   Cambio 1: _SCHEMA
+     Se agregó "lecho_erosion": pl.Boolean
+
+   Cambio 2: _filter_F2C()
+     - Parámetro cambiado de `lf: pl.LazyFrame` a `df: pl.DataFrame`
+     - Se eliminó .collect() interno (ahora recibe DataFrame ya colectado)
+     - Esto permite reusar el mismo raw_df para filtro + posiciones
+
+   Cambio 3: run_topology_analysis()
+     Reescribir completamente:
+     a) Procesa el ÚLTIMO frame primero para obtener eroded_ids
+     b) Luego itera frames 0..total-1:
+        - Lee raw_df una sola vez por frame
+        - Filtra raw_df por eroded_ids → posiciones en TODOS los frames
+        - Corre _filter_F2C con raw_df → OVITO + lecho_erosion
+        - Mergea posiciones con OVITO columns (left join)
+        - Agrega lecho_erosion por frame
+     c) Ya no retro-filtra por eroded_ids (se hace en cada frame directo)
+
+2. io.py
+   - Cambio menor: pl.concat(results, how="vertical_relaxed") → pl.concat(results, how="vertical")
+     (compatible con polars 0.18+, vertical_relaxed no existe en 0.18)
+
+=== COMPORTAMIENTO NUEVO ===
+
+La columna lecho_erosion indica:
+  - True:  partícula tipo 1 detectada como erosionada en ese frame
+  - False: partícula tipo 1 presente pero aún no erosionada
+  - None:  partícula tipo 2 (proyectil)
+
+El tracking retroactivo ahora incluye TODAS las partículas de la eyecta
+en TODOS los frames, con sus posiciones reales incluso antes de ser
+eyectadas (antes se perdían porque el filtro de altura las descartaba).
+
+=== VERIFICACIÓN ===
+
+Test con simulación ff_0.15_np_3_vel_-50:
+  10 frames procesados
+  NEW: 50 rows (10 frames x 5 partículas)
+  OLD: 39 rows (bed particles faltaban en frames tempranos)
+  lecho_erosion correcto en todos los frames

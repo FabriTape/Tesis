@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Carga de configuración y descubrimiento de simulaciones LAMMPS.
 
@@ -20,7 +21,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-_SIM_PREFIX: str = "erosion_"
+_SIM_PREFIX: str = "sims_SI_"
 
 _PATRONES: dict[str, str] = {
     "ff": r"ff_([^_]+)",
@@ -75,7 +76,7 @@ class FilterConfig:
     umbral_vz_min: float
     umbral_techo_radios: float
     tolerancia_v_cm: float
-    filtro_activo: str = "F3C"
+    filtro_activo: str = "F2C"
 
 
 @dataclass(frozen=True)
@@ -111,25 +112,29 @@ class Config:
     dir_imagenes: Path
 
 
-def load_config(path: Path = Path("config.toml")) -> Config:
+def load_config(
+    path: Path = Path("config.toml"), project_root: Path | None = None
+) -> Config:
     """Carga y parsea el archivo de configuración TOML embebido.
 
     Args:
         path: Ruta al archivo config.toml (ignorada, se usa el embebido).
+        project_root: Raíz contra la cual resolver rutas relativas de salida.
+            Si es None, se usa el CWD.
 
     Returns:
         Config: Instancia inmutable con todos los parámetros de análisis.
 
     Raises:
         FileNotFoundError: Si el config.toml embebido no se encuentra.
-        KeyError: Si faltan secciones obligatorias en el TOML.
+        KeyError: Si faltan secciones obligatorias del TOML.
     """
     resolved = _resolve_config_path(path)
 
     with resolved.open("rb") as f:
         raw: dict = tomllib.load(f)
 
-    return _build_config(raw)
+    return _build_config(raw, project_root)
 
 
 def _resolve_config_path(path: Path) -> Path:
@@ -141,7 +146,7 @@ def _resolve_config_path(path: Path) -> Path:
     raise FileNotFoundError(f"config.toml embebido no encontrado en '{module_config}'.")
 
 
-def _build_config(raw: dict) -> Config:
+def _build_config(raw: dict, project_root: Path | None = None) -> Config:
     """Construye la instancia Config a partir del diccionario TOML."""
     radio_um: float = raw["defaults"]["radio_um"]
 
@@ -169,6 +174,12 @@ def _build_config(raw: dict) -> Config:
     )
 
     rutas = raw["rutas"]
+    raiz = Path(project_root) if project_root is not None else Path(".")
+
+    def _resolver_ruta(valor: str) -> Path:
+        p = Path(valor)
+        return p if p.is_absolute() else raiz / p
+
     return Config(
         radio_m=radio_um * 1e-6,
         usar_caja=bool(raw["defaults"].get("usar_caja", True)),
@@ -180,8 +191,8 @@ def _build_config(raw: dict) -> Config:
         wave=wave,
         filters=filters,
         factor_cutoff=float(raw["jkr"]["factor_cutoff"]),
-        dir_resultados=Path(rutas["resultados"]),
-        dir_imagenes=Path(rutas["imagenes"]),
+        dir_resultados=_resolver_ruta(rutas["resultados"]),
+        dir_imagenes=_resolver_ruta(rutas["imagenes"]),
     )
 
 
@@ -204,9 +215,12 @@ def discover_simulations(
     Raises:
         SystemExit: Si no se encuentra ninguna simulación válida.
     """
+    if base_dir.name.startswith(_EROSION_PREFIX):
+        return [base_dir]
     if base_dir.name.startswith(prefix):
         sims = sorted(
-            p for p in base_dir.iterdir()
+            p
+            for p in base_dir.iterdir()
             if p.is_dir() and p.name.startswith(_EROSION_PREFIX)
         )
         if sims:
@@ -263,6 +277,33 @@ def extraer_metadatos(sim_id: str) -> dict[str, str]:
     return metadatos
 
 
+def extraer_rotacion(nombre: str) -> dict[str, str]:
+    """Extrae parámetros de rotación desde el nombre de la carpeta PADRE.
+
+    Busca el patrón posicional <angulo>_<eje_x>_<eje_y>_<eje_z> justo antes de _ff_,
+    que es donde aparece en los nombres tipo:
+      sims_SI_erosion_bed_100um_90_0_1_0_ff_...
+
+    Si no encuentra rotación (simulación vieja), retorna defaults nulos.
+
+    Args:
+        nombre: Nombre de la carpeta padre (ej. sims_SI_erosion_bed_100um_90_0_1_0_ff_...).
+
+    Returns:
+        Diccionario con claves: rot_angulo, rot_eje_x, rot_eje_y, rot_eje_z.
+    """
+    patron = r"_(\d+)_(\d+)_(\d+)_(\d+)_ff_"
+    m = re.search(patron, nombre)
+    if m:
+        return {
+            "rot_angulo": m.group(1),
+            "rot_eje_x": m.group(2),
+            "rot_eje_y": m.group(3),
+            "rot_eje_z": m.group(4),
+        }
+    return {"rot_angulo": "0", "rot_eje_x": "0", "rot_eje_y": "0", "rot_eje_z": "0"}
+
+
 def print_progress(current: int, total: int, label: str = "análisis") -> None:
     """Actualiza en línea una barra de progreso ASCII en la terminal.
 
@@ -295,7 +336,7 @@ def browse_for_simulation() -> list[Path]:
 
     while True:
         subdirs = _list_subdirs(current)
-        erosion_dirs = [p for p in subdirs if p.name.startswith(_SIM_PREFIX)]
+        erosion_dirs = [p for p in subdirs if p.name.startswith(_EROSION_PREFIX)]
         dump_files = list(current.glob("output.*.gz"))
 
         _print_browser_header(current, subdirs, erosion_dirs, dump_files)
@@ -360,7 +401,7 @@ def _print_browser_header(
     print()
 
     for i, subdir in enumerate(subdirs, start=1):
-        tag = " ★" if subdir.name.startswith(_SIM_PREFIX) else ""
+        tag = " ★" if subdir.name.startswith(_EROSION_PREFIX) else ""
         print(f"[{i}] {subdir.name}{tag}")
 
     print()
@@ -368,7 +409,7 @@ def _print_browser_header(
 
 def _select_current(current: Path, subdirs: list[Path]) -> list[Path]:
     """Procesa la selección de la carpeta actual por el usuario."""
-    erosion_subs = [p for p in subdirs if p.name.startswith(_SIM_PREFIX)]
+    erosion_subs = [p for p in subdirs if p.name.startswith(_EROSION_PREFIX)]
 
     if erosion_subs:
         print(

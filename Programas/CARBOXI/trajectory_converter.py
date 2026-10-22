@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Conversor de resultados CARBOXI a formato compatible con OVITO.
 

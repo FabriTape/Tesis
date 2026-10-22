@@ -23,9 +23,8 @@ umbral_pared = 10
 
 [filtros]
 umbral_vz_min = 0.0
-umbral_techo_radios = 0.0
-tolerancia_v_cm = 1e-6
-filtro_activo = "F3C"
+umbral_techo_radios = 5.0
+filtro_activo = "F2C"
 
 [jkr]
 factor_cutoff = 2.02

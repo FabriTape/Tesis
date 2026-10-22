@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Pipeline principal y punto de entrada de CARBOXI.
 
@@ -23,11 +24,13 @@ from .config_and_discovery import (
     browse_for_simulation,
     discover_simulations,
     extraer_metadatos,
+    extraer_rotacion,
     load_config,
 )
 from .erosion_analysis import build_ovito_pipeline, run_topology_analysis
-from .storage_and_viz import (
+from .io import (
     detect_and_create_reader,
+    plot_empty,
     plot_erosion,
     save_erosion_results,
     save_no_erosion_flag,
@@ -38,18 +41,42 @@ _SIM_PREFIX: str = "erosion_bed_SI_"
 _TZ_ARG = timezone(timedelta(hours=-3))
 
 
+def _parse_args(argv: list[str]) -> tuple[Path | None, Path | None]:
+    """Extrae la carpeta de simulación y la raíz del proyecto desde argv.
+
+    Returns:
+        (base_dir, project_root); cualquiera puede ser None.
+    """
+    base_dir: Path | None = None
+    project_root: Path | None = None
+    i = 1
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--project-root":
+            i += 1
+            if i >= len(argv):
+                raise SystemExit("--project-root requiere un valor")
+            project_root = Path(argv[i]).resolve()
+        elif arg.startswith("--project-root="):
+            project_root = Path(arg.split("=", 1)[1]).resolve()
+        elif base_dir is None:
+            base_dir = Path(arg).resolve()
+        i += 1
+    return base_dir, project_root
+
+
 def main() -> None:
     """Punto de entrada principal de CARBOXI."""
-    if len(sys.argv) > 1:
-        base_dir = Path(sys.argv[1]).resolve()
-    else:
+    base_dir, project_root = _parse_args(sys.argv)
+
+    if base_dir is None:
         selected = browse_for_simulation()
         if not selected:
             print("No se seleccionó ninguna carpeta. Saliendo.")
             return
-        base_dir = selected[0].parent if len(selected) == 1 else selected[0].parent
+        base_dir = selected[0].parent if len(selected) > 1 else selected[0]
 
-    config = load_config()
+    config = load_config(project_root=project_root)
     run_all(base_dir, config)
 
 
@@ -67,17 +94,14 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
     timestamp = datetime.now(_TZ_ARG).strftime("%Y-%m-%d_%H-%M-%S")
     filter_name = config.filters.filtro_activo
 
-    print(f"\n{'=' * 55}")
-    print(f"  Procesando: {sim_dir.name}")
-    print(f"  Filtro activo: {filter_name}")
-    print(f"{'=' * 55}")
+    print(f"""\n{"=" * 55}
+  Procesando: {sim_dir.name}
+  Filtro activo: {filter_name}
+{"=" * 55}""")
 
     reader = detect_and_create_reader(sim_dir)
     if not reader:
-        print(
-            f"  Sin datos de trayectoria (.dump o .gz) en '{sim_dir.name}'. "
-            "Saltando..."
-        )
+        print(f"  Sin datos (.dump o .gz) en '{sim_dir.name}'. Saltando...")
         return
 
     timestep_interval = reader.timestep_interval
@@ -88,15 +112,17 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         print("  No se pudieron extraer metadatos del nombre de carpeta. Saltando...")
         return
 
-    bed_height = _select_bed_height(metadata, config)
-    umbral_radios = config.filters.umbral_techo_radios
+    # Extraer rotación desde el nombre de la carpeta PADRE
+    rotacion = extraer_rotacion(sim_dir.parent.name)
+    metadata.update(rotacion)
+    rot = (
+        f"_rot_{rotacion['rot_angulo']}_{rotacion['rot_eje_x']}"
+        f"_{rotacion['rot_eje_y']}_{rotacion['rot_eje_z']}"
+    )
+    sim_id = f"{sim_id}{rot}"
 
-    if umbral_radios < 0:
-        max_height = bed_height - abs(umbral_radios) * config.radio_m
-        bed_height = max_height
-    else:
-        max_height = bed_height + umbral_radios * config.radio_m
-
+    bed_height = config.bed_height_ff_015
+    max_height = bed_height + config.filters.umbral_techo_radios * config.radio_m
     box_limits = {"x": [0.0, config.caja_x], "y": [0.0, config.caja_y]}
 
     run_wave = is_critical_simulation(metadata, config)
@@ -113,15 +139,14 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
 
     if run_wave:
         _, cut_index = run_wave_scan(
-            reader=reader,
-            radius=config.radio_m,
-            max_height=max_height,
-            box_limits=box_limits,
-            use_static_box=True,
-            sim_id=sim_id,
-            timestamp=timestamp,
-            output_dir=config.dir_resultados,
-            config=config,
+            reader,
+            config.radio_m,
+            max_height,
+            box_limits,
+            sim_id,
+            timestamp,
+            config.dir_resultados,
+            config,
         )
     else:
         cut_index = num_frames
@@ -132,16 +157,14 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         pipeline=pipeline,
         bed_height=bed_height,
         max_height=max_height,
-        sim_id=sim_id,
+        metadata=metadata,
         timestep_interval=timestep_interval,
-        tolerancia_v_cm=config.filters.tolerancia_v_cm,
         freeze_height=config.freeze_height,
     )
 
-    filter_thresholds = {
+    thresholds = {
         "umbral_vz_min": config.filters.umbral_vz_min,
         "umbral_techo_radios": config.filters.umbral_techo_radios,
-        "tolerancia_v_cm": config.filters.tolerancia_v_cm,
     }
 
     if not results:
@@ -151,27 +174,34 @@ def run_simulation(sim_dir: Path, config: Config) -> None:
         print(f"  Sin erosión significativa. Marcador guardado en: {path}")
         return
 
-    result_path = save_erosion_results(
+    path = save_erosion_results(
         results,
         sim_id,
         timestamp,
         config.dir_resultados,
-        filter_thresholds,
+        thresholds,
         filter_name=filter_name,
     )
-    print(f"\n  Resultados guardados en: {result_path}")
+    if not path:
+        return
+    print(f"\n  Resultados guardados en: {path}")
 
-    df_total = pl.concat(results, how="vertical_relaxed")
-
-    if df_total.is_empty() or df_total.height == 0:
+    df_total = pl.concat(results, how="vertical")
+    if df_total.is_empty():
         print("  Sin datos para graficar. Generando gráfico vacío...")
-        _plot_empty(sim_id, timestamp, config.dir_imagenes, filter_name)
+        plot_empty(sim_id, timestamp, config.dir_imagenes, filter_name)
         return
 
     total_timesteps = df_total["i"].max()
-
     try:
-        plot_erosion(df_total, sim_id, timestamp, config.dir_imagenes, filter_name, total_timesteps=total_timesteps)
+        plot_erosion(
+            df_total,
+            sim_id,
+            timestamp,
+            config.dir_imagenes,
+            filter_name,
+            total_timesteps=total_timesteps,
+        )
     except Exception as exc:
         print(f"  Advertencia: no se pudo generar el gráfico: {exc}")
 
@@ -199,31 +229,6 @@ def _metadata_valid(metadata: dict[str, str]) -> bool:
         and metadata.get("np") != "N/A"
         and metadata.get("vel0") != "N/A"
     )
-
-
-def _select_bed_height(metadata: dict[str, str], config: Config) -> float:
-    """Selecciona la altura de la cama según el valor de ff."""
-    ff_value = metadata.get("ff", "N/A")
-    if ff_value == "0.15":
-        return config.bed_height_ff_015
-    elif ff_value == "0.35":
-        return config.bed_height_ff_035
-    else:
-        print(
-            f"  Advertencia: ff={ff_value} no reconocido, usando ff_0.15 por defecto."
-        )
-        return config.bed_height_ff_015
-
-
-def _plot_empty(
-    sim_id: str,
-    timestamp: str,
-    dir_imagenes: Path,
-    filter_name: str = "F3C",
-) -> None:
-    """Genera un gráfico vacío cuando no hay erosión."""
-    from .storage_and_viz import _plot_empty as plot_empty
-    plot_empty(sim_id, timestamp, dir_imagenes, filter_name)
 
 
 if __name__ == "__main__":

@@ -60,6 +60,13 @@ Tesis/
     │   ├── solo_graficos.py         #   Regenera gráficos desde CSV ya calculados
     │   └── run_all.py               #   Corre las variaciones de margen
     │
+    ├── scripts_de_comparacion/      # Verificación antes/después del merge F2C
+    │   ├── comparar_versiones.py    #   Compara parquet de dos versiones (por clave y frames comunes)
+    │   ├── comparar_y_mergear.sh    #   Regenera el merge del "después" y ejecuta la comparación
+    │   ├── lanzar_pre_merge.sh      #   Corre el baseline pre-merge (paquete viejo) sobre 9 o 25 movimientos
+    │   ├── limpieza_fase1.sh        #   Elimina archivos obsoletos tras la reconciliación
+    │   └── reubicar_9moves.py       #   Reubica y deduplica los parquet de 9 movimientos
+    │
     ├── Ideas_de_implementacion/     # Prototipos y experimentos en curso
     │   ├── fabric_tensor*.py        #   Tensor de fábrica (v1…v5) con OVITO
     │   ├── crater_analisis.py       #   Análisis de cráteres
@@ -140,6 +147,26 @@ python verificar_polars.py
 `legacy/`): procesa los datos con **polars**, guarda los resultados intermedios
 en `datos/procesados/` (se reutilizan si no se fuerza la recarga) y escribe las
 figuras en `figuras/9_mov/` y `figuras/49_mov/`.
+
+### 4. Verificación de la reconciliación (antes/después del merge F2C)
+
+`Programas/scripts_de_comparacion/` reúne los scripts usados para validar que el
+merge del filtro **F2C** (coordinación por capas) no altera los resultados
+físicos de las simulaciones:
+
+- `lanzar_pre_merge.sh`: corre el paquete **pre-merge** (snapshot viejo) sobre un
+  set de simulaciones (`9_moves` o `25_moves`) para generar el baseline "antes".
+- `comparar_versiones.py`: compara dos versiones de resultados parquet,
+  indexando por clave de simulación y contrastando solo los frames comunes.
+  Clasifica las diferencias como esperadas (columnas `rot_*`, `umbral_*`) o
+  inesperadas (cambios de valores o de filas).
+- `comparar_y_mergear.sh`: orquesta lo anterior; regenera el merge del estado
+  "después" (excluyendo los `_ONDA_`), verifica duplicados y ejecuta la
+  comparación.
+- `limpieza_fase1.sh` y `reubicar_9moves.py`: limpieza y reubicación de los
+  parquet de 9 movimientos tras la reconciliación.
+
+Las salidas de estos scripts (`.txt`/`.csv` de comparación) no se versionan.
 
 ## Lanzamientos
 

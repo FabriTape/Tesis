@@ -1,27 +1,11 @@
-"""
-Almacenamiento de datos y visualización de resultados.
-
-Este módulo combina:
-- Lectura de archivos dump de LAMMPS
-- Escritura de resultados (Parquet, marcadores)
-- Generación de gráficos SVG
-
-Física: Los archivos dump contienen posiciones y velocidades de partículas.
-Los resultados almacenan el estado cinemático y topológico de las partículas
-eyectadas de la cama de sílice.
-"""
-
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import polars as pl
 from ovito.io import import_file  # type: ignore[import-untyped]
-
-_ALL_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
-_WAVE_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
 
 _STEP_TO_US = 1.25
 _AXIS_FONTSIZE = 14
@@ -31,41 +15,35 @@ class LammpsTrajectoryReader:
     """Lector de trayectorias LAMMPS usando el motor C++ de OVITO.
 
     Soporta tanto archivos individuales (.dump) como secuencias legacy (.gz).
-    El lector abstrae el formato subyacente, permitiendo que el código de
-    análisis trabaje con frames sin conocer la estructura de archivos.
-
-    Attributes:
-        num_frames: Número de frames en la trayectoria.
-        timestep_interval: Intervalo de timesteps entre frames consecutivos.
     """
 
     def __init__(self, pattern: str) -> None:
-        """Inicializa el lector con un patrón de archivo.
-
-        Args:
-            pattern: Ruta a archivo único ('output.dump') o comodín ('output.*.gz').
-        """
         self.pipeline = import_file(pattern)
-        self.num_frames = self.pipeline.source.num_frames
 
-        t0 = self.pipeline.compute(0).attributes.get("Timestep", 0)
-        if self.num_frames > 1:
-            t1 = self.pipeline.compute(1).attributes.get("Timestep", 0)
-            self.timestep_interval = t1 - t0
-        else:
-            self.timestep_interval = 0
+    @property
+    def num_frames(self) -> int:
+        return self.pipeline.source.num_frames
+
+    @property
+    def timestep_interval(self) -> int:
+        return 25000
 
     def get_frame_lazy(self, frame_index: int) -> pl.LazyFrame:
-        """Lee un frame específico hacia un LazyFrame de Polars.
-
-        Args:
-            frame_index: Índice del frame a leer (0 a num_frames-1).
-
-        Returns:
-            LazyFrame con columnas: id, type, x, y, z, vx, vy, vz.
-        """
-        data = self.pipeline.compute(frame_index)
-
+        try:
+            data = self.pipeline.compute(frame_index)
+        except RuntimeError:
+            return pl.DataFrame(
+                schema={
+                    "id": pl.UInt32,
+                    "type": pl.UInt32,
+                    "x": pl.Float64,
+                    "y": pl.Float64,
+                    "z": pl.Float64,
+                    "vx": pl.Float64,
+                    "vy": pl.Float64,
+                    "vz": pl.Float64,
+                }
+            ).lazy()
         return pl.DataFrame(
             {
                 "id": data.particles["Particle Identifier"][:],
@@ -81,17 +59,6 @@ class LammpsTrajectoryReader:
 
 
 def detect_and_create_reader(sim_dir: Path) -> LammpsTrajectoryReader | None:
-    """Detecta automáticamente el formato de los datos de trayectoria.
-
-    Busca primero el archivo unificado (metodología nueva), luego la secuencia
-    legacy de archivos .gz. Cada carpeta contiene un solo tipo de formato.
-
-    Args:
-        sim_dir: Directorio de la simulación a procesar.
-
-    Returns:
-        LammpsTrajectoryReader configurado, o None si no se encuentran datos.
-    """
     single_dump = sim_dir / "output_trayectoria.dump"
     if single_dump.exists():
         print(
@@ -109,63 +76,6 @@ def detect_and_create_reader(sim_dir: Path) -> LammpsTrajectoryReader | None:
     return None
 
 
-def read_dump(path: Path, columns: list[str] | None = None) -> pl.LazyFrame:
-    """Lee un archivo dump comprimido de LAMMPS como LazyFrame de Polars.
-
-    Args:
-        path: Ruta al archivo ``.gz`` a leer.
-        columns: Lista de columnas a seleccionar.
-
-    Returns:
-        LazyFrame con las columnas solicitadas.
-    """
-    lf = pl.scan_csv(
-        path,
-        skip_rows=9,
-        has_header=False,
-        separator=" ",
-        truncate_ragged_lines=True,
-        new_columns=_ALL_COLUMNS,
-        infer_schema_length=10_000,
-        schema_overrides={"type": pl.UInt8},
-    )
-    return lf.select(columns or _ALL_COLUMNS)
-
-
-def list_dump_files(directory: Path, recursive: bool = False) -> list[Path]:
-    """Lista y ordena cronológicamente los archivos dump de una simulación.
-
-    Args:
-        directory: Directorio donde buscar.
-        recursive: Si True, busca en subdirectorios también.
-    """
-    files = []
-    for f in directory.iterdir():
-        if f.is_file() and f.name.startswith("output") and f.name.endswith(".gz"):
-            files.append(f)
-    if recursive:
-        for subdir in directory.iterdir():
-            if subdir.is_dir():
-                for f in subdir.iterdir():
-                    if f.is_file() and f.name.startswith("output") and f.name.endswith(".gz"):
-                        files.append(f)
-    files.sort(key=lambda p: _extract_timestep(p.name))
-    return files
-
-
-def get_timestep_interval(files: list[Path]) -> int:
-    """Extrae el intervalo de volcado desde la lista de archivos."""
-    if len(files) < 2:
-        return 0
-    return _extract_timestep(files[1].name)
-
-
-def _extract_timestep(filename: str) -> int:
-    """Extrae el número de timestep del nombre de un archivo dump."""
-    match = re.search(r"output\.(\d+)\.gz", filename)
-    return int(match.group(1)) if match else 0
-
-
 def save_erosion_results(
     results: list[pl.DataFrame],
     sim_id: str,
@@ -173,22 +83,21 @@ def save_erosion_results(
     output_dir: Path,
     filter_thresholds: dict[str, float] | None = None,
     suffix: str = "",
-    filter_name: str = "F3C",
-) -> Path:
-    """Consolida y guarda los resultados de erosión en formato Parquet."""
+    filter_name: str = "F2C",
+) -> Path | None:
+    if not results:
+        return None
     output_dir.mkdir(parents=True, exist_ok=True)
-    df = pl.concat(results, how="vertical_relaxed")
-
+    df = pl.concat(results, how="vertical")
     if filter_thresholds:
         df = df.with_columns(**{k: pl.lit(v) for k, v in filter_thresholds.items()})
-
     path = output_dir / f"{sim_id}_TOTAL_{filter_name}{suffix}_{timestamp}.parquet"
     df.write_parquet(path)
     return path
 
 
 def save_no_erosion_flag(
-    sim_id: str, timestamp: str, output_dir: Path, filter_name: str = "F3C"
+    sim_id: str, timestamp: str, output_dir: Path, filter_name: str = "F2C"
 ) -> Path:
     """Crea un archivo de texto indicando que la simulación no produjo erosión."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -208,9 +117,8 @@ def save_wave_data(
     step_index: int,
     timestamp: str,
     output_dir: Path,
-    filter_name: str = "F3C",
+    filter_name: str = "F2C",
 ) -> Path:
-    """Guarda las partículas detectadas como parte de la onda de choque."""
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / f"{sim_id}_ONDA_{filter_name}_{step_index}_{timestamp}.parquet"
     wave_frame.sink_parquet(path)
@@ -222,7 +130,7 @@ def plot_erosion(
     sim_id: str,
     timestamp: str,
     dir_imagenes: Path,
-    filter_name: str = "F3C",
+    filter_name: str = "F2C",
     step_to_us: float = _STEP_TO_US,
     total_timesteps: int | None = None,
 ) -> None:
@@ -250,7 +158,6 @@ def plot_erosion(
     df_clusters = _aggregate_clusters(df, total_timesteps)
     df_gaps_cum = _compute_gaps_per_step(df, total_timesteps)
     df_gaps_raw = _compute_gaps_per_step_raw(df, total_timesteps)
-    meta = _extract_plot_metadata(df)
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     fig.subplots_adjust(top=0.90, right=0.82, wspace=0.28)
@@ -259,8 +166,8 @@ def plot_erosion(
         fontsize=14,
     )
 
-    _draw_ejected(axes[0, 0], df_plot, meta, step_to_us)
-    _draw_clusters(axes[0, 1], df_clusters, meta, step_to_us)
+    _draw_ejected(axes[0, 0], df_plot, step_to_us)
+    _draw_clusters(axes[0, 1], df_clusters, step_to_us)
     _draw_gaps_cumulative(axes[1, 0], df_gaps_cum, step_to_us)
     _draw_gaps_per_step(axes[1, 1], df_gaps_raw, step_to_us)
 
@@ -272,66 +179,52 @@ def plot_erosion(
 
 
 def _get_all_timesteps(df: pl.DataFrame, total_timesteps: int | None) -> pl.DataFrame:
-    """Genera lista de todos los timesteps posibles.
-    
-    Args:
-        df: DataFrame con datos.
-        total_timesteps: Total de timesteps. Si None, usa el máximo en df.
-    """
+    """Genera lista de todos los timesteps posibles."""
     if total_timesteps is not None:
         return pl.DataFrame({"i": range(total_timesteps + 1)})
     return df.select("i").unique().sort("i")
 
 
-def _aggregate_ejected(df: pl.DataFrame, total_timesteps: int | None = None) -> pl.DataFrame:
-    """Agrupa por iteración y cuenta partículas eyectadas.
-    
-    Rellena con 0 los timesteps sin eyectadas.
-    """
+def _aggregate_ejected(
+    df: pl.DataFrame, total_timesteps: int | None = None
+) -> pl.DataFrame:
+    """Agrupa por iteración y cuenta partículas eyectadas."""
     if df.is_empty():
         all_steps = _get_all_timesteps(df, total_timesteps)
         return all_steps.with_columns(pl.lit(0).alias("cantidad_eyectados"))
-    
+
     ejected = (
-        df.group_by("i")
-        .agg(pl.len().alias("cantidad_eyectados"))
-        .sort("i")
+        df.group_by("i").agg(pl.len().alias("cantidad_eyectados")).sort("i")
     )
-    
     all_steps = _get_all_timesteps(df, total_timesteps)
-    
     return all_steps.join(ejected, on="i", how="left").fill_null(0).sort("i")
 
 
-def _aggregate_clusters(df: pl.DataFrame, total_timesteps: int | None = None) -> pl.DataFrame:
-    """Agrupa por iteración y cuenta clusters únicos.
-    
-    Rellena con 0 los timesteps sin clusters (solo proyectil).
-    """
+def _aggregate_clusters(
+    df: pl.DataFrame, total_timesteps: int | None = None
+) -> pl.DataFrame:
+    """Agrupa por iteración y cuenta clusters únicos."""
     if df.is_empty():
         all_steps = _get_all_timesteps(df, total_timesteps)
         return all_steps.with_columns(pl.lit(0).alias("n_clusters"))
-    
+
     clusters = (
         df.group_by("i")
         .agg(pl.col("cluster").n_unique().alias("n_clusters"))
         .sort("i")
     )
-    
     all_steps = _get_all_timesteps(df, total_timesteps)
-    
     return all_steps.join(clusters, on="i", how="left").fill_null(0).sort("i")
 
 
-def _compute_gaps_per_step(df: pl.DataFrame, total_timesteps: int | None = None) -> pl.DataFrame:
-    """Calcula gaps acumulados por timestep.
-    
-    Rellena con 0 los timesteps sin gaps para mantener continuidad.
-    """
+def _compute_gaps_per_step(
+    df: pl.DataFrame, total_timesteps: int | None = None
+) -> pl.DataFrame:
+    """Calcula gaps acumulados por timestep."""
     if df.is_empty():
         all_steps = _get_all_timesteps(df, total_timesteps)
         return all_steps.with_columns(pl.lit(0).alias("gaps_cum"))
-    
+
     df_sorted = df.sort(["id", "i"])
     df_with_lag = df_sorted.with_columns(
         pl.col("i").shift(1).over("id").alias("i_prev"),
@@ -340,28 +233,25 @@ def _compute_gaps_per_step(df: pl.DataFrame, total_timesteps: int | None = None)
     gaps = df_with_lag.filter(
         pl.col("i_prev").is_not_null() & (pl.col("i") - pl.col("i_prev") > 1)
     )
-    gaps_per_step = (
-        gaps.group_by("i")
-        .agg(pl.len().alias("gaps_cum"))
-        .sort("i")
-    )
-    
+    gaps_per_step = gaps.group_by("i").agg(pl.len().alias("gaps_cum")).sort("i")
+
     all_steps = _get_all_timesteps(df, total_timesteps)
-    
-    return all_steps.join(gaps_per_step, on="i", how="left").fill_null(0).sort("i").with_columns(
-        pl.col("gaps_cum").cast(pl.Int64).cum_sum().alias("gaps_cum")
+    return (
+        all_steps.join(gaps_per_step, on="i", how="left")
+        .fill_null(0)
+        .sort("i")
+        .with_columns(pl.col("gaps_cum").cast(pl.Int64).cum_sum().alias("gaps_cum"))
     )
 
 
-def _compute_gaps_per_step_raw(df: pl.DataFrame, total_timesteps: int | None = None) -> pl.DataFrame:
-    """Calcula gaps por step individual.
-    
-    Rellena con 0 los timesteps sin gaps.
-    """
+def _compute_gaps_per_step_raw(
+    df: pl.DataFrame, total_timesteps: int | None = None
+) -> pl.DataFrame:
+    """Calcula gaps por step individual."""
     if df.is_empty():
         all_steps = _get_all_timesteps(df, total_timesteps)
         return all_steps.with_columns(pl.lit(0).alias("gaps"))
-    
+
     df_sorted = df.sort(["id", "i"])
     df_with_lag = df_sorted.with_columns(
         pl.col("i").shift(1).over("id").alias("i_prev"),
@@ -370,43 +260,37 @@ def _compute_gaps_per_step_raw(df: pl.DataFrame, total_timesteps: int | None = N
         pl.col("i_prev").is_not_null() & (pl.col("i") - pl.col("i_prev") > 1)
     )
     gaps_per_step = gaps.group_by("i").agg(pl.len().alias("gaps")).sort("i")
-    
+
     all_steps = _get_all_timesteps(df, total_timesteps)
-    
     return all_steps.join(gaps_per_step, on="i", how="left").fill_null(0).sort("i")
 
 
-def _extract_plot_metadata(df: pl.DataFrame) -> dict:
-    """Extrae metadatos del DataFrame para usar en los gráficos."""
-    if df.is_empty():
-        return {"ff": "N/A", "np": "N/A", "vel0": "N/A"}
-
-    def _get_first(col: str) -> str:
-        """Obtiene el primer valor de una columna o 'N/A' si no existe."""
-        return df[col][0] if col in df.columns else "N/A"
-
-    return {
-        "ff": _get_first("ff"),
-        "np": _get_first("np"),
-        "vel0": _get_first("vel0"),
-    }
-
-
-def _draw_ejected(ax, df: pl.DataFrame, meta: dict, step_to_us: float) -> None:
+def _draw_ejected(ax, df: pl.DataFrame, step_to_us: float) -> None:
     """Dibuja el subplot de partículas eyectadas."""
     if not df.is_empty():
-        ax.plot(df["i"] * step_to_us, df["cantidad_eyectados"], marker="o", markersize=3)
+        ax.plot(
+            df["i"] * step_to_us,
+            df["cantidad_eyectados"],
+            marker="o",
+            markersize=3,
+        )
     ax.set_xlabel(r"tiempo [$\mu$s]", fontsize=_AXIS_FONTSIZE)
     ax.set_ylabel("Y", fontsize=_AXIS_FONTSIZE)
     ax.tick_params(labelsize=_AXIS_FONTSIZE)
     ax.text(
-        0.02, 0.98, "(a)", transform=ax.transAxes,
-        fontsize=14, fontweight="bold", va="top", ha="left",
+        0.02,
+        0.98,
+        "(a)",
+        transform=ax.transAxes,
+        fontsize=14,
+        fontweight="bold",
+        va="top",
+        ha="left",
     )
     ax.grid(alpha=0.3)
 
 
-def _draw_clusters(ax, df: pl.DataFrame, meta: dict, step_to_us: float) -> None:
+def _draw_clusters(ax, df: pl.DataFrame, step_to_us: float) -> None:
     """Dibuja el subplot de clusters."""
     if not df.is_empty():
         ax.plot(df["i"] * step_to_us, df["n_clusters"], marker="s", markersize=3)
@@ -414,8 +298,14 @@ def _draw_clusters(ax, df: pl.DataFrame, meta: dict, step_to_us: float) -> None:
     ax.set_ylabel("N clusters", fontsize=_AXIS_FONTSIZE)
     ax.tick_params(labelsize=_AXIS_FONTSIZE)
     ax.text(
-        0.02, 0.98, "(b)", transform=ax.transAxes,
-        fontsize=14, fontweight="bold", va="top", ha="left",
+        0.02,
+        0.98,
+        "(b)",
+        transform=ax.transAxes,
+        fontsize=14,
+        fontweight="bold",
+        va="top",
+        ha="left",
     )
     ax.grid(alpha=0.3)
 
@@ -428,8 +318,14 @@ def _draw_gaps_cumulative(ax, df: pl.DataFrame, step_to_us: float) -> None:
     ax.set_ylabel("Gaps acumulados", fontsize=_AXIS_FONTSIZE)
     ax.tick_params(labelsize=_AXIS_FONTSIZE)
     ax.text(
-        0.02, 0.98, "(c)", transform=ax.transAxes,
-        fontsize=14, fontweight="bold", va="top", ha="left",
+        0.02,
+        0.98,
+        "(c)",
+        transform=ax.transAxes,
+        fontsize=14,
+        fontweight="bold",
+        va="top",
+        ha="left",
     )
     ax.grid(alpha=0.3)
 
@@ -442,17 +338,23 @@ def _draw_gaps_per_step(ax, df: pl.DataFrame, step_to_us: float) -> None:
     ax.set_ylabel("Gaps por step", fontsize=_AXIS_FONTSIZE)
     ax.tick_params(labelsize=_AXIS_FONTSIZE)
     ax.text(
-        0.02, 0.98, "(d)", transform=ax.transAxes,
-        fontsize=14, fontweight="bold", va="top", ha="left",
+        0.02,
+        0.98,
+        "(d)",
+        transform=ax.transAxes,
+        fontsize=14,
+        fontweight="bold",
+        va="top",
+        ha="left",
     )
     ax.grid(alpha=0.3)
 
 
-def _plot_empty(
+def plot_empty(
     sim_id: str,
     timestamp: str,
     dir_imagenes: Path,
-    filter_name: str = "F3C",
+    filter_name: str = "F2C",
     step_to_us: float = _STEP_TO_US,
 ) -> None:
     """Genera un gráfico vacío cuando no hay erosión."""
@@ -471,9 +373,15 @@ def _plot_empty(
         ax.tick_params(labelsize=_AXIS_FONTSIZE)
         ax.grid(alpha=0.3)
         ax.text(
-            0.5, 0.5, "Sin erosión", transform=ax.transAxes,
-            fontsize=12, ha="center", va="center",
-            color="gray", style="italic",
+            0.5,
+            0.5,
+            "Sin erosión",
+            transform=ax.transAxes,
+            fontsize=12,
+            ha="center",
+            va="center",
+            color="gray",
+            style="italic",
         )
 
     axes[0, 0].set_ylabel("Y", fontsize=_AXIS_FONTSIZE)

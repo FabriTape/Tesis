@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Análisis de onda de choque en simulaciones LAMMPS.
 
@@ -17,9 +18,7 @@ from pathlib import Path
 import polars as pl
 
 from .config_and_discovery import Config, WaveConfig, print_progress
-from .storage_and_viz import LammpsTrajectoryReader, save_wave_data
-
-_WAVE_COLUMNS: list[str] = ["id", "type", "x", "y", "z", "vx", "vy", "vz"]
+from .io import LammpsTrajectoryReader, save_wave_data
 
 
 def is_critical_simulation(metadata: dict[str, str], config: Config) -> bool:
@@ -60,7 +59,6 @@ def detect_wave_particles(
     radius: float,
     max_height: float,
     box_limits: dict[str, list[float]],
-    use_static_box: bool,
     wave_cfg: WaveConfig,
 ) -> tuple[pl.LazyFrame, int, float | None]:
     """Filtra las partículas que forman parte del frente de onda de choque.
@@ -73,8 +71,8 @@ def detect_wave_particles(
     Returns:
         Tuple (LazyFrame filtrado, count, max_v2)
     """
-    x_max = box_limits["x"][1] if use_static_box else pl.col("x").max()
-    y_max = box_limits["y"][1] if use_static_box else pl.col("y").max()
+    x_max = box_limits["x"][1]
+    y_max = box_limits["y"][1]
 
     lf_wave = lf.with_columns(
         (pl.col("vx") ** 2 + pl.col("vy") ** 2 + pl.col("vz") ** 2).alias("v2")
@@ -105,7 +103,6 @@ def run_wave_scan(
     radius: float,
     max_height: float,
     box_limits: dict[str, list[float]],
-    use_static_box: bool,
     sim_id: str,
     timestamp: str,
     output_dir: Path,
@@ -118,7 +115,6 @@ def run_wave_scan(
         radius: Radio de las partículas [m].
         max_height: Altura máxima para filtrado [m].
         box_limits: Límites de la caja en X e Y.
-        use_static_box: Si True, usa los límites fijos de la caja.
         sim_id: Identificador de la simulación.
         timestamp: Marca temporal para archivos de salida.
         output_dir: Directorio de resultados.
@@ -135,11 +131,13 @@ def run_wave_scan(
 
         lf = reader.get_frame_lazy(i)
         lf_wave, count, max_v2 = detect_wave_particles(
-            lf, radius, max_height, box_limits, use_static_box, wave_cfg
+            lf, radius, max_height, box_limits, wave_cfg
         )
 
         if _wave_threshold_reached(count, max_v2, wave_cfg):
-            print(f"\n[ONDA] Detectada en frame {i}: {count} partículas, v²_max={max_v2:.4e}")
+            print(
+                f"\n[ONDA] Detectada en frame {i}: {count} partículas, v²_max={max_v2:.4e}"
+            )
             save_wave_data(lf_wave, sim_id, i, timestamp, output_dir, "F3C")
             print_progress(total, total, label="onda")
             print()
