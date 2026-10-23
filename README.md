@@ -49,6 +49,7 @@ Tesis/
     │   │   └── 9_mov/, 49_mov/      #     Ajustes, métricas y tablas LaTeX por set
     │   ├── figuras/                 #   PNGs de la tesis (9_mov/ y 49_mov/)
     │   ├── generador_figuras.py     #   Genera TODAS las figuras de la tesis (unifica 9 y 49, polars)
+    │   ├── extraer_datos_graficos.py #   Exporta a CSV los datos (media ± SEM) de las figuras
     │   └── verificar_polars.py      #   Verifica la equivalencia polars vs pandas (vs legacy/)
     │
     ├── comparar_filtros/            # ─── P A S O  3 · VALIDACIÓN ──────────────
@@ -142,6 +143,9 @@ python generador_figuras.py 9_mov      # solo el set de 9 repeticiones
 python generador_figuras.py 49_mov     # solo el set de 49 repeticiones
 python generador_figuras.py 9_mov 49_mov --forzar  # regenera ignorando el caché
 
+# Datos (media ± SEM) de cada figura, un CSV por set
+python extraer_datos_graficos.py
+
 # Chequeo de equivalencia con las versiones originales (pandas, en legacy/)
 python verificar_polars.py
 ```
@@ -150,6 +154,11 @@ python verificar_polars.py
 `legacy/`): procesa los datos con **polars**, guarda los resultados intermedios
 en `datos/procesados/` (se reutilizan si no se fuerza la recarga) y escribe las
 figuras en `figuras/9_mov/` y `figuras/49_mov/`.
+
+`extraer_datos_graficos.py` reutiliza esos CSV procesados y escribe
+`datos/9_mov/datos_graficos.csv` y `datos/49_mov/datos_graficos.csv` en formato
+largo (`nombre_grafico, valor, dispersion, velocidad, np, angulo, ff,
+repeticiones, k`), con la media y el error estándar de cada punto dibujado.
 
 ### 4. Verificación de la reconciliación (antes/después del merge F2C)
 
