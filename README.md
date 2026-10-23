@@ -128,7 +128,7 @@ python -m CARBOXI.trajectory_converter resultados.parquet --format dump
 ```
 
 `CARBOXI` detecta automáticamente la onda de choque, filtra las partículas
-erosionadas (criterio **F3C** por defecto) y guarda resultados en `resultados/`
+erosionadas (criterio **F2C** por defecto) y guarda resultados en `resultados/`
 como `.parquet` y gráficos SVG.
 
 
