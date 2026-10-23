@@ -98,8 +98,20 @@ Tesis/
 ```
 
 ## Cómo empezar
+### 1. Simulación en el cluster (LAMMPS + Slurm)
 
-### 1. Análisis de simulaciones (CARBOXI)
+Todo el barrido de parámetros se configura en `Programas/cluster/scripts/config.toml`
+(única fuente de verdad). Desde esa carpeta:
+
+```bash
+# Enviar un lote de simulaciones a Slurm
+./encolar_sims.sh
+
+# Alternativa controlada por Python (idempotente, evita duplicados)
+python enqueue_sims.py
+```
+
+### 2. Análisis de simulaciones (CARBOXI)
 
 ```bash
 # Instalar el paquete (dependencias: polars, ovito, matplotlib, numpy)
@@ -119,18 +131,6 @@ python -m CARBOXI.trajectory_converter resultados.parquet --format dump
 erosionadas (criterio **F3C** por defecto) y guarda resultados en `resultados/`
 como `.parquet` y gráficos SVG.
 
-### 2. Simulación en el cluster (LAMMPS + Slurm)
-
-Todo el barrido de parámetros se configura en `Programas/cluster/scripts/config.toml`
-(única fuente de verdad). Desde esa carpeta:
-
-```bash
-# Enviar un lote de simulaciones a Slurm
-./encolar_sims.sh
-
-# Alternativa controlada por Python (idempotente, evita duplicados)
-python enqueue_sims.py
-```
 
 ### 3. Figuras de la tesis
 
