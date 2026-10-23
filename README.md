@@ -169,7 +169,7 @@ físicos de las simulaciones:
 - `limpieza_fase1.sh` y `reubicar_9moves.py`: limpieza y reubicación de los
   parquet de 9 movimientos tras la reconciliación.
 
-Las salidas de estos scripts (`.txt`/`.csv` de comparación) no se versionan.
+
 
 ### 5. Cálculo de tiempos de simulación
 
