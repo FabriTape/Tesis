@@ -80,11 +80,12 @@ Tesis/
     │
     ├── legacy/                      # Scripts obsoletos o de prueba (referencia)
     │   ├── analisis_Tesis.ipynb     #   Notebook de análisis original
-    │   ├── pdf_quitadas.py          #   Figuras removidas del pipeline principal
+    │   ├── pdf_quitadas.py          #   Figuras removidas from pipeline principal
     │   ├── analyze.py               #   Detección de formato y pipeline automático
     │   ├── CARBOXIMINI/             #   Versión previa del pipeline de clusters
     │   ├── solid/                   #   Módulos SOLID de un refactor descartado
     │   ├── final/                   #   Últimos scripts de visualización de clusters
+    │   ├── figuras_finales/         #   Bocetos iterativos previos a generador_figuras.py (a.py,b.py,c.py,erosion.py)
     │   ├── prueba_*.py              #   Scripts de prueba documentados
     │   ├── nuevo_plot_erosion/      #   Prototipo de figuras de balance de momento (removidas del pipeline)
     │   ├── resume_controller.py     #   Retomar sims incompletas desde restart
